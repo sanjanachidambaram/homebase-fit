@@ -158,6 +158,25 @@ CREATE TABLE basics_articles (
 
 -- ---------------------------------------------------------------- user activity
 
+-- The generated plan laid out on real dates (app/calendar.py): 4 weeks from the day the quiz is saved.
+-- workout_content is a SNAPSHOT of that day's plan when the entry was made, so a later change to the
+-- generator never silently rewrites a scheduled day. A retake only replaces entries dated today or later
+-- that are not completed and have no notes; past days and anything the user logged or wrote on are kept.
+-- notes are the user's own words: never sent to any AI model (shared_rules.md rule 2), and checked for
+-- red flags in code when saved (safety_events source 'calendar_note').
+CREATE TABLE calendar_entries (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    date            TEXT NOT NULL CHECK (date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),   -- YYYY-MM-DD
+    day_type        TEXT NOT NULL CHECK (day_type IN ('workout', 'rest')),
+    workout_content TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(workout_content) AND json_type(workout_content) = 'object'),
+    completed       INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
+    notes           TEXT,
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    UNIQUE (user_id, date)          -- one day widget per date; moving onto a taken date swaps the two
+);
+
 CREATE TABLE workout_logs (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -168,9 +187,13 @@ CREATE TABLE workout_logs (
     reps             INTEGER CHECK (reps >= 0),
     weight_used      REAL CHECK (weight_used >= 0),                   -- lb; NULL for bodyweight
     duration_seconds INTEGER CHECK (duration_seconds >= 0),
-    notes            TEXT
+    notes            TEXT,
+    -- Set when the row was written by marking a calendar day completed (and removed if it's un-marked).
+    -- Calendar notes are NOT copied into notes above.
+    calendar_entry_id INTEGER REFERENCES calendar_entries(id) ON DELETE CASCADE
 );
 CREATE INDEX idx_workout_logs_user_date ON workout_logs(user_id, date);
+CREATE INDEX idx_workout_logs_calendar ON workout_logs(calendar_entry_id);
 
 -- A user's favorited ("faved") exercises. Deleted with the user.
 CREATE TABLE exercise_favorites (
@@ -192,13 +215,13 @@ CREATE INDEX idx_measurements_user_date ON measurements(user_id, date);
 
 -- ---------------------------------------------------------------- safety
 
--- Every time the red-flag / injury-language redirect fires.
+-- Every time the red-flag / injury-language check fires (Basics questions, calendar notes).
 -- Deleting a user deletes their events too (trigger_text is their own words).
 CREATE TABLE safety_events (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id      INTEGER REFERENCES users(id) ON DELETE CASCADE,    -- NULL if not signed in
     timestamp    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    source       TEXT NOT NULL CHECK (source IN ('quiz', 'basics_qa')),
+    source       TEXT NOT NULL CHECK (source IN ('quiz', 'basics_qa', 'calendar_note')),
     trigger_text TEXT NOT NULL,     -- the user text that tripped the check
     action_taken TEXT NOT NULL      -- e.g. 'redirected_to_professional'
 );

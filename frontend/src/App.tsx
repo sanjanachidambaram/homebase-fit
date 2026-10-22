@@ -3,6 +3,7 @@ import { fetchSources, type Source } from './api'
 import { DisclaimerBar } from './components/Legal'
 import Link from './components/Link'
 import BuildPage from './pages/BuildPage'
+import CalendarPage from './pages/CalendarPage'
 import ContentPage from './pages/ContentPage'
 import DashboardPage from './pages/DashboardPage'
 import ExercisesPage from './pages/ExercisesPage'
@@ -18,6 +19,7 @@ const PAGES: Record<string, () => JSX.Element> = {
   '/': DashboardPage,
   '/content': ContentPage,
   '/build': BuildPage,
+  '/calendar': CalendarPage,
   '/faves': () => <ExercisesPage initialTab="faves" />,
   '/exercises': () => <ExercisesPage />,
   '/settings': SettingsPage,
@@ -27,10 +29,11 @@ const PAGES: Record<string, () => JSX.Element> = {
   '/pregnancy-support': PregnancySupportPage, // pregnant / postpartum users are sent here (quiz, Dashboard, blocks)
 }
 
-// Only pages that exist get a nav link (no Calendar yet).
+// Only pages that exist get a nav link.
 const NAV: { path: string; label: string }[] = [
   { path: '/', label: 'Dashboard' },
   { path: '/content', label: 'Your Plan & Basics' },
+  { path: '/calendar', label: 'Calendar' },
   { path: '/build', label: 'Build Your Own' },
   { path: '/faves', label: 'My Faves' },
   { path: '/exercises', label: 'Exercise Library' },

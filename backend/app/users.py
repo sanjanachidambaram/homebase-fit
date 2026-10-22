@@ -40,7 +40,9 @@ TEXT_MAX = 500
 GOAL_DATE_MAX_YEARS = 5
 
 # Every table holding a user's data. DELETE /api/users/{id} clears all of them.
-USER_DATA_TABLES = ("safety_events", "measurements", "workout_logs", "exercise_favorites", "quiz_profiles")
+# workout_logs goes before calendar_entries (a log can point at a calendar day).
+USER_DATA_TABLES = ("safety_events", "measurements", "workout_logs", "calendar_entries", "exercise_favorites",
+                    "quiz_profiles")
 
 
 def now_utc() -> str:
@@ -229,5 +231,9 @@ def save_quiz(user_id: int, body: QuizSubmission, uid: int = Depends(token_user_
         f"INSERT INTO quiz_profiles ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)}) "
         f"ON CONFLICT(user_id) DO UPDATE SET {updates}", row)
     conn.commit()
+    # Lay the (re)generated plan out on the calendar. Days the user completed or wrote notes on are kept;
+    # pregnant / postpartum users get no plan, so only their untouched future days are cleared.
+    from app.calendar import materialize_plan   # local import: calendar imports this module's db helpers
+    materialize_plan(user_id)
     row = conn.execute("SELECT * FROM quiz_profiles WHERE user_id = ?", (user_id,)).fetchone()
     return profile_dict(row)

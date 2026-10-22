@@ -16,7 +16,8 @@ from app.db import connect
 from tests.helpers import quiz_answers
 
 ANSWERS = quiz_answers()
-USER_TABLES = ("quiz_profiles", "workout_logs", "measurements", "safety_events", "exercise_favorites")
+USER_TABLES = ("quiz_profiles", "workout_logs", "measurements", "safety_events", "exercise_favorites",
+               "calendar_entries")
 
 
 def sign_up(client, email):
@@ -93,14 +94,19 @@ def test_delete_removes_user_and_all_related_rows(client):
             conn.execute("INSERT INTO exercise_favorites (user_id, exercise_id) VALUES (?, 'glute_bridge')", (uid,))
             conn.execute("INSERT INTO safety_events (user_id, source, trigger_text, action_taken) "
                          "VALUES (?, 'basics_qa', 'sharp pain in my back', 'redirected_to_professional')", (uid,))
+            conn.execute("UPDATE calendar_entries SET notes = 'my own words' WHERE user_id = ? AND date = "
+                         "(SELECT MIN(date) FROM calendar_entries WHERE user_id = ?)", (uid, uid))
     conn.close()
+    assert count("calendar_entries", a) == 28      # saving the quiz laid out 4 weeks of plan days
 
     assert client.delete(f"/api/users/{a}").status_code == 401          # no token
     assert client.delete(f"/api/users/{a}", headers=hb).status_code == 403  # someone else's token
     r = client.delete(f"/api/users/{a}", headers=ha)
     assert r.status_code == 200, r.text
     assert r.json()["rows_removed"] == {"safety_events": 1, "measurements": 1, "workout_logs": 2,
-                                        "exercise_favorites": 1, "quiz_profiles": 1, "users": 1}
+                                        "calendar_entries": 28, "exercise_favorites": 1, "quiz_profiles": 1,
+                                        "users": 1}
+    assert len(USER_TABLES) == 6 and set(USER_TABLES) | {"users"} == set(r.json()["rows_removed"])
 
     for table in USER_TABLES:
         assert count(table, a) == 0, table

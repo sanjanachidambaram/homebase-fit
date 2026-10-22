@@ -381,3 +381,65 @@ export interface PlanExample {
 
 /** A live run of the real generator for a fixed profile (public, no sign-in, no AI). */
 export const fetchPlanExample = () => getJson<PlanExample>('/api/plan/example')
+
+// ---------------------------------------------------------------- calendar
+
+export interface CalendarExercise {
+  exercise_id: string
+  name: string
+  muscle_group: MuscleGroup
+  sets: string
+  reps: string
+  rest_seconds: number
+  est_minutes: number
+  injury_check: string
+}
+
+export interface CalendarEntry {
+  id: number
+  date: string // YYYY-MM-DD
+  weekday: PlanDay['day']
+  day_type: 'workout' | 'rest'
+  // A snapshot of that day of the plan, taken when the entry was made (it never changes by itself).
+  workout: {
+    plan_day: PlanDay['day']
+    focus: string | null
+    est_minutes: number
+    exercises: CalendarExercise[]
+    protocol_status: 'placeholder' | 'pt_reviewed' | null
+    review_notice: string | null
+  }
+  completed: boolean
+  notes: string | null // the user's own words; never sent to any AI model
+  can_complete: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CalendarRange {
+  start: string
+  end: string
+  today: string
+  needs_quiz: boolean
+  needs_clinical_review: boolean
+  page?: string
+  entries: CalendarEntry[]
+}
+
+export const fetchCalendar = (token: string, start: string, end: string) =>
+  request<CalendarRange>(`/api/calendar?start=${start}&end=${end}`, {}, token)
+
+export interface CalendarUpdateResult {
+  entry: CalendarEntry
+  swapped_with: number | null
+  workout_logs_added: number
+  workout_logs_removed: number
+  // A red-flag note is still saved; the API sends a supportive message to show beside it (no AI involved).
+  safety: { flagged: boolean; message?: string; red_flags?: string[] }
+}
+
+export const updateCalendarDay = (
+  token: string,
+  id: number,
+  change: { date?: string; notes?: string | null; completed?: boolean },
+) => request<CalendarUpdateResult>(`/api/calendar/${id}`, { method: 'PATCH', body: JSON.stringify(change) }, token)

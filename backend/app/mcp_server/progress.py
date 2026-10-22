@@ -2,6 +2,11 @@
 
 Dates are calendar dates (YYYY-MM-DD); "today" is the server's UTC date unless a test passes one in.
 
+check_goal_achievement also compares what was DONE against what was PLANNED: the workout days scheduled on the
+user's calendar (calendar_entries, laid out from their generated plan) versus the ones they marked completed.
+Marking a calendar day completed is what writes its workout_logs rows, so both checks read the same real data.
+Calendar notes are never read here (they never reach the model; shared_rules.md rule 2).
+
 IMPORTANT: the thresholds in check_goal_achievement are simple product heuristics so the Coach agent
 has something concrete to react to. They are NOT scientific or medical guidance, and the result says so.
 They are placeholders for the physical therapist to review (see THRESHOLDS below).
@@ -129,6 +134,7 @@ THRESHOLDS = {
     "volume_on_track_if_ratio_at_least": 0.90,
     "min_days_since_quiz_to_judge": 7,
     "min_days_between_weigh_ins_to_judge": 7,
+    "plan_on_track_if_completed_ratio_at_least": 0.75,   # completed / scheduled plan workout days so far
 }
 TIMELINE_WEEKS = {"4_weeks": 4, "8_weeks": 8, "12_weeks": 12, "16_weeks": 16}
 HEURISTIC_NOTE = ("These statuses come from simple app thresholds (listed in thresholds_used), not from scientific "
@@ -140,6 +146,16 @@ def _rate(ratio: float, ahead: float, on_track: float) -> str:
     return "ahead" if ratio >= ahead else "on_track" if ratio >= on_track else "behind"
 
 
+def _plan_adherence(conn: sqlite3.Connection, user_id: int, start: date, today: date) -> dict:
+    """Workout days the plan scheduled from `start` up to today, and how many were marked completed.
+    Today only counts once it's done, so an unfinished today isn't a miss. Never reads notes."""
+    row = conn.execute(
+        "SELECT COUNT(*) AS scheduled, COALESCE(SUM(completed), 0) AS completed FROM calendar_entries "
+        "WHERE user_id = ? AND day_type = 'workout' AND date >= ? AND (date < ? OR (date = ? AND completed = 1))",
+        (user_id, start.isoformat(), today.isoformat(), today.isoformat())).fetchone()
+    return {"plan_workouts_scheduled": row["scheduled"], "plan_workouts_completed": row["completed"]}
+
+
 def check_goal_achievement(user_id: int, today: date | None = None) -> dict:
     today = today or _today()
     t = THRESHOLDS
@@ -148,6 +164,9 @@ def check_goal_achievement(user_id: int, today: date | None = None) -> dict:
         # Same PII boundary as get_user_profile: goals and timeline only come through agent_profile_for.
         profile = agent_profile_for(user_id, conn)
         quiz = conn.execute("SELECT created_at FROM quiz_profiles WHERE user_id = ?", (user_id,)).fetchone()
+        started = datetime.fromisoformat(quiz["created_at"].replace("Z", "+00:00")).date() if quiz else None
+        adherence = (_plan_adherence(conn, user_id, max(started, today - timedelta(days=WINDOW_DAYS - 1)), today)
+                     if started else None)
     finally:
         conn.close()
     if profile is None or quiz is None or not profile.goals:
@@ -155,7 +174,6 @@ def check_goal_achievement(user_id: int, today: date | None = None) -> dict:
                 "checks": [], "note": HEURISTIC_NOTE}
 
     summary = get_progress_summary(user_id, today)
-    started = datetime.fromisoformat(quiz["created_at"].replace("Z", "+00:00")).date()
     days_since_quiz = (today - started).days
     timeline = profile.timeline or "no_deadline"
     weeks_total = TIMELINE_WEEKS.get(timeline)
@@ -169,8 +187,8 @@ def check_goal_achievement(user_id: int, today: date | None = None) -> dict:
     result = {
         "goals": profile.goals,
         "timeline": timeline_info,
-        "progress": {k: summary[k] for k in ("sessions_logged", "total_weight_lifted_lbs",
-                                              "current_streak_days", "body_weight_trend")},
+        "progress": {**{k: summary[k] for k in ("sessions_logged", "total_weight_lifted_lbs",
+                                                 "current_streak_days", "body_weight_trend")}, **adherence},
         "thresholds_used": t,
         "note": HEURISTIC_NOTE,
     }
@@ -217,6 +235,17 @@ def check_goal_achievement(user_id: int, today: date | None = None) -> dict:
                            "detail": f"No logged measurement tracks '{goal}', so it is judged on consistency only."
                                      + (" Rehab progress is a question for a physical therapist." if goal == "rehab"
                                         else "")})
+
+    # 3. Did they do the plan they were given? Completed vs scheduled workout days on their calendar.
+    scheduled, done = adherence["plan_workouts_scheduled"], adherence["plan_workouts_completed"]
+    if scheduled:
+        share = done / scheduled
+        checks.append({"check": "plan_adherence",
+                       "status": "on_track" if share >= t["plan_on_track_if_completed_ratio_at_least"] else "behind",
+                       "detail": f"{done} of {scheduled} planned workout days marked done"})
+    else:
+        checks.append({"check": "plan_adherence", "status": "not_enough_data",
+                       "detail": "no planned workout days on the calendar yet in this period"})
 
     judged = [c["status"] for c in checks if c["status"] in ("ahead", "on_track", "behind")]
     if "behind" in judged:

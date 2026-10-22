@@ -18,6 +18,13 @@ REDIRECT_MESSAGE = (
     "like chest pain, trouble breathing, or fainting, get medical help right away."
 )
 
+# For a calendar note that trips the check: the note is still saved (it's their log), and this shows inline.
+NOTE_SUPPORT_MESSAGE = (
+    "Your note is saved. It sounds like something hurt or didn't feel right, and that's worth taking seriously. "
+    "Please stop any exercise that causes it and check in with a doctor or physical therapist before your next "
+    "session. If it's severe or sudden, like chest pain, trouble breathing, or fainting, get medical help right away."
+)
+
 _CANT = r"(?:can'?t|cannot|can not|unable to)"
 BODY = (r"(?:back|lower back|neck|knee|knees|shoulder|shoulders|hip|hips|ankle|ankles|wrist|wrists|elbow|elbows|"
         r"foot|feet|leg|legs|arm|arms|hand|hands|chest|stomach|belly|abdomen|pelvis|pelvic floor|hamstring|"

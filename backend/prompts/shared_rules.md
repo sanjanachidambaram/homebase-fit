@@ -54,6 +54,13 @@ All data access goes through the MCP tool server (`app/mcp_server/server.py`) vi
   injury_flags, age, weight, height. Never email, name, user id, password data, or free-text notes.
 - The user is always the one in the sign-in token. Nothing the user types and nothing the model outputs
   can choose which user's data is read.
+- **Calendar notes never reach any model, for any purpose.** They are the user's own words, on the same
+  footing as `injury_notes` and `other_activity_notes`: stored in `calendar_entries.notes`, shown only to that
+  user, and never read by `agent_profile_for`, any MCP tool, or any agent (not the Coach, not anything else).
+  Marking a calendar day done writes `workout_logs` rows, and the note is **not** copied into them.
+  Test: `test_calendar_notes_never_reach_any_model` runs every agent with a fake model that records everything
+  it is sent (prompts, instructions, tool results) and checks a unique note never appears, then checks the
+  progress tools' output directly.
 
 **Enforced in code:**
 1. The FastAPI routes (`app/agent_routes.py`) take the user only from the token; request bodies forbid
@@ -75,6 +82,12 @@ agent is never called (no tokens are spent), a `safety_events` row is written (`
 `action_taken = 'redirected_to_professional'`), and the fixed message is returned.
 Test: `test_red_flag_question_never_reaches_the_agent` (spies on the agent and checks the row).
 The term list is a placeholder for the PT/OB-GYN to review.
+
+**Calendar notes** go through the same check (`app/calendar.py`) whenever a note is saved or changed, with one
+difference: the note is **still saved** (it's the user's own log, and we never stop them writing in it). On a
+match the API returns a supportive message pointing to a doctor or physical therapist, shown beside the note,
+and writes a `safety_events` row (`source = 'calendar_note'`, `action_taken = 'note_saved_pointed_to_professional'`).
+There is no AI call either way. Test: `test_red_flag_note_is_saved_logged_and_answered_without_ai`.
 
 ## 4. Injury filtering (the plan generator and the Workout Builder)
 

@@ -1922,3 +1922,201 @@ fieldset.question {
 .left-out p {
   margin: 0.25rem 0 0;
 }
+
+/* ---------------------------------------------------------------- Calendar (week view, draggable days) */
+.calendar-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.calendar-range {
+  min-width: 9rem;
+  text-align: center;
+}
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.6rem;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .week-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.day-cell {
+  min-height: 8rem;
+  padding: 0.5rem;
+  border-radius: var(--radius-input);
+  border: 2px dashed transparent;
+  background: var(--lavender-tint);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.day-cell.day-today {
+  border-color: var(--pink);
+}
+
+.day-cell.day-over {
+  border-color: var(--pink-deep);
+  background: var(--pink-tint);
+}
+
+.day-cell-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.day-cell-title span {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.today-pill {
+  margin-left: auto;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--pink);
+  color: #fff;
+}
+
+.day-card {
+  position: relative;
+  padding: 0.6rem;
+  border-radius: var(--radius-input);
+  background: #fff;
+  border: 2px solid var(--lavender);
+  font-size: 0.9rem;
+}
+
+.day-card.day-workout {
+  border-color: var(--mint-deep);
+}
+
+.day-card.day-done {
+  background: var(--mint-tint);
+}
+
+.day-card.day-dragging {
+  z-index: 10;
+  box-shadow: 0 10px 24px rgba(58, 33, 71, 0.25);
+  cursor: grabbing;
+}
+
+.day-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.chip-workout {
+  background: var(--mint-tint);
+}
+
+.chip-rest {
+  background: var(--lavender-tint);
+}
+
+.drag-handle {
+  flex: none;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  font-size: 1.1rem;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--lavender);
+  background: #fff;
+  font-weight: 700;
+  cursor: grab;
+  touch-action: none;
+}
+
+.drag-handle:focus-visible {
+  outline: 3px solid var(--pink-deep);
+}
+
+.day-locked {
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.day-exercises {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.day-exercises li {
+  display: grid;
+  line-height: 1.3;
+}
+
+.day-exercises span {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.day-done-toggle {
+  min-height: 40px;
+  margin: 0.25rem 0;
+}
+
+.rest-text {
+  margin: 0.5rem 0;
+}
+
+.day-notes {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.5rem;
+  font-weight: 800;
+}
+
+.day-notes textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.4rem 0.5rem;
+  border: 2px solid var(--lavender);
+  border-radius: var(--radius-input);
+  font: inherit;
+  font-weight: 400;
+  resize: vertical;
+}
+
+.day-notes-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.btn-small {
+  min-height: 36px;
+  padding: 0 0.8rem;
+  font-size: 0.85rem;
+}
+
+.note-support {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-input);
+  background: #fff;
+  border: 2px solid var(--lavender-deep);
+  font-size: 0.85rem;
+}
+
+.day-empty {
+  margin: 0.5rem 0;
+}
