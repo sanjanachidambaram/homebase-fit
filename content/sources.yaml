@@ -1,0 +1,46 @@
+# SOURCE REGISTRY: the authoritative list of where HomeBase Fit's content comes from.
+# Served at GET /api/sources and shown in the site's "Data & Sources" footer.
+#
+# Add an entry whenever real content arrives, then point that content at it:
+#   exercises   source_dataset is set per folder by the seed
+#   programs    `source:` field in content/programs/*.yaml
+#   articles    `source:` field in the front matter of content/basics/*.md
+# Then rerun the seed (from backend/): .venv\Scripts\python.exe -m app.db.seed
+#
+# Fields:
+#   id        stable key that content refers to (never change it once used)
+#   name      shown on the site
+#   url       link shown on the site (optional)
+#   license   license or permission terms
+#   used_for  what in the app comes from this source
+#   status    active (real content in use) | placeholder (stand-in content in use)
+#             | pending (promised, not received yet)
+
+sources:
+  - id: free-exercise-db
+    name: Free Exercise DB
+    url: https://github.com/yuhonas/free-exercise-db
+    license: The Unlicense (public domain)
+    used_for: Exercise library (876 exercises) and demo images
+    status: active
+
+  - id: placeholder-authored
+    name: HomeBase Fit placeholder content (AI-drafted)
+    url:
+    license: Project content; not yet professionally reviewed
+    used_for: 27 starter exercises, 3 program templates, and 5 Fitness Basics articles, all pending PT review
+    status: placeholder
+
+  - id: pt-authored-programs
+    name: PT-authored programs
+    url:
+    license: Pending; terms to be confirmed with the PT
+    used_for: Program templates and their science rationale (replacing the placeholders)
+    status: pending
+
+  - id: pt-obgyn-reviewed-basics
+    name: PT/OB-GYN-reviewed Fitness Basics articles
+    url:
+    license: Pending; terms to be confirmed with the reviewers
+    used_for: Fitness Basics hub articles (replacing the placeholders)
+    status: pending

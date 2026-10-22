@@ -1,122 +1,144 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import { useEffect, useState } from 'react'
+import {
+  fetchExercises,
+  fetchSources,
+  MUSCLE_GROUP_LABELS,
+  type Exercise,
+  type MuscleGroup,
+  type Source,
+} from './api'
 import './App.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+function label(value: string): string {
+  return value.replace(/_/g, ' ')
+}
 
+function ExerciseCard({ ex }: { ex: Exercise }) {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <article className="card">
+      {ex.demo_image_url ? (
+        <img src={ex.demo_image_url} alt={`${ex.name} demo`} loading="lazy" />
+      ) : (
+        <div className="no-media">No demo yet</div>
+      )}
+      <div className="card-body">
+        <h3>{ex.name}</h3>
+        <p>
+          <strong>Muscle group:</strong> {MUSCLE_GROUP_LABELS[ex.muscle_group]}
+        </p>
+        <p>
+          <strong>Equipment:</strong> {ex.equipment_needed.map(label).join(', ')}
+        </p>
+        <span className={`badge badge-${ex.source_dataset}`}>{ex.source_dataset}</span>
+      </div>
+    </article>
   )
 }
 
-export default App
+function SourcesFooter({ sources }: { sources: Source[] }) {
+  return (
+    <footer className="sources">
+      <h2>Data &amp; Sources</h2>
+      <ul>
+        {sources.map((s) => (
+          <li key={s.id}>
+            {s.url ? (
+              <a href={s.url} target="_blank" rel="noopener noreferrer">
+                {s.name}
+              </a>
+            ) : (
+              <span className="source-name">{s.name}</span>
+            )}{' '}
+            <span className={`status status-${s.status}`}>{s.status}</span>
+            <br />
+            <span className="source-detail">
+              License: {s.license} · Used for: {s.used_for}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </footer>
+  )
+}
+
+export default function App() {
+  const [group, setGroup] = useState<MuscleGroup | ''>('')
+  const [exercises, setExercises] = useState<Exercise[]>([])
+  const [sources, setSources] = useState<Source[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchSources()
+      .then(setSources)
+      .catch((e: Error) => setError(e.message))
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchExercises(group)
+      .then((data) => {
+        if (!cancelled) {
+          setExercises(data)
+          setError(null)
+        }
+      })
+      .catch((e: Error) => !cancelled && setError(e.message))
+      .finally(() => !cancelled && setLoading(false))
+    return () => {
+      cancelled = true
+    }
+  }, [group])
+
+  const perSource = exercises.reduce<Record<string, number>>((acc, ex) => {
+    acc[ex.source_dataset] = (acc[ex.source_dataset] ?? 0) + 1
+    return acc
+  }, {})
+
+  return (
+    <div className="page">
+      <header className="site-header">
+        <h1>HomeBase Fit</h1>
+        <p>Exercise library (test page)</p>
+      </header>
+
+      <main>
+        <div className="controls">
+          <label htmlFor="group">Muscle group</label>
+          <select
+            id="group"
+            value={group}
+            onChange={(e) => {
+              setLoading(true)
+              setGroup(e.target.value as MuscleGroup | '')
+            }}
+          >
+            <option value="">All</option>
+            {Object.entries(MUSCLE_GROUP_LABELS).map(([value, text]) => (
+              <option key={value} value={value}>
+                {text}
+              </option>
+            ))}
+          </select>
+          <span className="count">
+            {loading
+              ? 'Loading…'
+              : `${exercises.length} exercises (${Object.entries(perSource)
+                  .map(([src, n]) => `${n} ${src}`)
+                  .join(', ')})`}
+          </span>
+        </div>
+
+        {error && <p className="error">Couldn't load data: {error}. Is the backend running on port 8000?</p>}
+
+        <section className="grid">
+          {exercises.map((ex) => (
+            <ExerciseCard key={ex.id} ex={ex} />
+          ))}
+        </section>
+      </main>
+
+      <SourcesFooter sources={sources} />
+    </div>
+  )
+}

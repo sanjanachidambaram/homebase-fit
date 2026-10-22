@@ -6,7 +6,8 @@ Run from backend/ whenever you change anything in content/:
 
 This rebuilds from scratch, so it also wipes user data in the working copy.
 Content problems (unknown exercise id, an exercise that's unsafe for the
-program's injury_focus, missing fields) stop the build with a list of errors.
+program's injury_focus, missing fields, unknown source) stop the build with
+a list of errors.
 """
 
 import json
@@ -25,6 +26,28 @@ INJURY_TAGS = {"lower_back", "knee", "shoulder"}
 DAYS = {"mon": 1, "tue": 2, "wed": 3, "thu": 4, "fri": 5, "sat": 6, "sun": 7}
 MEDIA_EXTS = (".gif", ".mp4", ".webm", ".jpg", ".jpeg", ".png", ".webp")
 DEFAULT_MEDIA_EXT = ".gif"
+DEFAULT_SOURCE = "placeholder-authored"   # the hand-authored drafts in content/
+
+# ---- free-exercise-db mapping onto HomeBase Fit's categories
+FEDB_SOURCE = "free-exercise-db"
+FEDB_DIR = CONTENT_DIR / "exercises" / "source_free_exercise_db"
+FEDB_MUSCLE_TO_GROUP = {
+    "abdominals": "core",
+    "lower back": "back", "middle back": "back", "lats": "back", "traps": "back", "neck": "back",
+    "quadriceps": "legs", "hamstrings": "legs", "glutes": "legs", "calves": "legs",
+    "adductors": "legs", "abductors": "legs",
+    # No chest/shoulders group in the app yet, so upper-body pushing work lands in "arms".
+    "biceps": "arms", "triceps": "arms", "forearms": "arms", "chest": "arms", "shoulders": "arms",
+}
+FEDB_FULL_BODY_CATEGORIES = {"cardio", "olympic weightlifting", "strongman"}
+FEDB_EQUIPMENT = {
+    None: "none", "body only": "none", "dumbbell": "dumbbells", "bands": "resistance_band",
+    "kettlebells": "kettlebells", "barbell": "barbell", "machine": "machine", "cable": "cable",
+    "foam roll": "foam_roller", "medicine ball": "medicine_ball", "exercise ball": "exercise_ball",
+    "e-z curl bar": "ez_curl_bar", "other": "other",
+}
+FEDB_LEVEL = {"beginner": "beginner", "intermediate": "intermediate", "expert": "advanced"}
+FEDB_EST_SECONDS = {"stretching": 30, "cardio": 60}   # everything else: 45
 
 
 class ContentError(Exception):
@@ -48,7 +71,28 @@ def require(item: dict, fields: tuple[str, ...], where: str, errors: list[str]) 
     return not missing
 
 
+def check_source(source_id: str, sources: set[str], where: str, errors: list[str]) -> bool:
+    if source_id not in sources:
+        errors.append(f"{where}: source '{source_id}' is not in content/sources.yaml")
+        return False
+    return True
+
+
 # ---------------------------------------------------------------- loaders
+
+def seed_sources(conn: sqlite3.Connection, errors: list[str]) -> set[str]:
+    path = CONTENT_DIR / "sources.yaml"
+    ids: set[str] = set()
+    for i, s in enumerate(load_yaml(path).get("sources", [])):
+        if not require(s, ("id", "name", "license", "used_for", "status"), f"{rel(path)} source {i + 1}", errors):
+            continue
+        ids.add(s["id"])
+        conn.execute(
+            "INSERT INTO sources (id, order_index, name, url, license, used_for, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (s["id"], i, s["name"], s.get("url") or None, s["license"], s["used_for"], s["status"]),
+        )
+    return ids
+
 
 def seed_quiz(conn: sqlite3.Connection, errors: list[str]) -> None:
     path = CONTENT_DIR / "quiz" / "quiz_questions.yaml"
@@ -74,8 +118,21 @@ def find_media(folder: Path, exercise_id: str) -> Path:
     return folder / f"{exercise_id}{DEFAULT_MEDIA_EXT}"
 
 
-def seed_exercises(conn: sqlite3.Connection, errors: list[str]) -> dict[str, set[str]]:
-    """Returns {exercise_id: contraindications} for checking programs."""
+def insert_exercise(conn: sqlite3.Connection, **ex) -> None:
+    conn.execute(
+        "INSERT INTO exercises (id, name, muscle_group, equipment_needed, difficulty,"
+        " injury_contraindications, contraindication_status, demo_media_path, instructions,"
+        " est_time_seconds, category, primary_muscles, secondary_muscles, source_dataset)"
+        " VALUES (:id, :name, :muscle_group, :equipment_needed, :difficulty,"
+        " :injury_contraindications, :contraindication_status, :demo_media_path, :instructions,"
+        " :est_time_seconds, :category, :primary_muscles, :secondary_muscles, :source_dataset)",
+        ex,
+    )
+
+
+def seed_authored_exercises(conn: sqlite3.Connection, errors: list[str]) -> dict[str, set[str]]:
+    """Hand-authored drafts in content/exercises/<group>/exercises.yaml.
+    Returns {exercise_id: contraindications} for checking programs."""
     contraindications: dict[str, set[str]] = {}
     fields = ("id", "name", "difficulty", "instructions", "est_time_seconds")
     for group in MUSCLE_GROUPS:
@@ -95,29 +152,73 @@ def seed_exercises(conn: sqlite3.Connection, errors: list[str]) -> dict[str, set
             if unknown:
                 errors.append(f"{where}: unknown injury tag(s) {sorted(unknown)}")
             contraindications[ex["id"]] = set(contra)
-            conn.execute(
-                "INSERT INTO exercises (id, name, muscle_group, equipment_needed, difficulty,"
-                " injury_contraindications, demo_media_path, instructions, est_time_seconds)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (ex["id"], ex["name"], group, json.dumps(ex.get("equipment_needed") or ["none"]),
-                 ex["difficulty"], json.dumps(contra), rel(find_media(folder, ex["id"])),
-                 ex["instructions"].strip(), int(ex["est_time_seconds"])),
+            insert_exercise(
+                conn, id=ex["id"], name=ex["name"], muscle_group=group,
+                equipment_needed=json.dumps(ex.get("equipment_needed") or ["none"]),
+                difficulty=ex["difficulty"], injury_contraindications=json.dumps(contra),
+                contraindication_status="draft", demo_media_path=rel(find_media(folder, ex["id"])),
+                instructions=ex["instructions"].strip(), est_time_seconds=int(ex["est_time_seconds"]),
+                category=None, primary_muscles="[]", secondary_muscles="[]", source_dataset=DEFAULT_SOURCE,
             )
     return contraindications
 
 
-def seed_programs(conn: sqlite3.Connection, contraindications: dict[str, set[str]], errors: list[str]) -> None:
+def fedb_muscle_group(ex: dict) -> str:
+    if ex.get("category") in FEDB_FULL_BODY_CATEGORIES:
+        return "full_body"
+    groups = {FEDB_MUSCLE_TO_GROUP.get(m) for m in ex.get("primaryMuscles", [])} - {None}
+    if len(groups) == 1:
+        return groups.pop()
+    return "full_body"   # several (or no) primary groups
+
+
+def seed_free_exercise_db(conn: sqlite3.Connection, taken_ids: set[str], errors: list[str]) -> None:
+    """Imported library from content/exercises/source_free_exercise_db/ (see ATTRIBUTION.md).
+    No injury info in the dataset, so every row starts 'untagged'."""
+    path = FEDB_DIR / "exercises.json"
+    if not path.exists():
+        return
+    for ex in json.loads(path.read_text(encoding="utf-8")):
+        where = f"{rel(path)} {ex.get('id', '?')}"
+        if not require(ex, ("id", "name", "level", "instructions"), where, errors):
+            continue
+        if ex["id"] in taken_ids:
+            errors.append(f"{where}: id already used by another exercise")
+            continue
+        if ex.get("equipment") not in FEDB_EQUIPMENT or ex["level"] not in FEDB_LEVEL:
+            errors.append(f"{where}: unmapped equipment '{ex.get('equipment')}' or level '{ex['level']}'")
+            continue
+        taken_ids.add(ex["id"])
+        image = FEDB_DIR / "images" / ex["images"][0] if ex.get("images") else None
+        insert_exercise(
+            conn, id=ex["id"], name=ex["name"], muscle_group=fedb_muscle_group(ex),
+            equipment_needed=json.dumps([FEDB_EQUIPMENT[ex.get("equipment")]]),
+            difficulty=FEDB_LEVEL[ex["level"]], injury_contraindications="[]",
+            contraindication_status="untagged", demo_media_path=rel(image) if image else None,
+            instructions="\n".join(step.strip() for step in ex["instructions"]),
+            est_time_seconds=FEDB_EST_SECONDS.get(ex.get("category"), 45), category=ex.get("category"),
+            primary_muscles=json.dumps(ex.get("primaryMuscles", [])),
+            secondary_muscles=json.dumps(ex.get("secondaryMuscles", [])), source_dataset=FEDB_SOURCE,
+        )
+
+
+def seed_programs(conn: sqlite3.Connection, contraindications: dict[str, set[str]],
+                  sources: set[str], errors: list[str]) -> None:
+    """Programs may only use hand-authored exercises (the ones with drafted injury tags)."""
     fields = ("name", "goal_tags", "description", "science_rationale", "created_by", "schedule")
     for path in sorted((CONTENT_DIR / "programs").glob("*.yaml")):
         p = load_yaml(path)
         if not require(p, fields, rel(path), errors):
             continue
+        source = p.get("source") or DEFAULT_SOURCE
+        if not check_source(source, sources, rel(path), errors):
+            continue
         focus = set(p.get("injury_focus") or [])
         cur = conn.execute(
             "INSERT INTO program_templates (name, goal_tags, injury_focus, description,"
-            " science_rationale, created_by, source_file) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            " science_rationale, created_by, source_id, source_file) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (p["name"], json.dumps(p["goal_tags"]), json.dumps(sorted(focus)), p["description"].strip(),
-             p["science_rationale"].strip(), p["created_by"], rel(path)),
+             p["science_rationale"].strip(), p["created_by"], source, rel(path)),
         )
         program_id = cur.lastrowid
         for day, items in p["schedule"].items():
@@ -150,14 +251,18 @@ def split_front_matter(text: str) -> tuple[dict, str]:
     return {}, text.strip()
 
 
-def seed_basics(conn: sqlite3.Connection, errors: list[str]) -> None:
+def seed_basics(conn: sqlite3.Connection, sources: set[str], errors: list[str]) -> None:
     for path in sorted((CONTENT_DIR / "basics").glob("*.md")):
         meta, body = split_front_matter(path.read_text(encoding="utf-8"))
         if not require(meta, ("title", "category"), rel(path), errors):
             continue
+        source = meta.get("source") or DEFAULT_SOURCE
+        if not check_source(source, sources, rel(path), errors):
+            continue
         conn.execute(
-            "INSERT INTO basics_articles (slug, title, category, content, media_path) VALUES (?, ?, ?, ?, ?)",
-            (path.stem, meta["title"], meta["category"], body, meta.get("media_path")),
+            "INSERT INTO basics_articles (slug, title, category, content, media_path, source_id)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (path.stem, meta["title"], meta["category"], body, meta.get("media_path"), source),
         )
 
 
@@ -171,10 +276,12 @@ def build_original() -> None:
     ok = False
     try:
         conn.executescript((DB_DIR / "schema.sql").read_text(encoding="utf-8"))
+        sources = seed_sources(conn, errors)
         seed_quiz(conn, errors)
-        contraindications = seed_exercises(conn, errors)
-        seed_programs(conn, contraindications, errors)
-        seed_basics(conn, errors)
+        contraindications = seed_authored_exercises(conn, errors)
+        seed_free_exercise_db(conn, set(contraindications), errors)
+        seed_programs(conn, contraindications, sources, errors)
+        seed_basics(conn, sources, errors)
         if errors:
             raise ContentError("\n".join(f"  - {e}" for e in errors))
         conn.commit()

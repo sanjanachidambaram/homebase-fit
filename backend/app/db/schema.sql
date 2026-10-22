@@ -5,7 +5,7 @@
 --   * Dates are ISO text: date = 'YYYY-MM-DD', timestamps = 'YYYY-MM-DDTHH:MM:SSZ' (UTC).
 --   * Injury tags are lower_back | knee | shoulder everywhere (quiz answers,
 --     exercises.injury_contraindications, program_templates.injury_focus).
---   * Content tables (quiz_questions, exercises, program_templates,
+--   * Content tables (sources, quiz_questions, exercises, program_templates,
 --     program_template_exercises, basics_articles) are loaded from content/
 --     by app/db/seed.py. User tables start empty.
 
@@ -48,18 +48,40 @@ CREATE TABLE quiz_profiles (
 
 -- ---------------------------------------------------------------- content
 
+-- Source registry (from content/sources.yaml). Served at GET /api/sources.
+CREATE TABLE sources (
+    id          TEXT PRIMARY KEY,           -- e.g. 'free-exercise-db'
+    order_index INTEGER NOT NULL,
+    name        TEXT NOT NULL,
+    url         TEXT,
+    license     TEXT NOT NULL,
+    used_for    TEXT NOT NULL,
+    status      TEXT NOT NULL CHECK (status IN ('active', 'placeholder', 'pending'))
+);
+
 CREATE TABLE exercises (
-    id                       TEXT PRIMARY KEY,       -- slug, also the demo media file name
+    id                       TEXT PRIMARY KEY,       -- hand-authored: slug; imported: the dataset's own id
     name                     TEXT NOT NULL,
     muscle_group             TEXT NOT NULL CHECK (muscle_group IN ('legs', 'arms', 'back', 'core', 'full_body')),
     equipment_needed         TEXT NOT NULL DEFAULT '["none"]' CHECK (json_valid(equipment_needed)),        -- ["dumbbells"]
     difficulty               TEXT NOT NULL CHECK (difficulty IN ('beginner', 'intermediate', 'advanced')),
     injury_contraindications TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(injury_contraindications)),       -- ["knee"]
+    -- How far to trust injury_contraindications. An empty list on an 'untagged'
+    -- exercise means "nobody has checked", NOT "safe for every injury".
+    --   untagged     no injury review at all (every imported exercise starts here)
+    --   draft        tags drafted but not yet reviewed by a PT
+    --   pt_reviewed  tags confirmed by a PT
+    contraindication_status  TEXT NOT NULL CHECK (contraindication_status IN ('untagged', 'draft', 'pt_reviewed')),
     demo_media_path          TEXT,                   -- relative to project root
     instructions             TEXT NOT NULL,
-    est_time_seconds         INTEGER NOT NULL CHECK (est_time_seconds > 0)
+    est_time_seconds         INTEGER NOT NULL CHECK (est_time_seconds > 0),
+    category                 TEXT,                   -- dataset category: strength, stretching, cardio, ... (NULL for hand-authored)
+    primary_muscles          TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(primary_muscles)),     -- dataset's own muscle names
+    secondary_muscles        TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(secondary_muscles)),
+    source_dataset           TEXT NOT NULL REFERENCES sources(id)  -- 'placeholder-authored' | 'free-exercise-db' | ...
 );
 CREATE INDEX idx_exercises_muscle_group ON exercises(muscle_group);
+CREATE INDEX idx_exercises_source ON exercises(source_dataset);
 
 CREATE TABLE program_templates (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,6 +91,7 @@ CREATE TABLE program_templates (
     description       TEXT NOT NULL,
     science_rationale TEXT NOT NULL,
     created_by        TEXT NOT NULL,
+    source_id         TEXT NOT NULL REFERENCES sources(id),
     source_file       TEXT                                                          -- content/programs/<file>.yaml
 );
 
@@ -90,7 +113,8 @@ CREATE TABLE basics_articles (
     title       TEXT NOT NULL,
     category    TEXT NOT NULL,
     content     TEXT NOT NULL,          -- markdown body
-    media_path  TEXT
+    media_path  TEXT,
+    source_id   TEXT NOT NULL REFERENCES sources(id)
 );
 
 -- ---------------------------------------------------------------- user activity
