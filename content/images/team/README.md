@@ -2,14 +2,14 @@
 
 Drop one photo per person in this folder, named exactly:
 
-| File | Who |
+| File | Caption on the About page |
 |---|---|
-| `creator.jpg` | the creator (Yale student) |
-| `pt-friend.jpg` | physical therapist (friend) |
-| `pt-mom.jpg` | physical therapist (her mom) |
-| `obgyn-sister.jpg` | OB-GYN (sister) |
+| `sanjana.jpg` | Sanjana — creator |
+| `summer.jpg` | Summer — Personal Trainer & Pilates Instructor |
+| `fauzia.jpg` | Fauzia — Physical Therapist |
+| `sister.jpg` | My sister — OB-GYN |
 
-`.png` or `.webp` work too (for example `creator.png`). The About page tries `.jpg`, then `.png`, then `.webp`,
+`.png` or `.webp` work too (for example `sanjana.png`). The About page tries `.jpg`, then `.png`, then `.webp`,
 and shows a placeholder avatar until a file exists, so a missing photo never shows a broken image.
 
 ## Format
@@ -20,5 +20,4 @@ and shows a placeholder avatar until a file exists, so a missing photo never sho
 - Strip location data (EXIF GPS) before committing; this folder is public on GitHub.
 - Only add a photo with that person's permission.
 
-Names, roles and bios are placeholders in `frontend/src/pages/AboutPage.tsx` (`TEAM`). The OB-GYN's name
-comes from `OBGYN_NAME` in `frontend/src/legal.ts`, the same constant the pregnancy support page uses.
+The captions are in `frontend/src/pages/AboutPage.tsx` (`TEAM`).

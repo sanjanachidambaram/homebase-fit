@@ -1,6 +1,7 @@
 import { type JSX } from 'react'
 import { DisclaimerBar } from './components/Legal'
 import Link from './components/Link'
+import AboutDataPage from './pages/AboutDataPage'
 import AboutPage from './pages/AboutPage'
 import BuildPage from './pages/BuildPage'
 import CalendarPage from './pages/CalendarPage'
@@ -25,7 +26,8 @@ const PAGES: Record<string, () => JSX.Element> = {
   '/settings': SettingsPage,
   '/quiz': QuizPage, // reached from the dashboard and sign-up, not the nav
   '/legal': LegalPage, // linked from the footer on every page
-  '/about': AboutPage, // public; the class-project disclaimer, the data and its sources, the team
+  '/about': AboutPage, // public; Sanjana's essay (verbatim), her class-project disclaimer, the team
+  '/about/data': AboutDataPage, // public; live data figures and every source (linked from About and the footer)
   '/how-we-build': HowWeBuildPage, // public; linked from the plan on the Dashboard and Your Plan page
   '/pregnancy-support': PregnancySupportPage, // pregnant / postpartum users are sent here (quiz, Dashboard, blocks)
 }
@@ -61,7 +63,11 @@ export default function App() {
           </h1>
           <nav aria-label="Main">
             {NAV.map((p) => (
-              <Link key={p.path} to={p.path} className={p.path === path ? 'nav-link active' : 'nav-link'}>
+              <Link
+                key={p.path}
+                to={p.path}
+                className={p.path === path || (p.path === '/about' && path.startsWith('/about/')) ? 'nav-link active' : 'nav-link'}
+              >
                 {p.label}
               </Link>
             ))}

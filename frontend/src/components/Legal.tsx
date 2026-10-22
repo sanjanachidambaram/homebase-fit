@@ -7,7 +7,7 @@ export function DisclaimerBar() {
   return (
     <div className="disclaimer-bar" role="note" aria-label="Medical disclaimer">
       <strong>Medical disclaimer:</strong> {DISCLAIMER} <Link to="/legal">Legal &amp; privacy</Link> ·{' '}
-      <Link to="/about">About, data &amp; sources</Link>
+      <Link to="/about">About</Link> · <Link to="/about/data">Data &amp; sources</Link>
     </div>
   )
 }

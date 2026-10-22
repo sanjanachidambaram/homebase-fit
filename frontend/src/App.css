@@ -2106,9 +2106,9 @@ fieldset.question {
 
 .class-disclaimer p {
   margin: 0 0 0.6rem;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 700;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .class-disclaimer a {
@@ -2369,4 +2369,39 @@ fieldset.question {
 .review-sources a {
   color: var(--ink);
   font-weight: 700;
+}
+
+/* About page essay (her words, verbatim) */
+.about-essay p,
+.about-essay li {
+  line-height: 1.7;
+  font-size: 1.05rem;
+}
+
+.about-essay ul {
+  padding-left: 1.3rem;
+}
+
+.about-essay li {
+  margin: 0.55rem 0;
+}
+
+.about-essay .class-disclaimer {
+  margin: 1.5rem 0;
+}
+
+.about-data-link {
+  margin: 1.75rem 0;
+  padding: 1rem 1.2rem;
+  border-radius: 20px;
+  background: var(--lavender-tint);
+  font-weight: 800;
+}
+
+.about-data-link a {
+  color: var(--pink-deep);
+}
+
+.team-card .team-name {
+  margin-top: 0.4rem;
 }

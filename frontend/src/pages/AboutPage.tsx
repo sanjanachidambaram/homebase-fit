@@ -1,40 +1,18 @@
-// About: the class-project disclaimer, why the app exists, what's different, an honest "About the Data" section,
-// and the team. Every number in "About the Data" comes live from the API (GET /api/data-summary, /api/sources),
-// never typed in by hand, so it can't go stale when content is added or reviewed.
-// The section copy is placeholder text for the creator to edit.
-import { useEffect, useState, type ReactNode } from 'react'
-import { fetchDataSummary, fetchSources, type DataSummary, type Source } from '../api'
+// About: Sanjana's essay, verbatim (her voice, her caps, her typos; please don't "clean it up"), with her own
+// "HUGE disclaimer" paragraph styled as the page's disclaimer box, then the team photos.
+// The live data and sources section lives on its own page now: /about/data (AboutDataPage.tsx).
+import { useState } from 'react'
 import Link from '../components/Link'
-import { OBGYN_NAME } from '../legal'
 
 const TEAM_PHOTOS = '/content/images/team'
 const PHOTO_EXTS = ['jpg', 'png', 'webp']
 
-const TEAM: { file: string; name: string; role: string; bio: string }[] = [
-  {
-    file: 'creator',
-    name: '[Your name]',
-    role: 'Creator · Yale student',
-    bio: '[Bio placeholder: who you are, what you study, and why you wanted to build this.]',
-  },
-  {
-    file: 'pt-friend',
-    name: '[Name], PT',
-    role: 'Physical therapist · reviewing the protocols and injury tags',
-    bio: '[Bio placeholder: her background and what she is reviewing for HomeBase Fit.]',
-  },
-  {
-    file: 'pt-mom',
-    name: '[Name], PT',
-    role: 'Physical therapist · reviewing the protocols and injury tags',
-    bio: '[Bio placeholder: her background and what she is reviewing for HomeBase Fit.]',
-  },
-  {
-    file: 'obgyn-sister',
-    name: OBGYN_NAME,
-    role: 'OB-GYN · the pregnancy and postpartum message',
-    bio: '[Bio placeholder: her background, and the message she recorded for pregnant and postpartum users.]',
-  },
+// Photo files go in content/images/team/ (see its README): <file>.jpg, .png or .webp.
+const TEAM: { file: string; caption: string; name: string }[] = [
+  { file: 'sanjana', name: 'Sanjana', caption: 'Sanjana — creator' },
+  { file: 'summer', name: 'Summer', caption: 'Summer — Personal Trainer & Pilates Instructor' },
+  { file: 'fauzia', name: 'Fauzia', caption: 'Fauzia — Physical Therapist' },
+  { file: 'sister', name: 'My sister', caption: 'My sister — OB-GYN' },
 ]
 
 /** Tries name.jpg, .png, .webp; shows a drawn placeholder avatar until one exists (never a broken image). */
@@ -60,197 +38,109 @@ function TeamPhoto({ file, name }: { file: string; name: string }) {
   )
 }
 
-function SourceLink({ source, children }: { source?: Source; children: ReactNode }) {
-  return source?.url ? (
-    <a href={source.url} target="_blank" rel="noopener noreferrer">
-      {children}
-    </a>
-  ) : (
-    <>{children}</>
-  )
-}
-
-const n = (x: number) => x.toLocaleString()
-
-function AboutTheData() {
-  const [data, setData] = useState<DataSummary | null>(null)
-  const [sources, setSources] = useState<Source[]>([])
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    Promise.all([fetchDataSummary(), fetchSources()])
-      .then(([d, s]) => {
-        setData(d)
-        setSources(s)
-      })
-      .catch((e: Error) => setError(e.message))
-  }, [])
-
-  if (error) return <p className="error">Couldn't load the live numbers: {error}</p>
-  if (!data) return <p className="hint">Counting the library…</p>
-
-  const ex = data.exercises
-  const bySource = Object.fromEntries(ex.by_source.map((s) => [s.id, s]))
-  const fedb = bySource['free-exercise-db']
-  const authored = ex.total - (fedb?.count ?? 0)
-  const src = Object.fromEntries(sources.map((s) => [s.id, s]))
-  const checkedNoCaution = ex.injury_checked - ex.with_cautions
-  const licenseName = (fedb?.license ?? 'The Unlicense').replace(/\s*\(.*\)\s*$/, '')   // "The Unlicense"
-  const p = data.protocols
-
-  return (
-    <>
-      <div className="stat-row" aria-label="The library today, counted live">
-        <div className="stat-tile">
-          <strong>{n(ex.total)}</strong>
-          <span>exercises in the library</span>
-        </div>
-        <div className="stat-tile stat-tile-key">
-          <strong>
-            {n(ex.injury_checked)} <small>of {n(ex.total)}</small>
-          </strong>
-          <span>have any injury-safety information</span>
-        </div>
-        <div className="stat-tile">
-          <strong>{n(ex.reasons_ai_drafted)}</strong>
-          <span>injury cautions with an AI-drafted reason</span>
-        </div>
-        <div className="stat-tile">
-          <strong>{n(ex.injury_pt_reviewed)}</strong>
-          <span>reviewed by a physical therapist so far</span>
-        </div>
-      </div>
-      <p className="hint">Counted live from the app's database every time this page loads.</p>
-
-      <p>
-        Most of HomeBase Fit's exercise library, <strong>{n(fedb?.count ?? 0)} of its {n(ex.total)} exercises</strong>,
-        comes from <SourceLink source={src['free-exercise-db']}>free-exercise-db</SourceLink>, a public-domain dataset
-        (released under {licenseName}, meaning anyone can use it freely, with no legal restrictions) of exercise
-        names, muscles targeted, equipment needed, step-by-step instructions, and demo images. The other{' '}
-        {n(authored)} are starter exercises written for this project. We chose free-exercise-db over paid alternatives
-        (several commercial exercise-database APIs exist, but cost money and restrict reuse) and over wger (a full
-        open-source workout-manager app with its own API, but more setup overhead than we needed for a one-day build)
-        because it was free, legally unencumbered, and already structured almost exactly how our database needed it.
-      </p>
-      <p>
-        What's good about this data: it's large, well-organized, and free of licensing risk. What's <em>not</em> good
-        about it, and important to be honest about: it was not written or reviewed by medical or fitness
-        professionals. It's crowdsourced, so quality and consistency vary from exercise to exercise, and critically, it
-        contains no information at all about which exercises are unsafe for which injuries. That part, the
-        safety-critical part, had to come from somewhere else: we hand-authored and drafted injury-safety reasoning for
-        a starting set of exercises ourselves, clearly labeled everywhere as "AI-drafted, not yet reviewed by a physical
-        therapist" until a real PT confirms or corrects it. As of today,{' '}
-        <strong>
-          {n(ex.injury_checked)} of {n(ex.total)} exercises
-        </strong>{' '}
-        have any injury-safety information at all: {n(ex.with_cautions)} carry drafted cautions ({n(ex.cautions)} in
-        all, each with its own AI-drafted reason)
-        {checkedNoCaution > 0 && <>, and {n(checkedNoCaution)} were checked and given none</>}. The other{' '}
-        {n(ex.injury_unchecked)} are honestly labeled "not yet checked" rather than assumed safe.
-      </p>
-      <p>
-        The same honesty applies to the science behind the workout protocols themselves (sessions per week, and sets,
-        reps and rest for each goal): {p.placeholder === p.total ? `all ${n(p.total)}` : `${n(p.placeholder)} of the ${n(p.total)}`}{' '}
-        are starting values still pending review by a physical therapist, and{' '}
-        {p.with_citations === 0
-          ? 'none is backed by cited research yet.'
-          : `${n(p.with_citations)} are backed by cited research so far.`} Two pieces of outside guidance <em>are</em> real, cited sources: the{' '}
-        <SourceLink source={src['cdc-losing-weight']}>CDC's guidance</SourceLink> that safe, sustainable weight loss is
-        roughly 1 to 2 pounds a week, and{' '}
-        <SourceLink source={src['acog-co-804']}>ACOG Committee Opinion No. 804 (2020)</SourceLink> on physical activity
-        during pregnancy and postpartum recovery.
-      </p>
-      <p>
-        We built the app to never blur these lines: anywhere you see a claim presented as scientific fact, it's backed
-        by an actual citation; anywhere it isn't yet, the app says so outright instead of pretending otherwise.
-      </p>
-
-      <h3 className="about-subhead">Every source we use</h3>
-      <ul className="source-list">
-        {sources.map((s) => (
-          <li key={s.id}>
-            <div>
-              {s.url ? (
-                <a href={s.url} target="_blank" rel="noopener noreferrer">
-                  {s.name}
-                </a>
-              ) : (
-                <strong>{s.name}</strong>
-              )}{' '}
-              <span className={`status status-${s.status}`}>{s.status}</span>
-            </div>
-            <span className="source-detail">
-              Used for: {s.used_for}
-              <br />
-              License: {s.license}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </>
-  )
-}
-
 export default function AboutPage() {
   return (
     <article className="about">
-      <section className="class-disclaimer" role="note" aria-labelledby="class-disclaimer-title">
-        <h2 id="class-disclaimer-title">A student project</h2>
-        <p>
-          HomeBase Fit was built as a final project for an AI agent-building class at Yale University. It's a student
-          project, not a commercial product or a medical device.
-        </p>
-        <Link to="/legal">Read the full disclaimer, privacy and legal page</Link>
-      </section>
-
       <h2 className="page-title">About HomeBase Fit</h2>
 
-      <section className="about-section">
-        <h3>Why I built it</h3>
+      <div className="about-essay">
         <p>
-          Most workout apps assume you either have a full gym or a flawless, injury-free body. I wanted something
-          different: an app for people working out at home with limited equipment, who are also dealing with something
-          real, like a cranky lower back, a packed schedule, or a weight goal they've tried before. I wanted an app that
-          could hold "I want to lose weight" and "my back needs to heal" at the same time, instead of forcing a choice.
+          Omg!! Guys, I literally vibe coded this entire site for my Yale SOM AI Foundations class. I'm shook to my
+          core.
         </p>
-      </section>
 
-      <section className="about-section">
-        <h3>What's different</h3>
         <p>
-          Most fitness apps either hand you a generic program or use AI to pick exercises without real safety logic
-          behind it. HomeBase Fit runs every plan through a strict, code-enforced safety filter: if you've flagged an
-          injury, you only get exercises checked for it, no exceptions. The plan isn't AI-guessed. It's built from
-          protocols my PT friend and her mom (also a PT) are reviewing, matched to your goals by clear rules, and the
-          AI's only job is explaining the plan, not inventing it. See exactly how on the{' '}
-          <Link to="/how-we-build">How We Build Your Plan</Link> page.
+          So this was our final project for the class, and – also, hi, I'm Sanjana, first-year MBA at Yale SOM (and,
+          must add, ardent Buckeye as an Ohio State undergrad) – and I've been thinking about an idea like this for a
+          while. Come hear my grievances about working out:
         </p>
-      </section>
 
-      <section className="about-section">
-        <h3>What's cool about it</h3>
+        <ul>
+          <li>I like working out. I feel good working out.</li>
+          <li>
+            What I don't like about working out is the MENTAL LOAD. Like. You're telling me I have to not only motivate
+            myself to leave my apartment and go to the gym and wear cute workout clothes – and I don't think my workout
+            clothes are that cute so sometimes that's a whole battle and also sometimes I don't want to leave the house
+            because I literally cannot deal with seeing a single other soul after hours of #networking – but first I
+            have to eat a snack and debate how starving I am after and if I have time to cook and then if I can't get
+            to the gym in time then I can't cook – and it's just like, okay, on top of all of this, I have to THINK
+            ABOUT MY WORKOUT? I can't. Literally cannot.
+          </li>
+          <li>
+            I suppose they all say consistency is key? But you better not expect me to be writing down my workouts. In
+            the economy????
+          </li>
+          <li>
+            I need flexibility. I really need to be able to have some at-home workouts and some where I actually go to
+            the gym and use machines. I need short times sometimes and longer times others. And I need something to
+            hold the mental weight of my working out.
+          </li>
+          <li>
+            Also, at the unripe age of 28, my body hurts. My back hurts and the other day I did my old workout routine
+            from like 10 years ago and my back hurt moreeee. I've been in PT, graduated, and yet, it's still hard to
+            actually find a workout app that works for your body.
+          </li>
+          <li>
+            I'm also broke now, and these pilates studios will deadass look you in the eye with and tell you that their
+            classes are $55/session. In this economy????
+          </li>
+          <li>
+            Also, I sort of only want to play sports. Like, actual things that are fun. I joined a soccer league last
+            year, and it was so fun (we lost every game), and after every game my entire team was unable to move. So,
+            like, to do the fun life things, you have to strength train.
+          </li>
+          <li>
+            And, guys, I begged my women's health friends to all tell me differently but their consensus was
+            unequivocal: women, especially women over 30, simply must strength train. I'm sorry. I wish it were
+            different, too.
+          </li>
+          <li>
+            Okay, sorry, I had to ask the AI to strip out all of my stream of consciousness and my personality for the
+            rest of this app so it's not all this lengthy. Tl;dr: I needed a free workout app that allowed me to meet my
+            goals while taking into consideration my injuries, time constraints, home workout materials and – most
+            critically – once I set it, would just push me to stick to it.
+          </li>
+        </ul>
+
+        <p>So here we are! That's my app.</p>
+
         <p>
-          A plan that explains its own reasoning, down to why specific exercises were left out for your injuries. A
-          calendar you can actually drag around your week. Favorite your go-to exercises. Fun non-scale-victory stats.
-          And a genuinely pregnancy- and postpartum-aware design: if that's you, the app steps aside for real guidance
-          instead of guessing.
+          I feel super not qualified to actually give advice on fitness. Thankfully, my best friend/platonic life
+          partner (Summer) and her mom (Fauzia) are both in the industry – Summer is a personal trainer and pilates
+          instructor, and Fauzia is a physical therapist. My sister (can you guess younger or older??? lol) is a
+          literal OB/GYN (talk about one kid with no skills and one kid who's overskilled, right). I've enlisted their
+          help to make this app really good, and the functionality features are described below.
         </p>
-      </section>
 
-      <section className="about-section about-data">
-        <h3>About the data</h3>
-        <AboutTheData />
-      </section>
+        {/* Her own disclaimer, in her words, gets the site's disclaimer-box treatment (design.md 7 rule 1). */}
+        <section className="class-disclaimer" role="note" aria-label="Disclaimer">
+          <p>
+            HUGE disclaimer. THIS IS A CLASS PROJECT. Think about your class projects. There are things here that aren't
+            fully reviewed and none of this has been verified by a legit, non-vibe-coding programmer. There are flaws,
+            it will be buggy, and the health data is IN PROGRESS. If this somehow takes off, then sure, I'll make sure
+            we actually work through all health verifications, injury verifications, etc. But guys, it's 40% of my
+            class grade at a program that doesn't do grade disclosures. So I'm proud of my work, but to be so real,
+            it's not perfect.
+          </p>
+          <Link to="/legal">Read the full medical disclaimer, privacy and legal page</Link>
+        </section>
 
-      <section className="about-section">
-        <h3>Meet the team</h3>
+        <p>
+          Okay, that's about it. Email me with whatever if you guys have thoughts or want any changes. If they're easy
+          enough, I'll make them. If they're hard, Venmo me. ;)
+        </p>
+      </div>
+
+      <p className="about-data-link">
+        <Link to="/about/data">Curious where our data comes from? See the live numbers and every source we use →</Link>
+      </p>
+
+      <section className="about-section" aria-label="The team">
         <ul className="team-grid">
           {TEAM.map((t) => (
             <li key={t.file} className="team-card">
               <TeamPhoto file={t.file} name={t.name} />
-              <strong className="team-name">{t.name}</strong>
-              <span className="team-role">{t.role}</span>
-              <p>{t.bio}</p>
+              <strong className="team-name">{t.caption}</strong>
             </li>
           ))}
         </ul>
