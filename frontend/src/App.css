@@ -2261,3 +2261,35 @@ fieldset.question {
   font-weight: 700;
   color: var(--pink-deep);
 }
+
+/* Custom calendar days ("Build your own for this day") */
+.chip-custom {
+  background: var(--pink-tint);
+  border: 2px solid var(--pink);
+}
+
+.day-custom-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.4rem 0 0.2rem;
+}
+
+.day-custom-actions .btn-ghost {
+  text-align: left;
+}
+
+.build-day-modal {
+  max-width: 56rem;
+}
+
+.build-day-modal .builder-card {
+  box-shadow: none;
+  padding: 0;
+}
+
+.day-builder-note {
+  margin: 0.25rem 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}

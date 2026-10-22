@@ -7,8 +7,13 @@ Routes (sign-in required; the user always comes from the token):
 Rules, all enforced here in code:
   * materialize_plan() runs when the quiz is saved: 4 weeks of entries from today, one per date, following the
     plan's weekly pattern. Each entry's workout_content is a snapshot of that day of the plan.
-    A retake REFRESHES only entries dated today or later that are not completed and have no notes. Past days,
-    completed days, and days with notes are never touched.
+    A retake REFRESHES only entries dated today or later that are not completed, have no notes, and are not
+    custom. Past days, completed days, days with notes, and days the user built themselves are never touched.
+  * Custom days: POST /api/calendar/{id}/custom (in app/agent_routes.py, with the other AI routes) builds a
+    workout with the Workout Builder agent (same injury filter as always) and replaces that day's
+    workout_content with it; source becomes 'custom' and the generated day is kept in planned_content.
+    DELETE /api/calendar/{id}/custom restores it. Only for days that are today or later and not completed,
+    and never for pregnant / postpartum users (403).
   * Moving a day onto a date that already has one swaps the two. A completed day can't be moved (its
     workout_logs rows are dated), and nothing can be swapped onto a completed day.
   * Marking a workout day completed writes one workout_logs row per exercise (calendar_entry_id set), so the
@@ -86,7 +91,7 @@ def materialize_plan(user_id: int, start: date | None = None) -> dict:
         with conn:
             refreshed = conn.execute(
                 "DELETE FROM calendar_entries WHERE user_id = ? AND date >= ? AND completed = 0 "
-                "AND (notes IS NULL OR TRIM(notes) = '')", (user_id, start.isoformat())).rowcount
+                "AND (notes IS NULL OR TRIM(notes) = '') AND source = 'generated'", (user_id, start.isoformat())).rowcount
             taken = {r[0] for r in conn.execute(
                 "SELECT date FROM calendar_entries WHERE user_id = ? AND date BETWEEN ? AND ?",
                 (user_id, days[0].isoformat(), days[-1].isoformat()))}
@@ -94,7 +99,7 @@ def materialize_plan(user_id: int, start: date | None = None) -> dict:
             if plan.generated:   # pregnant / postpartum: no plan, so nothing new is scheduled
                 for d in days:
                     if d.isoformat() in taken:
-                        continue   # a day the user completed or wrote on: keep it exactly as it is
+                        continue   # a day the user completed, wrote on, or built: keep it exactly as it is
                     pd = by_weekday[WEEKDAYS[d.weekday()]]
                     conn.execute(
                         "INSERT INTO calendar_entries (user_id, date, day_type, workout_content) VALUES (?, ?, ?, ?)",
@@ -122,7 +127,12 @@ def can_complete(day_type: str, day: str) -> bool:
     return day_type == "workout" and date.fromisoformat(day) <= today() + timedelta(days=COMPLETE_GRACE_DAYS)
 
 
+def can_override(day: str, completed: bool) -> bool:
+    return not completed and date.fromisoformat(day) >= today()
+
+
 def entry_dict(r: sqlite3.Row) -> dict:
+    planned = json.loads(r["planned_content"]) if r["planned_content"] else None
     return {
         "id": r["id"],
         "date": r["date"],
@@ -132,6 +142,10 @@ def entry_dict(r: sqlite3.Row) -> dict:
         "completed": bool(r["completed"]),
         "notes": r["notes"],
         "can_complete": can_complete(r["day_type"], r["date"]),
+        "source": r["source"],   # 'generated' (from the plan) or 'custom' (built by the user)
+        "can_override": can_override(r["date"], bool(r["completed"])),
+        # What "Revert to planned workout" would bring back (only on custom days).
+        "planned": {"day_type": planned["day_type"], "focus": planned["workout_content"].get("focus")} if planned else None,
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
     }
@@ -289,3 +303,94 @@ def update_entry(entry_id: int, body: CalendarUpdate, uid: int = Depends(signed_
                       "safety_event_id": event_id}
     return {"entry": entry_dict(row), "swapped_with": swapped_with, "workout_logs_added": logged,
             "workout_logs_removed": removed, "safety": safety, "agent_called": False}
+
+
+# ---------------------------------------------------------------- custom days (override + revert)
+
+def _overridable(conn: sqlite3.Connection, uid: int, entry_id: int) -> sqlite3.Row:
+    entry = conn.execute("SELECT * FROM calendar_entries WHERE id = ? AND user_id = ?", (entry_id, uid)).fetchone()
+    if entry is None:
+        raise HTTPException(404, "Calendar day not found.")
+    if entry["completed"]:
+        raise HTTPException(409, "This day is marked done, so it stays as it was. Un-mark it to change it.")
+    if date.fromisoformat(entry["date"]) < today():
+        raise HTTPException(422, "Past days can't be changed.")
+    return entry
+
+
+def check_overridable(uid: int, entry_id: int) -> None:
+    """Called BEFORE the Workout Builder runs, so an ineligible day never costs a model call."""
+    conn = connect()
+    try:
+        _overridable(conn, uid, entry_id)
+    finally:
+        conn.close()
+
+
+def custom_content(session: dict, request: dict, weekday: str) -> dict:
+    """The Workout Builder's session in the same shape as a generated day, so the widget, the done toggle and the
+    workout_logs rows all work unchanged."""
+    groups = ", ".join(g.replace("_", " ") for g in request["picks"])
+    return {
+        "plan_day": weekday,
+        "focus": f"Your own: {groups}",
+        "est_minutes": session["total_estimated_minutes"],
+        "exercises": [{"exercise_id": x["exercise_id"], "name": x["name"], "muscle_group": x["muscle_group"],
+                       "sets": str(x["sets"]), "reps": x["reps"], "rest_seconds": x["rest_seconds"],
+                       "est_minutes": x["est_minutes"], "injury_check": x["injury_check"]}
+                      for x in session["exercises"]],
+        "built_by": "workout_builder",
+        "request": request,
+        "balance_note": session.get("balance_note"),
+        "notes": session.get("notes", []),
+        "protocol_status": None,
+        "review_notice": None,
+        "snapshot_at": now_utc(),
+    }
+
+
+def apply_custom(uid: int, entry_id: int, session: dict, request: dict) -> dict:
+    """Replace the day's workout with the custom session, keeping the generated day for revert."""
+    if not session["exercises"]:
+        raise HTTPException(422, "We couldn't fit any exercises with those picks, your equipment and your injury "
+                                 "filters, so this day wasn't changed. Try other muscle groups.")
+    conn = connect()
+    try:
+        with conn:
+            entry = _overridable(conn, uid, entry_id)   # checked again: the day may have changed while the AI ran
+            weekday = WEEKDAYS[date.fromisoformat(entry["date"]).weekday()]
+            planned = entry["planned_content"]
+            if entry["source"] == "generated":          # first override: keep what the plan had
+                planned = json.dumps({"day_type": entry["day_type"],
+                                      "workout_content": json.loads(entry["workout_content"])})
+            conn.execute(
+                "UPDATE calendar_entries SET day_type = 'workout', workout_content = ?, source = 'custom', "
+                "planned_content = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(custom_content(session, request, weekday)), planned, now_utc(), entry_id))
+        row = conn.execute("SELECT * FROM calendar_entries WHERE id = ?", (entry_id,)).fetchone()
+    finally:
+        conn.close()
+    return entry_dict(row)
+
+
+@router.delete("/calendar/{entry_id}/custom")
+def revert_custom(entry_id: int, uid: int = Depends(signed_in)) -> dict:
+    """Undo an override: the generated day comes back exactly as it was. No AI involved."""
+    if profile_needs_clinical_review(uid):
+        raise HTTPException(403, {"code": "needs_clinical_review", "message": CLINICAL_REVIEW_NO_AI,
+                                  "page": CLINICAL_REVIEW_PAGE})
+    conn = connect()
+    try:
+        with conn:
+            entry = _overridable(conn, uid, entry_id)
+            if entry["source"] != "custom":
+                raise HTTPException(409, "This day is already the planned workout.")
+            planned = json.loads(entry["planned_content"])
+            conn.execute(
+                "UPDATE calendar_entries SET day_type = ?, workout_content = ?, source = 'generated', "
+                "planned_content = NULL, updated_at = ? WHERE id = ?",
+                (planned["day_type"], json.dumps(planned["workout_content"]), now_utc(), entry_id))
+        row = conn.execute("SELECT * FROM calendar_entries WHERE id = ?", (entry_id,)).fetchone()
+    finally:
+        conn.close()
+    return {"entry": entry_dict(row)}

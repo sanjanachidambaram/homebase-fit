@@ -435,10 +435,14 @@ export interface CalendarEntry {
     exercises: CalendarExercise[]
     protocol_status: 'placeholder' | 'pt_reviewed' | null
     review_notice: string | null
+    notes?: string[] // custom days: the Workout Builder's notes (e.g. fewer moves fit your filters)
   }
   completed: boolean
   notes: string | null // the user's own words; never sent to any AI model
   can_complete: boolean
+  source: 'generated' | 'custom' // custom = the user built this day with the Workout Builder
+  can_override: boolean // today or later and not done
+  planned: { day_type: 'workout' | 'rest'; focus: string | null } | null // what "revert" brings back
   created_at: string
   updated_at: string
 }
@@ -470,3 +474,15 @@ export const updateCalendarDay = (
   id: number,
   change: { date?: string; notes?: string | null; completed?: boolean },
 ) => request<CalendarUpdateResult>(`/api/calendar/${id}`, { method: 'PATCH', body: JSON.stringify(change) }, token)
+
+/** Build a custom workout for one calendar day (Workout Builder agent, same injury filter) and save it there. */
+export const overrideCalendarDay = (token: string, id: number, body: WorkoutRequest) =>
+  request<AgentResponse<WorkoutSession> & { entry: CalendarEntry }>(
+    `/api/calendar/${id}/custom`,
+    { method: 'POST', body: JSON.stringify(body) },
+    token,
+  )
+
+/** Undo a custom day: the planned (generated) workout comes back. No AI involved. */
+export const revertCalendarDay = (token: string, id: number) =>
+  request<{ entry: CalendarEntry }>(`/api/calendar/${id}/custom`, { method: 'DELETE' }, token)

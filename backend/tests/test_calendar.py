@@ -61,6 +61,11 @@ def by_date(body: dict) -> dict[str, dict]:
     return {e["date"]: e for e in body["entries"]}
 
 
+def stored(e: dict) -> dict:
+    """An entry without the flags computed from "today" (tests move today forward)."""
+    return {k: v for k, v in e.items() if k not in ("can_override", "can_complete")}
+
+
 def patch(client, h, entry_id, **body):
     return client.patch(f"/api/calendar/{entry_id}", headers=h, json=body)
 
@@ -117,13 +122,13 @@ def test_retake_keeps_logged_and_noted_days_and_refreshes_only_untouched_future_
 
     after = by_date(get_days(client, h, MONDAY, MONDAY + timedelta(days=29)))
     # the logged day: same row, same snapshot, still done, and its workout_logs untouched
-    assert after[d(0)] == {**logged, "completed": True, "updated_at": after[d(0)]["updated_at"]}
+    assert stored(after[d(0)]) == stored({**logged, "completed": True, "updated_at": after[d(0)]["updated_at"]})
     assert rows("SELECT * FROM workout_logs WHERE calendar_entry_id = ?", logged["id"]) == logs_before
     # the day with notes: same row, same (old) workout, notes intact, even though it's in the future
     assert after[d(4)]["id"] == noted["id"] and after[d(4)]["workout"] == noted["workout"]
     assert after[d(4)]["notes"] == "Busy day, keep it short"
     # past days are history: never refreshed, even untouched ones
-    assert after[d(1)] == past_untouched
+    assert stored(after[d(1)]) == stored(past_untouched)
     # every other day from today on was rebuilt from the NEW plan, for 4 weeks from the new today
     for i in range(2, 30):
         e = after[d(i)]

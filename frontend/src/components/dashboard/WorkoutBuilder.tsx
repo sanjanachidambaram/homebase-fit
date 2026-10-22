@@ -1,6 +1,14 @@
 // "Build your own workout": muscle-group picks + time budget -> POST /api/workouts/build (Workout Builder agent).
-import { useState, type FormEvent } from 'react'
-import { buildWorkout, MUSCLE_GROUP_LABELS, type MuscleGroup, type WorkoutSession } from '../../api'
+// The calendar reuses it for "Build your own for this day" by passing `build` (POST /api/calendar/{id}/custom):
+// same form, same agent, same injury filter.
+import { useId, useState, type FormEvent } from 'react'
+import {
+  buildWorkout,
+  MUSCLE_GROUP_LABELS,
+  type MuscleGroup,
+  type WorkoutRequest,
+  type WorkoutSession,
+} from '../../api'
 import { agentError } from '../../agentCalls'
 import { useFavorites } from '../../favorites'
 import ExerciseDetail from '../ExerciseDetail'
@@ -18,8 +26,24 @@ const EQUIPMENT: { value: string; label: string }[] = [
 ]
 const GROUPS = Object.keys(MUSCLE_GROUP_LABELS) as MuscleGroup[]
 
-export default function WorkoutBuilder({ token, compact = false }: { token: string; compact?: boolean }) {
+export default function WorkoutBuilder({
+  token,
+  compact = false,
+  title = 'Build your own workout',
+  submitLabel = 'Build my workout',
+  build,
+  onBuilt,
+}: {
+  token: string
+  compact?: boolean
+  title?: string
+  submitLabel?: string
+  /** Where the request goes; defaults to POST /api/workouts/build. */
+  build?: (req: WorkoutRequest) => Promise<WorkoutSession>
+  onBuilt?: (session: WorkoutSession) => void
+}) {
   const favorites = useFavorites()
+  const titleId = useId()
   const [picks, setPicks] = useState<Record<MuscleGroup, number>>(
     () => Object.fromEntries(GROUPS.map((g) => [g, g === 'legs' || g === 'core' ? 2 : 0])) as Record<MuscleGroup, number>,
   )
@@ -48,8 +72,10 @@ export default function WorkoutBuilder({ token, compact = false }: { token: stri
     setError(null)
     try {
       const chosen = Object.fromEntries(Object.entries(picks).filter(([, n]) => n > 0))
-      const r = await buildWorkout(token, { picks: chosen, time_budget_minutes: minutes, equipment })
-      setSession(r.result)
+      const req = { picks: chosen, time_budget_minutes: minutes, equipment }
+      const result = build ? await build(req) : (await buildWorkout(token, req)).result
+      setSession(result)
+      onBuilt?.(result)
     } catch (err) {
       setError(agentError(err))
     } finally {
@@ -58,10 +84,10 @@ export default function WorkoutBuilder({ token, compact = false }: { token: stri
   }
 
   return (
-    <section className={`dash-card builder-card${compact ? '' : ' builder-full'}`} aria-labelledby="builder-title">
+    <section className={`dash-card builder-card${compact ? '' : ' builder-full'}`} aria-labelledby={titleId}>
       <div className="dash-card-head">
-        <h3 id="builder-title">
-          <span className="card-icon" aria-hidden="true">🧩</span> Build your own workout
+        <h3 id={titleId}>
+          <span className="card-icon" aria-hidden="true">🧩</span> {title}
         </h3>
       </div>
 
@@ -117,7 +143,7 @@ export default function WorkoutBuilder({ token, compact = false }: { token: stri
           </fieldset>
 
           <button type="submit" className="btn btn-big" disabled={loading || total === 0}>
-            {loading ? 'Building…' : 'Build my workout'}
+            {loading ? 'Building…' : submitLabel}
           </button>
         </div>
       </form>

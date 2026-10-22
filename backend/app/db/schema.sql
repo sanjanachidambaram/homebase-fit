@@ -164,6 +164,9 @@ CREATE TABLE basics_articles (
 -- that are not completed and have no notes; past days and anything the user logged or wrote on are kept.
 -- notes are the user's own words: never sent to any AI model (shared_rules.md rule 2), and checked for
 -- red flags in code when saved (safety_events source 'calendar_note').
+-- A day can be overridden with a custom workout from the Workout Builder: source = 'custom', and the generated
+-- day it replaced is kept in planned_content ({"day_type", "workout_content"}) so it can be restored. A retake
+-- never replaces a custom day either.
 CREATE TABLE calendar_entries (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -172,9 +175,12 @@ CREATE TABLE calendar_entries (
     workout_content TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(workout_content) AND json_type(workout_content) = 'object'),
     completed       INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
     notes           TEXT,
+    source          TEXT NOT NULL DEFAULT 'generated' CHECK (source IN ('generated', 'custom')),
+    planned_content TEXT CHECK (planned_content IS NULL OR json_valid(planned_content)),   -- the generated day, kept
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    UNIQUE (user_id, date)          -- one day widget per date; moving onto a taken date swaps the two
+    UNIQUE (user_id, date),         -- one day widget per date; moving onto a taken date swaps the two
+    CHECK ((source = 'custom') = (planned_content IS NOT NULL))   -- a custom day can always be reverted
 );
 
 CREATE TABLE workout_logs (

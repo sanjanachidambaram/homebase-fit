@@ -1,5 +1,7 @@
 // Calendar: your generated plan on real dates, one week at a time. Drag a day onto another day to swap them
 // (PATCH /api/calendar/{id} {date}), tick a workout off (writes the workout logs the Coach reads), and keep notes.
+// "Build your own for this day" swaps a day's workout for one from the Workout Builder (same form, same injury
+// filter); the planned workout is kept so it can be restored, and a quiz retake never replaces a day you built.
 // Notes stay private: they're never sent to the AI. A note that mentions pain or other warning signs is still
 // saved, and the API (plain code, no AI) sends back a message pointing you to a doctor or physical therapist.
 import {
@@ -13,17 +15,20 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core'
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   fetchCalendar,
   isSignInGone,
   MUSCLE_GROUP_LABELS,
+  overrideCalendarDay,
+  revertCalendarDay,
   updateCalendarDay,
   type CalendarEntry,
   type CalendarRange,
 } from '../api'
 import AccountForm from '../components/AccountForm'
 import ClinicalSupportCard from '../components/ClinicalSupport'
+import WorkoutBuilder from '../components/dashboard/WorkoutBuilder'
 import Link from '../components/Link'
 import { setSession, useSession, type Session } from '../session'
 
@@ -51,11 +56,15 @@ function DayCard({
   busy,
   supportMessage,
   onChange,
+  onBuild,
+  onRevert,
 }: {
   entry: CalendarEntry
   busy: boolean
   supportMessage: string | null
   onChange: (id: number, change: { notes?: string | null; completed?: boolean }) => Promise<boolean>
+  onBuild: (entry: CalendarEntry) => void
+  onRevert: (id: number) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: entry.id,
@@ -79,7 +88,12 @@ function DayCard({
       aria-label={`${dayName(entry.date)} ${shortDate(entry.date)}: ${entry.day_type === 'workout' ? 'workout' : 'rest day'}`}
     >
       <div className="day-card-head">
-        <span className={`chip chip-small ${entry.day_type === 'workout' ? 'chip-workout' : 'chip-rest'}`}>
+        {/* A custom day's focus reads "Your own: ..." and gets the pink chip, so it's clear it was overridden. */}
+        <span
+          className={`chip chip-small ${
+            entry.source === 'custom' ? 'chip-custom' : entry.day_type === 'workout' ? 'chip-workout' : 'chip-rest'
+          }`}
+        >
           {entry.day_type === 'workout' ? (w.focus ?? 'Workout') : 'Rest day'}
         </span>
         {entry.completed ? (
@@ -106,6 +120,11 @@ function DayCard({
               </li>
             ))}
           </ul>
+          {w.notes?.map((note) => (
+            <p key={note} className="hint day-builder-note">
+              {note}
+            </p>
+          ))}
           <label className={`chip-check day-done-toggle${entry.completed ? ' chip-on' : ''}`}>
             <input
               type="checkbox"
@@ -119,6 +138,19 @@ function DayCard({
         </>
       ) : (
         <p className="rest-text">Rest and recover. Your muscles get stronger on days like this.</p>
+      )}
+
+      {entry.can_override && (
+        <div className="day-custom-actions">
+          <button type="button" className="btn-ghost btn-small" disabled={busy} onClick={() => onBuild(entry)}>
+            {entry.source === 'custom' ? 'Rebuild this day' : 'Build your own for this day'}
+          </button>
+          {entry.source === 'custom' && entry.planned && (
+            <button type="button" className="btn-ghost btn-small" disabled={busy} onClick={() => onRevert(entry.id)}>
+              Revert to planned {entry.planned.day_type === 'rest' ? 'rest day' : 'workout'}
+            </button>
+          )}
+        </div>
       )}
 
       <label className="day-notes">
@@ -166,6 +198,69 @@ function DayCell({ date, isToday, children }: { date: string; isToday: boolean; 
   )
 }
 
+/** The existing Build Your Own form in a modal, saving onto one calendar day. */
+function BuildDayModal({
+  entry,
+  token,
+  onClose,
+  onSaved,
+}: {
+  entry: CalendarEntry
+  token: string
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const closeRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null
+    closeRef.current?.focus()
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = previousOverflow
+      opener?.focus()
+    }
+  }, [onClose])
+
+  const replacing =
+    entry.source === 'custom' ? 'the workout you built' : entry.day_type === 'rest' ? 'the planned rest day' : 'the planned workout'
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        className="modal build-day-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="build-day-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-head">
+          <h2 id="build-day-title">
+            Build your own for {dayName(entry.date)} {shortDate(entry.date)}
+          </h2>
+          <button ref={closeRef} type="button" className="btn-secondary" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <p className="hint">
+          This replaces {replacing} for this day. You can switch back to the planned one any time before the day is
+          done, and retaking the quiz won't replace a day you built. The same injury filter applies as always.
+        </p>
+        <WorkoutBuilder
+          token={token}
+          compact
+          title="Pick your moves"
+          submitLabel="Build and save to this day"
+          build={async (req) => (await overrideCalendarDay(token, entry.id, req)).result}
+          onBuilt={onSaved}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------- the week
 
 function Calendar({ session }: { session: Session }) {
@@ -174,7 +269,10 @@ function Calendar({ session }: { session: Session }) {
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
   const [support, setSupport] = useState<Record<number, string>>({})
+  const [buildingFor, setBuildingFor] = useState<CalendarEntry | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const weekEnd = addDays(weekStart, 6)
+  const closeBuilder = useCallback(() => setBuildingFor(null), [])
 
   const load = useCallback(
     () =>
@@ -223,6 +321,24 @@ function Calendar({ session }: { session: Session }) {
     }
   }
 
+  async function revert(id: number) {
+    setBusyId(id)
+    setError(null)
+    setNotice(null)
+    try {
+      const r = await revertCalendarDay(session.token, id)
+      setNotice(`${dayName(r.entry.date)} ${shortDate(r.entry.date)} is back to the planned ${
+        r.entry.day_type === 'rest' ? 'rest day' : 'workout'
+      }.`)
+      await load()
+    } catch (e) {
+      if (isSignInGone(e)) setSession(null)
+      setError((e as Error).message)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   function onDragEnd(e: DragEndEvent) {
     const id = Number(e.active.id)
     const target = e.over ? String(e.over.id) : null
@@ -261,6 +377,11 @@ function Calendar({ session }: { session: Session }) {
       </div>
 
       {error && <p className="error">{error}</p>}
+      {notice && (
+        <p className="success" role="status">
+          {notice}
+        </p>
+      )}
       {!data && !error && <p className="hint">Loading your week…</p>}
 
       {data?.needs_clinical_review && <ClinicalSupportCard />}
@@ -294,6 +415,11 @@ function Calendar({ session }: { session: Session }) {
                         busy={busyId !== null}
                         supportMessage={support[entry.id] ?? null}
                         onChange={change}
+                        onBuild={(x) => {
+                          setNotice(null)
+                          setBuildingFor(x)
+                        }}
+                        onRevert={revert}
                       />
                     ) : (
                       <p className="hint day-empty">Nothing planned</p>
@@ -303,6 +429,19 @@ function Calendar({ session }: { session: Session }) {
               })}
             </div>
           </DndContext>
+          {buildingFor && (
+            <BuildDayModal
+              key={buildingFor.id}
+              entry={buildingFor}
+              token={session.token}
+              onClose={closeBuilder}
+              onSaved={() => {
+                setNotice(`Saved your own workout to ${dayName(buildingFor.date)} ${shortDate(buildingFor.date)}.`)
+                setBuildingFor(null)
+                load()
+              }}
+            />
+          )}
           {data.entries.length === 0 && (
             <p className="hint">
               Your calendar covers four weeks from when you took the quiz. Retake it any time for a fresh four weeks;

@@ -3,6 +3,7 @@
   GET  /api/plan                 the generated weekly plan (code only, no AI)
   POST /api/programs/recommend   the plan + the Program Architect's explanation
   POST /api/workouts/build       Workout Builder
+  POST /api/calendar/{id}/custom Workout Builder, saved onto that calendar day (app/calendar.py has the rules)
   GET  /api/coach/summary        Coach (dashboard load)
   POST /api/basics/ask           Fitness Basics (red-flag pre-filter runs first)
 
@@ -20,6 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior, UsageLimitExceeded
 
+from app import calendar
 from app.agents import basics, coach, program_architect, workout_builder
 from app.agents.harness import AgentUnavailable
 from app.db import connect
@@ -86,6 +88,17 @@ async def recommend_program(body: NoBody | None = None, uid: int = Depends(signe
 @router.post("/workouts/build")
 async def build_workout(body: workout_builder.WorkoutRequest, uid: int = Depends(no_ai_for_clinical_review)) -> dict:
     return await _run(workout_builder.build_workout(uid, body, route="POST /api/workouts/build"))
+
+
+@router.post("/calendar/{entry_id}/custom")
+async def build_custom_day(entry_id: int, body: workout_builder.WorkoutRequest,
+                           uid: int = Depends(no_ai_for_clinical_review)) -> dict:
+    """Override one calendar day with a custom workout. The same Workout Builder and injury filter as
+    /workouts/build; the day is checked before the model runs (an ineligible day costs no tokens)."""
+    calendar.check_overridable(uid, entry_id)
+    out = await _run(workout_builder.build_workout(uid, body, route="POST /api/calendar/{id}/custom"))
+    entry = calendar.apply_custom(uid, entry_id, out["result"], body.model_dump())
+    return {**out, "entry": entry}
 
 
 @router.get("/coach/summary")
