@@ -89,6 +89,9 @@ CREATE TABLE exercises (
     muscle_group             TEXT NOT NULL CHECK (muscle_group IN ('legs', 'arms', 'chest', 'shoulders', 'back', 'core', 'full_body')),
     equipment_needed         TEXT NOT NULL DEFAULT '["none"]' CHECK (json_valid(equipment_needed)),        -- ["dumbbells"]
     difficulty               TEXT NOT NULL CHECK (difficulty IN ('beginner', 'intermediate', 'advanced')),
+    -- Movement direction (free-exercise-db's "force"; hand-authored ones set it in exercises.yaml). NULL = no single
+    -- direction. Push plan days never get 'pull' moves and Pull days never get 'push' moves (program_generator.py).
+    force                    TEXT CHECK (force IS NULL OR force IN ('push', 'pull', 'static')),
     injury_contraindications TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(injury_contraindications)),       -- ["knee"]
     -- How far to trust injury_contraindications. An empty list on an 'untagged'
     -- exercise means "nobody has checked", NOT "safe for every injury".

@@ -50,6 +50,7 @@ def exercise_dict(r: sqlite3.Row) -> dict:
         "muscle_group": r["muscle_group"],
         "equipment_needed": json.loads(r["equipment_needed"]),
         "difficulty": r["difficulty"],
+        "force": r["force"],   # push | pull | static | None (no single direction)
         "category": r["category"],
         "primary_muscles": json.loads(r["primary_muscles"]),
         "secondary_muscles": json.loads(r["secondary_muscles"]),

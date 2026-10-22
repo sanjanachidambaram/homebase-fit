@@ -295,3 +295,59 @@ def test_worked_example_follows_changes_in_the_data(client):
     after = client.get("/api/plan/example").json()
     assert after["funnel"][1]["removed"] == before + 1
     assert "band_pull_apart" not in {e["exercise_id"] for d in after["plan"]["days"] for e in d["exercises"]}
+
+
+# ---------------------------------------------------------------- push / pull days (exercises.force)
+
+PPL = {"goals": ["strength"], "experience_level": "advanced", "days_available": 6, "session_length_minutes": 45,
+       "equipment": ["bodyweight", "mat", "resistance_band", "dumbbells"], "other_activity_days": 0,
+       "pregnancy_status": "none"}
+
+
+def forces() -> dict[str, str | None]:
+    conn = connect_readonly()
+    try:
+        return {r["id"]: r["force"] for r in conn.execute("SELECT id, force FROM exercises")}
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize("flags", [["lower_back"], [], ["shoulder", "wrist"]])
+@pytest.mark.parametrize("equipment", [PPL["equipment"], ["bodyweight"], ["bodyweight", "dumbbells", "kettlebells"]])
+def test_push_days_never_pull_and_pull_days_never_push(test_db, flags, equipment):
+    plan = generate({**PPL, "injury_flags": flags, "equipment": equipment})
+    assert plan.protocol.split_type == "push_pull_legs"
+    force = forces()
+    for day in plan.days:
+        if day.focus not in ("Push", "Pull"):
+            continue
+        opposite = "pull" if day.focus == "Push" else "push"
+        for e in day.exercises:
+            if e.muscle_group in gen.DIRECTIONAL_GROUPS:
+                assert force[e.exercise_id] != opposite, (day.focus, e.name, force[e.exercise_id])
+
+
+def test_the_reported_pull_day_no_longer_gets_push_ups_or_dips(test_db):
+    """Bug 2026-10-22: Pull days included Incline Push-Up and Chair Triceps Dip (filed under "arms")."""
+    plan = generate({**PPL, "injury_flags": ["lower_back"]})
+    pull = [e.exercise_id for d in plan.days if d.focus == "Pull" for e in d.exercises]
+    push = [e.exercise_id for d in plan.days if d.focus == "Push" for e in d.exercises]
+    assert pull and not {"incline_pushup", "knee_pushup", "chair_triceps_dip"} & set(pull)
+    assert {"incline_pushup", "chair_triceps_dip"} <= set(push)          # they belong on Push days
+
+
+def test_hand_authored_directions_match_the_movement(test_db):
+    f = forces()
+    assert {f[i] for i in ("incline_pushup", "knee_pushup", "chair_triceps_dip", "bodyweight_squat")} == {"push"}
+    assert {f[i] for i in ("dumbbell_bicep_curl", "band_biceps_curl", "band_seated_row", "band_pull_apart",
+                           "dumbbell_bent_over_row")} == {"pull"}
+
+
+def test_other_splits_are_unaffected(test_db):
+    """Only Push/Pull days filter by direction: a full-body day can still mix push and pull moves."""
+    plan = generate({**PPL, "goals": ["general_health"], "experience_level": "beginner", "days_available": 3,
+                     "injury_flags": []})
+    assert plan.protocol.split_type != "push_pull_legs"
+    f = forces()
+    upper = {f[e.exercise_id] for d in plan.days for e in d.exercises if e.muscle_group in gen.DIRECTIONAL_GROUPS}
+    assert {"push", "pull"} <= upper

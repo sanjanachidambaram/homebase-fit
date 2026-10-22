@@ -28,6 +28,7 @@ from app.db.reset import refresh_content, reset
 from app.safety_rules import RATIONALE_PENDING_SOURCE, RATIONALE_TIERS
 
 MUSCLE_GROUPS = ("legs", "arms", "chest", "shoulders", "back", "core", "full_body")
+FORCES = {"push", "pull", "static", None}   # movement direction; None = no single direction
 INJURY_TAGS = {"lower_back", "knee", "shoulder", "wrist", "ankle"}
 GOALS = ("weight_loss", "strength", "tone", "rehab", "general_health")
 EXPERIENCE = ("beginner", "intermediate", "advanced")
@@ -167,12 +168,13 @@ def insert_exercise(conn: sqlite3.Connection, **ex) -> None:
     ex.setdefault("status", "placeholder")
     ex.setdefault("citations", "[]")
     ex.setdefault("injury_rationale", "{}")
+    ex.setdefault("force", None)
     conn.execute(
         "INSERT INTO exercises (id, name, muscle_group, equipment_needed, difficulty,"
-        " injury_contraindications, contraindication_status, injury_rationale, demo_media_path, media_type, instructions,"
+        " injury_contraindications, contraindication_status, injury_rationale, force, demo_media_path, media_type, instructions,"
         " est_time_seconds, category, primary_muscles, secondary_muscles, source_dataset, status, citations)"
         " VALUES (:id, :name, :muscle_group, :equipment_needed, :difficulty,"
-        " :injury_contraindications, :contraindication_status, :injury_rationale, :demo_media_path, :media_type, :instructions,"
+        " :injury_contraindications, :contraindication_status, :injury_rationale, :force, :demo_media_path, :media_type, :instructions,"
         " :est_time_seconds, :category, :primary_muscles, :secondary_muscles, :source_dataset, :status, :citations)",
         ex,
     )
@@ -226,6 +228,8 @@ def seed_authored_exercises(conn: sqlite3.Connection, errors: list[str]) -> dict
             if unknown:
                 errors.append(f"{where}: unknown injury tag(s) {sorted(unknown)}")
             rationale = injury_rationale(ex, contra, where, errors)
+            if ex.get("force") not in FORCES:
+                errors.append(f"{where}: force must be push, pull or static (or left out), not {ex.get('force')!r}")
             review = review_fields(ex, where, errors)   # optional status + citations in the yaml
             if review is None:
                 continue
@@ -234,7 +238,7 @@ def seed_authored_exercises(conn: sqlite3.Connection, errors: list[str]) -> dict
                 conn, id=ex["id"], name=ex["name"], muscle_group=group,
                 equipment_needed=json.dumps(ex.get("equipment_needed") or ["none"]),
                 difficulty=ex["difficulty"], injury_contraindications=json.dumps(contra),
-                injury_rationale=json.dumps(rationale),
+                injury_rationale=json.dumps(rationale), force=ex.get("force"),
                 contraindication_status="draft", demo_media_path=rel(find_media(folder, ex["id"])),
                 instructions=ex["instructions"].strip(), est_time_seconds=int(ex["est_time_seconds"]),
                 category=None, primary_muscles="[]", secondary_muscles="[]", source_dataset=DEFAULT_SOURCE,
@@ -265,15 +269,16 @@ def seed_free_exercise_db(conn: sqlite3.Connection, taken_ids: set[str], errors:
         if ex["id"] in taken_ids:
             errors.append(f"{where}: id already used by another exercise")
             continue
-        if ex.get("equipment") not in FEDB_EQUIPMENT or ex["level"] not in FEDB_LEVEL:
-            errors.append(f"{where}: unmapped equipment '{ex.get('equipment')}' or level '{ex['level']}'")
+        if ex.get("equipment") not in FEDB_EQUIPMENT or ex["level"] not in FEDB_LEVEL or ex.get("force") not in FORCES:
+            errors.append(f"{where}: unmapped equipment '{ex.get('equipment')}', level '{ex['level']}' "
+                          f"or force '{ex.get('force')}'")
             continue
         taken_ids.add(ex["id"])
         image = FEDB_DIR / "images" / ex["images"][0] if ex.get("images") else None
         insert_exercise(
             conn, id=ex["id"], name=ex["name"], muscle_group=fedb_muscle_group(ex),
             equipment_needed=json.dumps([FEDB_EQUIPMENT[ex.get("equipment")]]),
-            difficulty=FEDB_LEVEL[ex["level"]], injury_contraindications="[]",
+            difficulty=FEDB_LEVEL[ex["level"]], injury_contraindications="[]", force=ex.get("force"),
             contraindication_status="untagged", demo_media_path=rel(image) if image else None,
             instructions="\n".join(step.strip() for step in ex["instructions"]),
             est_time_seconds=FEDB_EST_SECONDS.get(ex.get("category"), 45), category=ex.get("category"),

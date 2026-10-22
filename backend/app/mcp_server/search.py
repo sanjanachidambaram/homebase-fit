@@ -148,6 +148,7 @@ def search_exercises(
             "difficulty": r["difficulty"],
             "est_time_seconds": r["est_time_seconds"],
             "category": r["category"],
+            "force": r["force"],
             "primary_muscles": json.loads(r["primary_muscles"]),
             "injury_contraindications": json.loads(r["injury_contraindications"]),
             "injury_check": check,

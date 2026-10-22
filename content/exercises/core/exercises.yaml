@@ -2,6 +2,8 @@
 # id: lowercase_with_underscores; demo media in this folder is named <id>.gif/.mp4/.jpg/.png
 # equipment_needed: list from none | mat | dumbbells | resistance_band | chair | bench
 # difficulty: beginner | intermediate | advanced
+# force: push | pull | static (optional; free-exercise-db's movement direction). Push plan days never
+#   get pull moves and Pull days never get push moves. Leave it out for moves with no single direction.
 # injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder | wrist | ankle).
 #   The app filters these out in code, so be conservative.
 # injury_rationale: one entry per tag above, {reasoning, tier, source}. reasoning = why the exercise is commonly
@@ -14,6 +16,7 @@ exercises:
     name: Dead Bug
     equipment_needed: [mat]
     difficulty: beginner
+    force: pull
     injury_contraindications: []
     est_time_seconds: 60
     instructions: Lie on your back with arms up and knees bent at 90 degrees. Press your low back into the floor and slowly extend the opposite arm and leg, then switch.
@@ -21,6 +24,7 @@ exercises:
     name: Forearm Plank
     equipment_needed: [mat]
     difficulty: beginner
+    force: static
     injury_contraindications: [shoulder]
     injury_rationale:
       shoulder:
@@ -33,6 +37,7 @@ exercises:
     name: Cat-Cow
     equipment_needed: [mat]
     difficulty: beginner
+    force: static
     injury_contraindications: [wrist]
     injury_rationale:
       wrist:
@@ -45,6 +50,7 @@ exercises:
     name: Pelvic Tilt
     equipment_needed: [mat]
     difficulty: beginner
+    force: static
     injury_contraindications: []
     est_time_seconds: 45
     instructions: Lie on your back with knees bent. Gently flatten your low back into the floor by tilting your pelvis, hold for a breath, and release.
@@ -52,6 +58,7 @@ exercises:
     name: Crunch
     equipment_needed: [mat]
     difficulty: beginner
+    force: pull
     injury_contraindications: [lower_back]
     injury_rationale:
       lower_back:

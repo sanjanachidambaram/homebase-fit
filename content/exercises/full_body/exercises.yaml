@@ -2,6 +2,8 @@
 # id: lowercase_with_underscores; demo media in this folder is named <id>.gif/.mp4/.jpg/.png
 # equipment_needed: list from none | mat | dumbbells | resistance_band | chair | bench
 # difficulty: beginner | intermediate | advanced
+# force: push | pull | static (optional; free-exercise-db's movement direction). Push plan days never
+#   get pull moves and Pull days never get push moves. Leave it out for moves with no single direction.
 # injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder | wrist | ankle).
 #   The app filters these out in code, so be conservative.
 # injury_rationale: one entry per tag above, {reasoning, tier, source}. reasoning = why the exercise is commonly
@@ -44,6 +46,7 @@ exercises:
     name: Mountain Climber
     equipment_needed: [mat]
     difficulty: intermediate
+    force: pull
     injury_contraindications: [shoulder, lower_back, wrist]
     injury_rationale:
       shoulder:
@@ -92,6 +95,7 @@ exercises:
     name: Dumbbell Squat to Press
     equipment_needed: [dumbbells]
     difficulty: intermediate
+    force: push
     injury_contraindications: [knee, shoulder]
     injury_rationale:
       knee:

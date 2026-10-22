@@ -39,17 +39,22 @@ DAY_PATTERNS = {
     1: ("wed",), 2: ("mon", "thu"), 3: ("mon", "wed", "fri"), 4: ("mon", "tue", "thu", "fri"),
     5: ("mon", "tue", "wed", "fri", "sat"), 6: ("mon", "tue", "wed", "thu", "fri", "sat"),
 }
-# Day templates per split: (label, muscle groups in the order they're filled).
+# Day templates per split: (label, muscle groups in the order they're filled, movement direction or None).
+# A direction keeps the opposite one out of that day's upper-body slots: a Push day never gets a curl or a row,
+# and a Pull day never gets a push-up or a dip (exercises.force). Static and unclassified moves stay allowed.
 DAY_TEMPLATES = {
-    "full_body": [("Full body A", ["legs", "back", "chest", "core", "shoulders", "arms", "full_body", "legs"]),
-                  ("Full body B", ["legs", "chest", "back", "core", "arms", "shoulders", "full_body", "core"])],
-    "circuit": [("Full-body circuit", ["full_body", "legs", "back", "core", "chest", "shoulders", "arms", "legs"])],
-    "upper_lower": [("Upper body", ["chest", "back", "shoulders", "arms", "core", "back", "chest", "arms"]),
-                    ("Lower body + core", ["legs", "core", "legs", "full_body", "legs", "core", "legs", "core"])],
-    "push_pull_legs": [("Push", ["chest", "shoulders", "arms", "chest", "core", "shoulders", "arms", "core"]),
-                       ("Pull", ["back", "arms", "back", "core", "shoulders", "back", "arms", "core"]),
-                       ("Legs", ["legs", "legs", "core", "legs", "full_body", "legs", "core", "legs"])],
+    "full_body": [("Full body A", ["legs", "back", "chest", "core", "shoulders", "arms", "full_body", "legs"], None),
+                  ("Full body B", ["legs", "chest", "back", "core", "arms", "shoulders", "full_body", "core"], None)],
+    "circuit": [("Full-body circuit", ["full_body", "legs", "back", "core", "chest", "shoulders", "arms", "legs"],
+                 None)],
+    "upper_lower": [("Upper body", ["chest", "back", "shoulders", "arms", "core", "back", "chest", "arms"], None),
+                    ("Lower body + core", ["legs", "core", "legs", "full_body", "legs", "core", "legs", "core"], None)],
+    "push_pull_legs": [("Push", ["chest", "shoulders", "arms", "chest", "core", "shoulders", "arms", "core"], "push"),
+                       ("Pull", ["back", "arms", "back", "core", "shoulders", "back", "arms", "core"], "pull"),
+                       ("Legs", ["legs", "legs", "core", "legs", "full_body", "legs", "core", "legs"], None)],
 }
+DIRECTIONAL_GROUPS = {"chest", "shoulders", "arms", "back"}   # where push vs pull matters
+OPPOSITE = {"push": "pull", "pull": "push"}
 # Quiz equipment answers -> equipment values in the exercise library. None = no equipment filter.
 QUIZ_EQUIPMENT = {
     "bodyweight": ["none"], "dumbbells": ["dumbbells"], "resistance_band": ["resistance_band"], "mat": ["mat"],
@@ -308,12 +313,16 @@ class Picker:
             ]
         return self.candidates[group]
 
-    def pick(self, group: str, used_today: set[str]) -> dict | None:
-        options = [(self.week_use.get(e["id"], 0), i, e) for i, e in enumerate(self.pool(group))
-                   if e["id"] not in used_today]
+    def pick(self, group: str, used_today: set[str], direction: str | None = None) -> dict | None:
+        allowed = self.pool(group)
+        if direction and group in DIRECTIONAL_GROUPS:   # Push/Pull days: never the opposite movement
+            allowed = [e for e in allowed if e.get("force") != OPPOSITE[direction]]
+        options = [(self.week_use.get(e["id"], 0), i, e) for i, e in enumerate(allowed) if e["id"] not in used_today]
         if not options:
             if not self.pool(group):
                 self.empty_groups.add(group)
+            elif not allowed:
+                self.empty_groups.add(f"{direction}ing {group}")
             return None
         _, _, chosen = min(options, key=lambda t: (t[0], t[1]))   # least used this week, then search order
         self.week_use[chosen["id"]] = self.week_use.get(chosen["id"], 0) + 1
@@ -326,7 +335,8 @@ def exercise_seconds(est_time_seconds: int, b: Blended) -> int:
     return b.sets[1] * est_time_seconds + (b.sets[1] - 1) * b.rest_seconds
 
 
-def build_day(day: str, label: str, groups: list[str], picker: Picker, b: Blended) -> PlanDay:
+def build_day(day: str, label: str, groups: list[str], picker: Picker, b: Blended,
+              direction: str | None = None) -> PlanDay:
     """Fill the day's muscle-group slots in order (cycling through them again if there's time left)
     until the session length or MAX_EXERCISES is reached."""
     budget = b.session_length_minutes * 60
@@ -336,7 +346,7 @@ def build_day(day: str, label: str, groups: list[str], picker: Picker, b: Blende
     for group in (groups * 2)[: MAX_EXERCISES * 2]:
         if len(exercises) >= MAX_EXERCISES:
             break
-        e = picker.pick(group, used_today)
+        e = picker.pick(group, used_today, direction)
         if e is None:
             continue
         seconds = exercise_seconds(e["est_time_seconds"], b)
@@ -388,8 +398,8 @@ def generate(profile: dict) -> WeeklyProgram:
     days = []
     for day in WEEK:
         if day in training:
-            label, groups = templates[training.index(day) % len(templates)]
-            days.append(build_day(day, label, groups, picker, b))
+            label, groups, direction = templates[training.index(day) % len(templates)]
+            days.append(build_day(day, label, groups, picker, b, direction))
         else:
             days.append(PlanDay(day=day, kind="rest"))
 
