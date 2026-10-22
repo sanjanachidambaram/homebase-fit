@@ -13,7 +13,10 @@ from app import config
 
 def connect(path: Path | None = None) -> sqlite3.Connection:
     # config.WORKING_DB is read at call time so tests can point it at a temp copy.
-    conn = sqlite3.connect(path or config.WORKING_DB)
+    # check_same_thread=False: FastAPI may open a request's connection (the `db` dependency) on one worker
+    # thread and run the endpoint on another. Each request has its own connection and uses it one step at a
+    # time, so handing it between threads is safe.
+    conn = sqlite3.connect(path or config.WORKING_DB, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn

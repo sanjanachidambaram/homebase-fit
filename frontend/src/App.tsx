@@ -1,21 +1,36 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type JSX } from 'react'
 import { fetchSources, type Source } from './api'
 import { DisclaimerBar } from './components/Legal'
+import Link from './components/Link'
+import BuildPage from './pages/BuildPage'
 import ContentPage from './pages/ContentPage'
+import DashboardPage from './pages/DashboardPage'
 import ExercisesPage from './pages/ExercisesPage'
 import LegalPage from './pages/LegalPage'
 import QuizPage from './pages/QuizPage'
 import SettingsPage from './pages/SettingsPage'
-import Link from './components/Link'
 import { usePath } from './router'
 import './App.css'
 
-const PAGES: { path: string; label: string; element: () => React.JSX.Element }[] = [
-  { path: '/', label: 'Exercises', element: ExercisesPage },
-  { path: '/quiz', label: 'Quiz', element: QuizPage },
-  { path: '/content', label: 'Programs & Basics', element: ContentPage },
-  { path: '/settings', label: 'Settings', element: SettingsPage },
-  { path: '/legal', label: 'Legal', element: LegalPage },
+const PAGES: Record<string, () => JSX.Element> = {
+  '/': DashboardPage,
+  '/content': ContentPage,
+  '/build': BuildPage,
+  '/faves': () => <ExercisesPage initialTab="faves" />,
+  '/exercises': () => <ExercisesPage />,
+  '/settings': SettingsPage,
+  '/quiz': QuizPage, // reached from the dashboard and sign-up, not the nav
+  '/legal': LegalPage, // linked from the footer on every page
+}
+
+// Only pages that exist get a nav link (no Calendar yet).
+const NAV: { path: string; label: string }[] = [
+  { path: '/', label: 'Dashboard' },
+  { path: '/content', label: 'Programs & Basics' },
+  { path: '/build', label: 'Build Your Own' },
+  { path: '/faves', label: 'My Faves' },
+  { path: '/exercises', label: 'Exercise Library' },
+  { path: '/settings', label: 'Settings' },
 ]
 
 function SourcesFooter({ sources }: { sources: Source[] }) {
@@ -54,30 +69,36 @@ export default function App() {
       .catch(() => setSources([]))
   }, [])
 
-  const page = PAGES.find((p) => p.path === path)
-  const Page = page?.element
+  const Page = PAGES[path]
 
   return (
     <div className="page">
       <header className="site-header">
-        <h1>
-          <Link to="/">HomeBase Fit</Link>
-        </h1>
-        <nav>
-          {PAGES.map((p) => (
-            <Link key={p.path} to={p.path} className={p.path === path ? 'active' : ''}>
-              {p.label}
+        <div className="header-inner">
+          <h1 className="brand">
+            <Link to="/">
+              <span className="brand-mark" aria-hidden="true">
+                ♥
+              </span>
+              HomeBase Fit
             </Link>
-          ))}
-        </nav>
+          </h1>
+          <nav aria-label="Main">
+            {NAV.map((p) => (
+              <Link key={p.path} to={p.path} className={p.path === path ? 'nav-link active' : 'nav-link'}>
+                {p.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
       </header>
 
-      <main>
+      <main key={path} className="page-enter">
         {Page ? (
           <Page />
         ) : (
           <p>
-            Page not found. <Link to="/">Go home</Link>
+            Page not found. <Link to="/">Go to the dashboard</Link>
           </p>
         )}
       </main>

@@ -1,15 +1,40 @@
+/* HomeBase Fit design tokens. Source of truth: design.md (sections 2-4).
+   Brand colors are for fills and accents; text uses --ink or the *-deep colors (contrast in design.md). */
 :root {
-  --blue: #1f4e9c;
-  --blue-dark: #163a75;
-  --blue-light: #e8eff9;
-  --border: #c9d6ea;
-  --text: #1a1a1a;
-  --muted: #555;
+  --pink: #ff4fa3;
+  --yellow: #ffd23f;
+  --mint: #06d6a0;
+  --lavender: #b298dc;
+  --coral: #ff6b6b;
+  --bg: #fff9f5;
+  --ink: #3a2147;
+  --ink-soft: #5e4a68;          /* secondary text; 7.6:1 on --bg */
+  --pink-deep: #e0006b;
+  --mint-deep: #048261;
+  --lavender-deep: #865dc8;
+  --error: #b3261e;
 
-  font-family: 'Times New Roman', Times, serif;
-  color: var(--text);
-  background: #ffffff;
-  line-height: 1.4;
+  /* light tints for backgrounds (dark ink text on all of them) */
+  --pink-tint: #ffe3f0;
+  --yellow-tint: #fff4cc;
+  --mint-tint: #d8f8ee;
+  --lavender-tint: #efe8fa;
+  --coral-tint: #ffe3e3;
+
+  --radius-card: 24px;
+  --radius-input: 16px;
+  --radius-pill: 999px;
+  --shadow: 0 8px 24px rgba(255, 79, 163, 0.16);
+  --shadow-lift: 0 12px 28px rgba(255, 79, 163, 0.24);
+  --font-display: 'Fredoka Variable', 'Fredoka', 'Baloo 2', system-ui, sans-serif;
+  --font-body: 'Nunito Variable', 'Nunito', 'Quicksand', system-ui, sans-serif;
+
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
 }
 
 * {
@@ -18,8 +43,55 @@
 
 body {
   margin: 0;
+  background: var(--bg);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.2;
 }
 
 a {
-  color: var(--blue);
+  color: var(--pink-deep);
+  text-underline-offset: 3px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* One visible focus ring for everything (design.md section 8). */
+:focus-visible {
+  outline: 3px solid var(--pink-deep);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Reduced motion is a requirement: no bounces, slides, or confetti. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

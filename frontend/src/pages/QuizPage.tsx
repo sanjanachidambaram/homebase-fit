@@ -247,6 +247,9 @@ export default function QuizPage() {
             Disclaimer accepted on {new Date(saved.consent_accepted_at).toLocaleString()}. You can review or delete
             your data any time in <Link to="/settings">Settings</Link>.
           </p>
+          <Link to="/" className="btn btn-big">
+            Go to my dashboard
+          </Link>
         </div>
       )}
     </>

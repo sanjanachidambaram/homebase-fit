@@ -12,7 +12,7 @@ function label(value: string): string {
 
 function ExerciseCard({ ex, favorites, onOpen }: { ex: Exercise; favorites: Favorites; onOpen: () => void }) {
   return (
-    <article className="card">
+    <article className={`card group-${ex.muscle_group}`}>
       <DemoMedia url={ex.demo_media_url} type={ex.media_type} alt={`${ex.name} demo`} compact />
       <div className="card-body">
         <h3>
@@ -39,9 +39,9 @@ function ExerciseCard({ ex, favorites, onOpen }: { ex: Exercise; favorites: Favo
   )
 }
 
-export default function ExercisesPage() {
+export default function ExercisesPage({ initialTab = 'all' }: { initialTab?: 'all' | 'faves' }) {
   const favorites = useFavorites()
-  const [tab, setTab] = useState<'all' | 'faves'>('all')
+  const [tab, setTab] = useState<'all' | 'faves'>(initialTab)
   const [group, setGroup] = useState<MuscleGroup | ''>('')
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [loading, setLoading] = useState(true)
@@ -75,7 +75,7 @@ export default function ExercisesPage() {
 
   return (
     <>
-      <h2 className="page-title">Exercise library (test page)</h2>
+      <h2 className="page-title">{tab === 'faves' ? 'My Faves' : 'Exercise library'}</h2>
 
       <div className="tabs" role="group" aria-label="Exercise view">
         <button type="button" className={tab === 'all' ? 'tab tab-on' : 'tab'} aria-pressed={tab === 'all'} onClick={() => setTab('all')}>

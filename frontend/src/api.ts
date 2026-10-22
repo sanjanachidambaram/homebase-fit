@@ -182,3 +182,91 @@ export const addFavorite = (exerciseId: string, token: string) =>
 
 export const removeFavorite = (exerciseId: string, token: string) =>
   request<{ favorited: boolean }>(`/api/favorites/${encodeURIComponent(exerciseId)}`, { method: 'DELETE' }, token)
+
+// ---------------------------------------------------------------- agents (all need a sign-in)
+
+export interface AgentMeta {
+  agent_run_id?: number
+  usage?: { input_tokens: number; output_tokens: number; cached_tokens: number; requests: number; tool_calls: number }
+  tool_calls?: { tool: string; args: Record<string, unknown>; called_by: string }[]
+  agent_called?: boolean
+}
+
+export interface AgentResponse<T> {
+  result: T
+  meta: AgentMeta
+}
+
+export interface ProgramRecommendation {
+  recommended: boolean
+  program_id: number | null
+  name: string | null
+  rationale: string
+  goal_tags: string[]
+  matched_goals: string[]
+  status: 'placeholder' | 'pt_reviewed' | null
+  review_notice: string | null
+  review_note: string | null
+  citations: Citation[]
+  injury_note: string | null
+  schedule: Record<string, { exercise_id: string; name: string; sets: number; reps: string }[]> | null
+  message: string | null
+}
+
+export interface WorkoutRequest {
+  picks: Partial<Record<MuscleGroup, number>>
+  time_budget_minutes: number
+  equipment?: string[]
+}
+
+export interface SessionExercise {
+  order: number
+  exercise_id: string
+  name: string
+  muscle_group: MuscleGroup
+  sets: number
+  reps: string
+  rest_seconds: number
+  est_minutes: number
+  injury_check: string
+}
+
+export interface WorkoutSession {
+  exercises: SessionExercise[]
+  total_estimated_minutes: number
+  time_budget_minutes: number
+  balance_note: string
+  notes: string[]
+}
+
+export type GoalStatus = 'on_track' | 'ahead' | 'behind' | 'insufficient_data'
+
+export interface CoachMessage {
+  encouragement: string
+  fun_fact: string | null
+  goal_status: GoalStatus
+  overtraining_flag: boolean
+  rest_suggestion: string | null
+  current_streak_days: number
+  sessions_last_30_days: number
+  total_weight_lifted_lbs: number
+}
+
+export interface BasicsAnswer {
+  answer: string
+  answered: boolean
+  redirected_to_professional: boolean
+  sources: { slug: string; title: string; status: string; review_notice: string | null; citations: Citation[] }[]
+  review_note: string | null
+}
+
+export const recommendProgram = (token: string) =>
+  request<AgentResponse<ProgramRecommendation>>('/api/programs/recommend', { method: 'POST' }, token)
+
+export const buildWorkout = (token: string, body: WorkoutRequest) =>
+  request<AgentResponse<WorkoutSession>>('/api/workouts/build', { method: 'POST', body: JSON.stringify(body) }, token)
+
+export const fetchCoach = (token: string) => request<AgentResponse<CoachMessage>>('/api/coach/summary', {}, token)
+
+export const askBasics = (token: string, question: string) =>
+  request<AgentResponse<BasicsAnswer>>('/api/basics/ask', { method: 'POST', body: JSON.stringify({ question }) }, token)
