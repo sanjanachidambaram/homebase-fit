@@ -178,3 +178,296 @@ main {
     font-size: 0.85rem;
   }
 }
+
+/* ---------------------------------------------------------------- layout & nav */
+
+.site-header h1 a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.site-header nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-top: 0.5rem;
+}
+
+.site-header nav a {
+  color: #fff;
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.site-header nav a.active,
+.site-header nav a:hover {
+  border-bottom-color: #fff;
+}
+
+.page-title {
+  margin: 0.25rem 0 0.75rem;
+  color: var(--blue-dark);
+}
+
+.section-title {
+  color: var(--blue-dark);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.25rem;
+}
+
+.meta,
+.hint {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.success {
+  color: #1b6b2f;
+  font-weight: bold;
+}
+
+.prose {
+  max-width: 720px;
+}
+
+/* ---------------------------------------------------------------- disclaimer (every page) */
+
+.disclaimer-bar {
+  background: var(--blue-dark);
+  color: #fff;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.95rem;
+}
+
+.disclaimer-bar a {
+  color: #fff;
+  font-weight: bold;
+}
+
+/* ---------------------------------------------------------------- forms & buttons */
+
+.btn,
+.btn-secondary,
+.btn-danger {
+  font: inherit;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid var(--blue);
+}
+
+.btn {
+  background: var(--blue);
+  color: #fff;
+}
+
+.btn-secondary {
+  background: #fff;
+  color: var(--blue);
+}
+
+.btn-danger {
+  background: #a11;
+  border-color: #a11;
+  color: #fff;
+}
+
+.btn:disabled,
+.btn-danger:disabled,
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-link {
+  font: inherit;
+  background: none;
+  border: none;
+  color: var(--blue);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 1rem;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.account-form form,
+.quiz-step,
+.settings-section {
+  max-width: 560px;
+}
+
+.account-form form label,
+.question {
+  display: block;
+  margin-bottom: 0.9rem;
+}
+
+.account-form input,
+.question input[type='number'],
+.question input[type='text'],
+.question textarea {
+  display: block;
+  width: 100%;
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  margin-top: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+fieldset.question {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem 0.75rem;
+}
+
+.question legend,
+.question .legend {
+  font-weight: bold;
+}
+
+.choice {
+  display: block;
+  margin: 0.3rem 0;
+}
+
+.choice input {
+  margin-right: 0.4rem;
+}
+
+.number-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.number-row input {
+  max-width: 10rem;
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  padding-left: 1.25rem;
+  color: var(--muted);
+}
+
+.steps .current {
+  color: var(--blue-dark);
+  font-weight: bold;
+}
+
+/* ---------------------------------------------------------------- privacy & consent */
+
+.privacy-note,
+.consent-box {
+  background: var(--blue-light);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--blue);
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+  max-width: 720px;
+}
+
+.privacy-note h3,
+.consent-box h3 {
+  color: var(--blue-dark);
+  margin: 0.4rem 0;
+}
+
+.privacy-note li,
+.consent-box li {
+  margin-bottom: 0.35rem;
+}
+
+.consent-check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin: 0.75rem 0 0.5rem;
+  font-weight: bold;
+}
+
+.consent-check input {
+  margin-top: 0.25rem;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+/* ---------------------------------------------------------------- reviewed content */
+
+.content-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.content-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+}
+
+.content-item h4 {
+  margin: 0.4rem 0 0.2rem;
+  color: var(--blue-dark);
+  font-size: 1.1rem;
+}
+
+.review-tag {
+  display: inline-block;
+  font-size: 0.8rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  border: 1px dashed var(--blue);
+  color: var(--blue);
+  background: #fff;
+}
+
+.review-tag-ok {
+  border-style: solid;
+  background: var(--blue);
+  color: #fff;
+}
+
+.citations {
+  font-size: 0.9rem;
+  margin-top: 0.3rem;
+}
+
+.citations ul {
+  margin: 0.2rem 0;
+}
+
+/* ---------------------------------------------------------------- settings */
+
+.settings-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.25rem 1rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.danger-zone {
+  border-color: #d9a3a3;
+}
+
+.danger-zone h3 {
+  color: #a11;
+}
+
+.confirm-box {
+  border: 1px solid #a11;
+  background: #fff5f5;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}

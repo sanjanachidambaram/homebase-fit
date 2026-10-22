@@ -13,6 +13,8 @@
 #   allow_free_text (optional) also show a text box under the options
 #   unit, min, max (number types, optional)
 #   required       true/false
+#   health         true = health/injury question. These are only shown AFTER the user
+#                  accepts the medical disclaimer, so keep this flag on the real quiz too.
 #
 # The injury option values (lower_back, knee, shoulder) must match the
 # injury_contraindications tags in content/exercises/*/exercises.yaml,
@@ -40,6 +42,7 @@ questions:
       - { value: no_deadline, label: No deadline, just building a habit }
 
   - id: injuries
+    health: true
     prompt: Any injuries or areas that need extra care?
     type: multi_select
     required: true
@@ -53,6 +56,7 @@ questions:
       - { value: none,       label: None }
 
   - id: age
+    health: true
     prompt: How old are you?
     type: number
     unit: years
@@ -61,6 +65,7 @@ questions:
     required: true
 
   - id: weight
+    health: true
     prompt: What is your current weight?
     type: number
     unit: lb
@@ -69,6 +74,7 @@ questions:
     required: true
 
   - id: height
+    health: true
     prompt: How tall are you?
     type: number
     unit: in

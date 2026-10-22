@@ -11,3 +11,6 @@ pyyaml
 fastapi==0.143.0
 uvicorn[standard]==0.54.0
 httpx
+
+# Tests (python -m pytest)
+pytest

@@ -2,6 +2,8 @@
 title: Injury Prevention Basics
 category: injury_prevention
 media_path: content/basics/media/injury_prevention_basics.jpg
+status: placeholder
+citations: []
 ---
 
 > **PLACEHOLDER — PT/OB-GYN TO REVIEW.** Do not treat this text as reviewed guidance.

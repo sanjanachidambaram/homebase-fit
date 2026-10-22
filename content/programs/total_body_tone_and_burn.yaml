@@ -5,6 +5,10 @@ name: Total-Body Tone & Burn
 goal_tags: [weight_loss, tone]
 injury_focus: []
 created_by: placeholder
+# status: placeholder | pt_reviewed. pt_reviewed requires at least one citation.
+status: placeholder
+# citations: list of { claim: "...", source: "full reference or URL" }. PT TO FILL IN.
+citations: []
 description: >
   Bodyweight circuits three days a week. Short rests keep your heart rate
   up while every major muscle group gets worked each session.

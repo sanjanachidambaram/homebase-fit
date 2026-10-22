@@ -2,6 +2,8 @@
 title: When to Push Through and When to Stop
 category: safety
 media_path: content/basics/media/push_through_vs_stop.jpg
+status: placeholder
+citations: []
 ---
 
 > **PLACEHOLDER — PT/OB-GYN TO REVIEW.** Do not treat this text as reviewed guidance.

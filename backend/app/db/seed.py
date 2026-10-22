@@ -71,6 +71,31 @@ def require(item: dict, fields: tuple[str, ...], where: str, errors: list[str]) 
     return not missing
 
 
+def review_fields(item: dict, where: str, errors: list[str]) -> tuple[str, str] | None:
+    """Validate status + citations; returns (status, citations_json) or None.
+    Citation integrity: content can't be marked pt_reviewed without at least
+    one {claim, source} citation backing it."""
+    status = item.get("status") or "placeholder"
+    citations = item.get("citations") or []
+    ok = True
+    if status not in ("placeholder", "pt_reviewed"):
+        errors.append(f"{where}: status must be placeholder or pt_reviewed, not '{status}'")
+        ok = False
+    if not isinstance(citations, list) or not all(
+        isinstance(c, dict) and str(c.get("claim") or "").strip() and str(c.get("source") or "").strip()
+        for c in citations
+    ):
+        errors.append(f"{where}: each citation needs a non-empty claim and source")
+        ok = False
+    elif status == "pt_reviewed" and not citations:
+        errors.append(f"{where}: pt_reviewed content needs at least one citation")
+        ok = False
+    if not ok:
+        return None
+    clean = [{"claim": str(c["claim"]).strip(), "source": str(c["source"]).strip()} for c in citations]
+    return status, json.dumps(clean)
+
+
 def check_source(source_id: str, sources: set[str], where: str, errors: list[str]) -> bool:
     if source_id not in sources:
         errors.append(f"{where}: source '{source_id}' is not in content/sources.yaml")
@@ -213,12 +238,15 @@ def seed_programs(conn: sqlite3.Connection, contraindications: dict[str, set[str
         source = p.get("source") or DEFAULT_SOURCE
         if not check_source(source, sources, rel(path), errors):
             continue
+        review = review_fields(p, rel(path), errors)
+        if review is None:
+            continue
         focus = set(p.get("injury_focus") or [])
         cur = conn.execute(
-            "INSERT INTO program_templates (name, goal_tags, injury_focus, description,"
-            " science_rationale, created_by, source_id, source_file) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO program_templates (name, goal_tags, injury_focus, description, science_rationale,"
+            " created_by, source_id, source_file, status, citations) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (p["name"], json.dumps(p["goal_tags"]), json.dumps(sorted(focus)), p["description"].strip(),
-             p["science_rationale"].strip(), p["created_by"], source, rel(path)),
+             p["science_rationale"].strip(), p["created_by"], source, rel(path), *review),
         )
         program_id = cur.lastrowid
         for day, items in p["schedule"].items():
@@ -259,10 +287,13 @@ def seed_basics(conn: sqlite3.Connection, sources: set[str], errors: list[str]) 
         source = meta.get("source") or DEFAULT_SOURCE
         if not check_source(source, sources, rel(path), errors):
             continue
+        review = review_fields(meta, rel(path), errors)
+        if review is None:
+            continue
         conn.execute(
-            "INSERT INTO basics_articles (slug, title, category, content, media_path, source_id)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            (path.stem, meta["title"], meta["category"], body, meta.get("media_path"), source),
+            "INSERT INTO basics_articles (slug, title, category, content, media_path, source_id, status, citations)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (path.stem, meta["title"], meta["category"], body, meta.get("media_path"), source, *review),
         )
 
 

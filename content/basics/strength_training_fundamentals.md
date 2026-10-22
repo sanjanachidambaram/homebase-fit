@@ -2,6 +2,8 @@
 title: Strength Training Fundamentals
 category: fundamentals
 media_path: content/basics/media/strength_training_fundamentals.jpg
+status: placeholder
+citations: []
 ---
 
 > **PLACEHOLDER — PT/OB-GYN TO REVIEW.** Do not treat this text as reviewed guidance.

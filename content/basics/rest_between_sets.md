@@ -2,6 +2,8 @@
 title: How Long to Rest Between Sets
 category: recovery
 media_path: content/basics/media/rest_between_sets.jpg
+status: placeholder
+citations: []
 ---
 
 > **PLACEHOLDER — PT/OB-GYN TO REVIEW.** Do not treat this text as reviewed guidance.

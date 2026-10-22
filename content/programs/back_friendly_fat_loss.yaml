@@ -15,6 +15,10 @@ name: Back-Friendly Fat Loss
 goal_tags: [weight_loss, rehab]
 injury_focus: [lower_back]
 created_by: placeholder
+# status: placeholder | pt_reviewed. pt_reviewed requires at least one citation.
+status: placeholder
+# citations: list of { claim: "...", source: "full reference or URL" }. PT TO FILL IN.
+citations: []
 description: >
   Three low-impact sessions a week that keep your heart rate up while
   strengthening the muscles that support your lower back. No jumping, no

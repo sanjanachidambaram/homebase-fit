@@ -13,6 +13,9 @@ PRAGMA foreign_keys = ON;
 
 -- ---------------------------------------------------------------- users
 
+-- Deleting a user (DELETE /api/users/{id}) removes their quiz_profiles,
+-- workout_logs, measurements, and safety_events too (ON DELETE CASCADE, plus
+-- explicit deletes in app/users.py). AUTOINCREMENT means ids are never reused.
 CREATE TABLE users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     email         TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -42,8 +45,14 @@ CREATE TABLE quiz_profiles (
     age          INTEGER CHECK (age BETWEEN 13 AND 120),
     weight       REAL CHECK (weight > 0),                                      -- lb
     height       REAL CHECK (height > 0),                                      -- in
+    -- Medical disclaimer acknowledgment. The quiz can't be saved without it,
+    -- and the table-level CHECK below means the database refuses it too.
+    consent_accepted    INTEGER NOT NULL CHECK (consent_accepted IN (0, 1)),
+    consent_accepted_at TEXT,                                                  -- UTC timestamp of acceptance
+    consent_version     TEXT,                                                  -- which disclaimer text was accepted
     created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    CHECK (consent_accepted = 1 AND consent_accepted_at IS NOT NULL AND consent_version IS NOT NULL)
 );
 
 -- ---------------------------------------------------------------- content
@@ -92,7 +101,11 @@ CREATE TABLE program_templates (
     science_rationale TEXT NOT NULL,
     created_by        TEXT NOT NULL,
     source_id         TEXT NOT NULL REFERENCES sources(id),
-    source_file       TEXT                                                          -- content/programs/<file>.yaml
+    source_file       TEXT,                                                         -- content/programs/<file>.yaml
+    -- Citation integrity: science claims need a source. [{"claim": ..., "source": ...}]
+    citations         TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(citations) AND json_type(citations) = 'array'),
+    -- 'placeholder' content is flagged "Content pending expert review" by the API.
+    status            TEXT NOT NULL DEFAULT 'placeholder' CHECK (status IN ('placeholder', 'pt_reviewed'))
 );
 
 CREATE TABLE program_template_exercises (
@@ -114,7 +127,9 @@ CREATE TABLE basics_articles (
     category    TEXT NOT NULL,
     content     TEXT NOT NULL,          -- markdown body
     media_path  TEXT,
-    source_id   TEXT NOT NULL REFERENCES sources(id)
+    source_id   TEXT NOT NULL REFERENCES sources(id),
+    citations   TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(citations) AND json_type(citations) = 'array'),
+    status      TEXT NOT NULL DEFAULT 'placeholder' CHECK (status IN ('placeholder', 'pt_reviewed'))
 );
 
 -- ---------------------------------------------------------------- user activity
@@ -145,9 +160,10 @@ CREATE INDEX idx_measurements_user_date ON measurements(user_id, date);
 -- ---------------------------------------------------------------- safety
 
 -- Every time the red-flag / injury-language redirect fires.
+-- Deleting a user deletes their events too (trigger_text is their own words).
 CREATE TABLE safety_events (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id      INTEGER REFERENCES users(id) ON DELETE SET NULL,   -- NULL if not signed in
+    user_id      INTEGER REFERENCES users(id) ON DELETE CASCADE,    -- NULL if not signed in
     timestamp    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     source       TEXT NOT NULL CHECK (source IN ('quiz', 'basics_qa')),
     trigger_text TEXT NOT NULL,     -- the user text that tripped the check

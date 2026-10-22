@@ -12,10 +12,16 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.config import CONTENT_DIR, MODEL_NAME, PROJECT_ROOT, WORKING_DB, is_production, llm_provider
+from app import config
+from app.config import CONTENT_DIR, MODEL_NAME, PROJECT_ROOT, is_production, llm_provider
 from app.db import connect, ensure_working_db, table_counts
+from app.users import router as users_router
 
 MuscleGroup = Literal["legs", "arms", "chest", "shoulders", "back", "core", "full_body"]
+
+# Shown on any program/article whose status is still 'placeholder', so no UI
+# can present unreviewed content as if it were verified.
+REVIEW_NOTICE = "Content pending expert review"
 
 
 @asynccontextmanager
@@ -36,6 +42,8 @@ app.add_middleware(
 
 # Demo images etc. DB media paths are project-relative ("content/..."), so the URL is "/" + path.
 app.mount("/content", StaticFiles(directory=CONTENT_DIR), name="content")
+
+app.include_router(users_router)
 
 
 def media_url(path: str | None) -> str | None:
@@ -100,6 +108,57 @@ def list_sources() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def review_fields(r) -> dict:
+    """status + citations for a program or article, with the pending-review flag."""
+    return {
+        "status": r["status"],
+        "review_notice": REVIEW_NOTICE if r["status"] == "placeholder" else None,
+        "citations": json.loads(r["citations"]),
+        "source_id": r["source_id"],
+    }
+
+
+@app.get("/api/programs")
+def list_programs() -> list[dict]:
+    conn = connect()
+    try:
+        rows = conn.execute("SELECT * FROM program_templates ORDER BY name").fetchall()
+    finally:
+        conn.close()
+    return [
+        {
+            "id": r["id"],
+            "name": r["name"],
+            "goal_tags": json.loads(r["goal_tags"]),
+            "injury_focus": json.loads(r["injury_focus"]),
+            "description": r["description"],
+            "science_rationale": r["science_rationale"],
+            **review_fields(r),
+        }
+        for r in rows
+    ]
+
+
+@app.get("/api/basics")
+def list_basics() -> list[dict]:
+    conn = connect()
+    try:
+        rows = conn.execute("SELECT * FROM basics_articles ORDER BY title").fetchall()
+    finally:
+        conn.close()
+    return [
+        {
+            "slug": r["slug"],
+            "title": r["title"],
+            "category": r["category"],
+            "content": r["content"],
+            "media_url": media_url(r["media_path"]),
+            **review_fields(r),
+        }
+        for r in rows
+    ]
+
+
 @app.get("/api/debug/tables")
 def debug_tables() -> dict:
     """Dev-only: row counts per table in the working database."""
@@ -107,6 +166,6 @@ def debug_tables() -> dict:
         raise HTTPException(404)
     conn = connect()
     try:
-        return {"database": WORKING_DB.name, "tables": table_counts(conn)}
+        return {"database": config.WORKING_DB.name, "tables": table_counts(conn)}
     finally:
         conn.close()

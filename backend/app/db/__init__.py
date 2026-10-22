@@ -8,11 +8,12 @@ Two files, same pattern as the shop project:
 import sqlite3
 from pathlib import Path
 
-from app.config import ORIGINAL_DB, WORKING_DB
+from app import config
 
 
-def connect(path: Path = WORKING_DB) -> sqlite3.Connection:
-    conn = sqlite3.connect(path)
+def connect(path: Path | None = None) -> sqlite3.Connection:
+    # config.WORKING_DB is read at call time so tests can point it at a temp copy.
+    conn = sqlite3.connect(path or config.WORKING_DB)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
@@ -31,10 +32,10 @@ def copy_db(src: Path, dst: Path) -> None:
 
 def ensure_working_db() -> None:
     """Create the working copy from the original if it's missing (fresh deploy)."""
-    if not WORKING_DB.exists():
-        if not ORIGINAL_DB.exists():
-            raise RuntimeError(f"{ORIGINAL_DB.name} not found. Build it with: python -m app.db.seed")
-        copy_db(ORIGINAL_DB, WORKING_DB)
+    if not config.WORKING_DB.exists():
+        if not config.ORIGINAL_DB.exists():
+            raise RuntimeError(f"{config.ORIGINAL_DB.name} not found. Build it with: python -m app.db.seed")
+        copy_db(config.ORIGINAL_DB, config.WORKING_DB)
 
 
 def table_counts(conn: sqlite3.Connection) -> dict[str, int]:

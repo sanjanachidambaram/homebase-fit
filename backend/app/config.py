@@ -38,6 +38,26 @@ def get_secret(name: str) -> str | None:
     return value or None
 
 
+_dev_secret: str | None = None
+
+
+def app_secret_key() -> str:
+    """Signs login tokens. Required in production; in dev a random per-process
+    key is used if unset (so tokens stop working when the server restarts)."""
+    global _dev_secret
+    key = get_secret("APP_SECRET_KEY")
+    if key:
+        return key
+    if is_production():
+        raise RuntimeError("APP_SECRET_KEY must be set in production.")
+    if _dev_secret is None:
+        import secrets
+        import warnings
+        _dev_secret = secrets.token_hex(32)
+        warnings.warn("APP_SECRET_KEY not set; using a temporary key. Sign-ins reset when the server restarts.")
+    return _dev_secret
+
+
 def is_production() -> bool:
     """APP_ENV=production turns off dev-only routes like /api/debug/*."""
     return (get_secret("APP_ENV") or "development").lower() == "production"

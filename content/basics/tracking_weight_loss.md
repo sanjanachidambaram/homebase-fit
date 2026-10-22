@@ -2,6 +2,8 @@
 title: How to Track Weight Loss
 category: tracking
 media_path: content/basics/media/tracking_weight_loss.jpg
+status: placeholder
+citations: []
 ---
 
 > **PLACEHOLDER — PT/OB-GYN TO REVIEW.** Do not treat this text as reviewed guidance.

@@ -5,6 +5,10 @@ name: Home Strength Foundations
 goal_tags: [strength, tone]
 injury_focus: []
 created_by: placeholder
+# status: placeholder | pt_reviewed. pt_reviewed requires at least one citation.
+status: placeholder
+# citations: list of { claim: "...", source: "full reference or URL" }. PT TO FILL IN.
+citations: []
 description: >
   A beginner upper/lower split for a basic home setup (dumbbells and a band).
   Four days a week with a rest day between hard sessions.
