@@ -26,7 +26,7 @@ const PAGES: Record<string, () => JSX.Element> = {
 // Only pages that exist get a nav link (no Calendar yet).
 const NAV: { path: string; label: string }[] = [
   { path: '/', label: 'Dashboard' },
-  { path: '/content', label: 'Programs & Basics' },
+  { path: '/content', label: 'Your Plan & Basics' },
   { path: '/build', label: 'Build Your Own' },
   { path: '/faves', label: 'My Faves' },
   { path: '/exercises', label: 'Exercise Library' },

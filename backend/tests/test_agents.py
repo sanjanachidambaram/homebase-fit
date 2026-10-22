@@ -22,9 +22,9 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from app.agents import basics, harness
 from app.agents.harness import McpGateway
 from app.db import connect
+from tests.helpers import quiz_answers
 
 TODAY = datetime.now(timezone.utc).date()
-QUIZ = {"goals": ["weight_loss", "rehab"], "timeline": "8_weeks", "age": 34, "weight": 165, "height": 66}
 RED_FLAG_QUESTION = "I have a sharp pain in my knee when I squat. Should I keep going?"
 
 
@@ -74,7 +74,7 @@ def account(client, email, injuries=("lower_back",), goals=None) -> tuple[int, d
     r = client.post("/api/users", json={"email": email, "password": "correct horse 1"})
     uid, token = r.json()["user_id"], r.json()["token"]
     h = {"Authorization": f"Bearer {token}"}
-    answers = {**QUIZ, "injuries": list(injuries) or ["none"], **({"goals": goals} if goals else {})}
+    answers = quiz_answers(injuries=list(injuries) or ["none"], **({"goals": goals} if goals else {}))
     assert client.put(f"/api/users/{uid}/quiz-profile", headers=h, json={
         "consent_accepted": True, "consent_version": "test", "answers": answers}).status_code == 200
     return uid, h
@@ -95,10 +95,6 @@ def rows(sql, *args):
         return [dict(r) for r in conn.execute(sql, args)]
     finally:
         conn.close()
-
-
-def program_id(name):
-    return rows("SELECT id FROM program_templates WHERE name = ?", name)[0]["id"]
 
 
 # ================================================================ SAFETY: red-flag pre-filter
@@ -191,7 +187,7 @@ def test_model_never_sees_user_id_injury_flags_or_checked_only(client, use_scrip
     a, ha = account(client, "a@example.com")
     shown = {}
     for route, method, body, final in [
-        ("/api/programs/recommend", "post", {}, {"recommended": False, "rationale": "-", "no_match_reason": "x"}),
+        ("/api/programs/recommend", "post", {}, {"explanation": "A gentle plan for your goals."}),
         ("/api/workouts/build", "post", {"picks": {"core": 1}, "time_budget_minutes": 20}, None),
         ("/api/coach/summary", "get", None, {"encouragement": "Nice work!", "fun_fact_comparison": None}),
         ("/api/basics/ask", "post", {"question": "How long should I rest between sets?"},
@@ -200,8 +196,9 @@ def test_model_never_sees_user_id_injury_flags_or_checked_only(client, use_scrip
         script = use_script(("final", final or {"items": [], "balance_note": "-"}))
         client.request(method.upper(), route, json=body, headers=ha)
         shown[route] = {t.name: set(t.parameters_json_schema.get("properties", {})) for t in script.tool_defs}
+    assert shown["/api/programs/recommend"] == {}, "the Program Architect explains a plan; it has no tools"
     for route, tools in shown.items():
-        assert tools, f"{route}: the model should have been shown its tools"
+        assert tools or route == "/api/programs/recommend", f"{route}: the model should have been shown its tools"
         for name, params in tools.items():
             assert not params & {"user_id", "injury_flags", "checked_only", "equipment"}, (route, name, params)
     assert set(shown["/api/basics/ask"]) == {"search_basics_kb"}
@@ -275,40 +272,6 @@ def test_uninjured_user_gets_checked_only_false(client, use_script, mcp_calls):
                           "balance_note": "Core only."}))
     assert client.post("/api/workouts/build", headers=ha, json={"picks": {"core": 1}, "time_budget_minutes": 10}).status_code == 200
     assert [a_["checked_only"] for t, a_ in mcp_calls if t == "search_exercises"] == [False]
-
-
-def test_program_architect_uses_checked_only_and_tool_facts(client, use_script, mcp_calls):
-    a, ha = account(client, "prog@example.com", injuries=("lower_back",))
-    pid = program_id("Back-Friendly Fat Loss")
-    use_script(("get_user_profile", {}),
-               ("search_program_templates", {"goal_tags": ["weight_loss", "rehab"], "checked_only": False}),  # rejected
-               ("search_program_templates", {"goal_tags": ["weight_loss", "rehab"]}),
-               ("final", {"recommended": True, "program_id": pid,
-                          "rationale": "Research proves this program fixes back pain fast."}))
-    res = client.post("/api/programs/recommend", headers=ha).json()["result"]
-    searches = [args for tool, args in mcp_calls if tool == "search_program_templates"]
-    assert searches and all(s["checked_only"] is True and s["injury_flags"] == ["lower_back"] for s in searches)
-    assert res["recommended"] and res["program_id"] == pid and res["name"] == "Back-Friendly Fat Loss"
-    assert res["status"] == "placeholder" and res["citations"] == [] and "pending expert review" in res["review_note"].lower()
-    assert "research" not in res["rationale"].lower() and "pending expert review" in res["rationale"]  # claim removed
-
-
-def test_program_architect_says_so_when_nothing_fits(client, use_script):
-    script = use_script(("final", {"recommended": True, "program_id": 1, "rationale": "x"}))
-    a, ha = account(client, "nofit@example.com", injuries=("knee",), goals=["strength"])
-    res = client.post("/api/programs/recommend", headers=ha).json()["result"]
-    assert res["recommended"] is False and "None of our programs" in res["message"]
-    assert "aren't cleared for your injuries" in res["message"] and script.calls == 0
-
-
-def test_program_architect_rejects_a_program_it_wasnt_shown(client, use_script):
-    a, ha = account(client, "fake@example.com")
-    pid = program_id("Back-Friendly Fat Loss")
-    use_script(("search_program_templates", {"goal_tags": ["rehab"]}),
-               ("final", {"recommended": True, "program_id": 999, "rationale": "x"}),
-               ("final", {"recommended": True, "program_id": pid, "rationale": "Built for lower back care."}))
-    res = client.post("/api/programs/recommend", headers=ha).json()["result"]
-    assert res["program_id"] == pid
 
 
 # ================================================================ Workout Builder checks

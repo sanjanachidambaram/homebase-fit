@@ -18,7 +18,7 @@ from app.config import CONTENT_DIR, ORIGINAL_DB
 from app.db import connect
 
 TEMPLATE = CONTENT_DIR / "exercises" / "contraindication_tags_TEMPLATE.csv"
-INJURIES = ("lower_back", "knee", "shoulder")
+INJURIES = ("lower_back", "knee", "shoulder", "wrist", "ankle")
 COLUMNS = ("exercise_id", "name", "source_dataset", "muscle_group", "category", "equipment",
            "primary_muscles", "contraindication_status", *INJURIES, "pt_notes", "reviewed_by")
 

@@ -5,8 +5,8 @@ Run from backend/ whenever you change anything in content/:
     .venv\\Scripts\\python.exe -m app.db.seed
 
 This rebuilds from scratch, so it also wipes user data in the working copy.
-Content problems (unknown exercise id, an exercise that's unsafe for the
-program's injury_focus, missing fields, unknown source) stop the build with
+Content problems (missing fields, a bad goal protocol, an unknown source or injury tag)
+stop the build with
 a list of errors.
 """
 
@@ -22,8 +22,10 @@ from app.db import connect, table_counts
 from app.db.reset import reset
 
 MUSCLE_GROUPS = ("legs", "arms", "chest", "shoulders", "back", "core", "full_body")
-INJURY_TAGS = {"lower_back", "knee", "shoulder"}
-DAYS = {"mon": 1, "tue": 2, "wed": 3, "thu": 4, "fri": 5, "sat": 6, "sun": 7}
+INJURY_TAGS = {"lower_back", "knee", "shoulder", "wrist", "ankle"}
+GOALS = ("weight_loss", "strength", "tone", "rehab", "general_health")
+EXPERIENCE = ("beginner", "intermediate", "advanced")
+SPLITS = {"full_body", "upper_lower", "push_pull_legs", "circuit"}
 VIDEO_EXTS = (".mp4", ".webm")
 MEDIA_EXTS = (".gif", *VIDEO_EXTS, ".jpg", ".jpeg", ".png", ".webp")
 DEFAULT_MEDIA_EXT = ".gif"
@@ -171,7 +173,7 @@ def insert_exercise(conn: sqlite3.Connection, **ex) -> None:
 
 def seed_authored_exercises(conn: sqlite3.Connection, errors: list[str]) -> dict[str, set[str]]:
     """Hand-authored drafts in content/exercises/<group>/exercises.yaml.
-    Returns {exercise_id: contraindications} for checking programs."""
+    Returns {exercise_id: contraindications}."""
     contraindications: dict[str, set[str]] = {}
     fields = ("id", "name", "difficulty", "instructions", "est_time_seconds")
     for group in MUSCLE_GROUPS:
@@ -245,49 +247,57 @@ def seed_free_exercise_db(conn: sqlite3.Connection, taken_ids: set[str], errors:
         )
 
 
-def seed_programs(conn: sqlite3.Connection, contraindications: dict[str, set[str]],
-                  sources: set[str], errors: list[str]) -> None:
-    """Programs may only use hand-authored exercises (the ones with drafted injury tags)."""
-    fields = ("name", "goal_tags", "description", "science_rationale", "created_by", "schedule")
-    for path in sorted((CONTENT_DIR / "programs").glob("*.yaml")):
-        p = load_yaml(path)
-        if not require(p, fields, rel(path), errors):
+def parse_range(text: str) -> tuple[int, int] | None:
+    """"2-3" -> (2, 3); "3" -> (3, 3); anything else -> None."""
+    parts = str(text).replace(" ", "").split("-")
+    if not 1 <= len(parts) <= 2 or not all(p.isdigit() for p in parts):
+        return None
+    lo, hi = int(parts[0]), int(parts[-1])
+    return (lo, hi) if 0 < lo <= hi else None
+
+
+def seed_goal_protocols(conn: sqlite3.Connection, sources: set[str], errors: list[str]) -> None:
+    """content/protocols/goal_protocols.yaml: exactly one row per goal x experience level."""
+    path = CONTENT_DIR / "protocols" / "goal_protocols.yaml"
+    fields = ("goal", "experience_level", "sessions_per_week", "session_length_minutes", "split_type",
+              "sets_range", "reps_range", "rest_seconds", "progression_note")
+    seen: set[tuple[str, str]] = set()
+    for i, p in enumerate(load_yaml(path).get("protocols", [])):
+        where = f"{rel(path)} row {i + 1} ({p.get('goal')}/{p.get('experience_level')})"
+        if not require(p, fields, where, errors):
+            continue
+        key = (p["goal"], p["experience_level"])
+        problems = []
+        if p["goal"] not in GOALS:
+            problems.append(f"goal must be one of {GOALS}")
+        if p["experience_level"] not in EXPERIENCE:
+            problems.append(f"experience_level must be one of {EXPERIENCE}")
+        if p["split_type"] not in SPLITS:
+            problems.append(f"split_type must be one of {sorted(SPLITS)}")
+        if parse_range(p["sets_range"]) is None or parse_range(p["reps_range"]) is None:
+            problems.append('sets_range and reps_range must look like "2-3" or "10"')
+        if not 1 <= int(p["sessions_per_week"]) <= 6:
+            problems.append("sessions_per_week must be 1-6 (every plan keeps a rest day)")
+        if key in seen:
+            problems.append("duplicate goal + experience_level")
+        if problems:
+            errors.extend(f"{where}: {x}" for x in problems)
             continue
         source = p.get("source") or DEFAULT_SOURCE
-        if not check_source(source, sources, rel(path), errors):
+        review = review_fields(p, where, errors)
+        if review is None or not check_source(source, sources, where, errors):
             continue
-        review = review_fields(p, rel(path), errors)
-        if review is None:
-            continue
-        focus = set(p.get("injury_focus") or [])
-        cur = conn.execute(
-            "INSERT INTO program_templates (name, goal_tags, injury_focus, description, science_rationale,"
-            " created_by, source_id, source_file, status, citations) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (p["name"], json.dumps(p["goal_tags"]), json.dumps(sorted(focus)), p["description"].strip(),
-             p["science_rationale"].strip(), p["created_by"], source, rel(path), *review),
-        )
-        program_id = cur.lastrowid
-        for day, items in p["schedule"].items():
-            day_num = DAYS.get(str(day).lower()[:3])
-            if day_num is None:
-                errors.append(f"{rel(path)}: unknown day '{day}' (use mon..sun)")
-                continue
-            for order, item in enumerate(items or []):
-                where = f"{rel(path)} {day} #{order + 1}"
-                ex_id = item.get("exercise")
-                if ex_id not in contraindications:
-                    errors.append(f"{where}: unknown exercise '{ex_id}'")
-                    continue
-                unsafe = contraindications[ex_id] & focus
-                if unsafe:
-                    errors.append(f"{where}: '{ex_id}' is contraindicated for {sorted(unsafe)}, "
-                                  f"which this program's injury_focus covers")
-                    continue
-                conn.execute(
-                    "INSERT INTO program_template_exercises (program_id, exercise_id, day_of_week,"
-                    " sets, reps, order_index) VALUES (?, ?, ?, ?, ?, ?)",
-                    (program_id, ex_id, day_num, int(item.get("sets", 1)), str(item.get("reps", "")), order),
-                )
+        seen.add(key)
+        conn.execute(
+            "INSERT INTO goal_protocols (goal, experience_level, sessions_per_week, session_length_minutes, "
+            "split_type, sets_range, reps_range, rest_seconds, progression_note, reference_notes, source_id, "
+            "status, citations) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (p["goal"], p["experience_level"], int(p["sessions_per_week"]), int(p["session_length_minutes"]),
+             p["split_type"], str(p["sets_range"]), str(p["reps_range"]), int(p["rest_seconds"]),
+             p["progression_note"].strip(), (p.get("reference_notes") or "").strip() or None, source, *review))
+    missing = [f"{g}/{e}" for g in GOALS for e in EXPERIENCE if (g, e) not in seen]
+    if missing and not any(rel(path) in e for e in errors):
+        errors.append(f"{rel(path)}: missing protocols for {missing}")
 
 
 def split_front_matter(text: str) -> tuple[dict, str]:
@@ -329,7 +339,7 @@ def build_original() -> None:
         seed_quiz(conn, errors)
         contraindications = seed_authored_exercises(conn, errors)
         seed_free_exercise_db(conn, set(contraindications), errors)
-        seed_programs(conn, contraindications, sources, errors)
+        seed_goal_protocols(conn, sources, errors)
         seed_basics(conn, sources, errors)
         if errors:
             raise ContentError("\n".join(f"  - {e}" for e in errors))

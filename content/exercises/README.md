@@ -7,7 +7,9 @@ Two sources feed the `exercises` table (see `content/sources.yaml`):
 | `legs/`, `arms/`, `chest/`, `shoulders/`, `back/`, `core/`, `full_body/` (`exercises.yaml` in each) | `placeholder-authored` | drafted, not yet PT-reviewed (`draft`) |
 | `source_free_exercise_db/` (see its `ATTRIBUTION.md`) | `free-exercise-db` | none yet (`untagged`) |
 
-Program templates can only use the hand-authored exercises for now, because those are the only ones with injury tags.
+For anyone with an injury flag, generated plans and custom workouts only use exercises that have injury tags
+(today, the hand-authored ones). The tags cover lower_back, knee, shoulder, wrist and ankle; the wrist and ankle
+tags were drafted 2026-10-22 and, like the rest, are waiting on PT review.
 
 Every exercise starts as `status: placeholder` with no citations, so the app shows "Content pending expert review" on it. For hand-authored exercises you can add `status: pt_reviewed` and a `citations:` list (each `{claim, source}`) in `exercises.yaml`; `pt_reviewed` requires at least one citation. Demo media type (image, gif, or video) is picked from the file extension when you rerun the seed.
 

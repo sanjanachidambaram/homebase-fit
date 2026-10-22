@@ -2,7 +2,7 @@
 # id: lowercase_with_underscores; demo media in this folder is named <id>.gif/.mp4/.jpg/.png
 # equipment_needed: list from none | mat | dumbbells | resistance_band | chair | bench
 # difficulty: beginner | intermediate | advanced
-# injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder).
+# injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder | wrist | ankle).
 #   The app filters these out in code, so be conservative.
 # est_time_seconds: rough time for one set including setup
 
@@ -11,14 +11,14 @@ exercises:
     name: Incline Push-Up
     equipment_needed: [chair]
     difficulty: beginner
-    injury_contraindications: [shoulder]
+    injury_contraindications: [shoulder, wrist]
     est_time_seconds: 45
     instructions: Hands on a sturdy chair or counter, body in a straight line. Lower your chest to the edge and press back up.
   - id: knee_pushup
     name: Knee Push-Up
     equipment_needed: [mat]
     difficulty: beginner
-    injury_contraindications: [shoulder]
+    injury_contraindications: [shoulder, wrist]
     est_time_seconds: 45
     instructions: From your knees with a straight line from head to knees, lower your chest toward the floor and press back up.
   - id: dumbbell_bicep_curl
@@ -32,7 +32,7 @@ exercises:
     name: Chair Triceps Dip
     equipment_needed: [chair]
     difficulty: intermediate
-    injury_contraindications: [shoulder]
+    injury_contraindications: [shoulder, wrist]
     est_time_seconds: 45
     instructions: Hands on the edge of a sturdy chair behind you, bend your elbows to lower your hips, then press back up.
   - id: band_biceps_curl

@@ -1,4 +1,4 @@
-"""Read-only searches over exercises, program templates, and Fitness Basics articles.
+"""Read-only searches over exercises and Fitness Basics articles.
 
 Everything here opens the database read-only (see app.db.connect_readonly). The injury filters are
 SQL, not prompt text: a contraindicated exercise is never returned, whatever the caller asks for.
@@ -17,12 +17,10 @@ from app.content import REVIEW_NOTICE
 from app.db import connect_readonly
 
 MuscleGroup = Literal["legs", "arms", "chest", "shoulders", "back", "core", "full_body"]
-InjuryFlag = Literal["lower_back", "knee", "shoulder"]
-GoalTag = Literal["weight_loss", "tone", "strength", "rehab"]
+InjuryFlag = Literal["lower_back", "knee", "shoulder", "wrist", "ankle"]
 
 MUSCLE_GROUPS = ("legs", "arms", "chest", "shoulders", "back", "core", "full_body")
-INJURY_FLAGS = ("lower_back", "knee", "shoulder")
-GOAL_TAGS = ("weight_loss", "tone", "strength", "rehab")
+INJURY_FLAGS = ("lower_back", "knee", "shoulder", "wrist", "ankle")
 MAX_LIMIT = 50
 
 # Callers (an LLM) may use natural names; map them onto the equipment values stored in the database.
@@ -179,91 +177,6 @@ def search_exercises(
     if total > len(exercises):
         result["truncated"] = f"Showing {len(exercises)} of {total}. Narrow the search or raise limit (max {MAX_LIMIT})."
     return result
-
-
-# ---------------------------------------------------------------- program templates
-
-def search_program_templates(
-    goal_tags: list[str] | None = None,
-    injury_flags: list[str] | None = None,
-    checked_only: bool = False,
-) -> dict:
-    goals = sorted(set(goal_tags or []))
-    bad = [g for g in goals if g not in GOAL_TAGS]
-    if bad:
-        raise ToolInputError(f"Unknown goal tag(s) {bad}. Valid: {list(GOAL_TAGS)}.")
-    flags = _clean_flags(injury_flags)
-
-    conn = connect_readonly()
-    try:
-        programs = conn.execute("SELECT * FROM program_templates ORDER BY name").fetchall()
-        items = conn.execute(
-            "SELECT p.program_id, p.day_of_week, p.order_index, p.sets, p.reps, e.id, e.name, "
-            "e.injury_contraindications, e.contraindication_status "
-            "FROM program_template_exercises p JOIN exercises e ON e.id = p.exercise_id "
-            "ORDER BY p.program_id, p.day_of_week, p.order_index").fetchall()
-    finally:
-        conn.close()
-
-    by_program: dict[int, list[sqlite3.Row]] = {}
-    for it in items:
-        by_program.setdefault(it["program_id"], []).append(it)
-
-    day_names = {1: "mon", 2: "tue", 3: "wed", 4: "thu", 5: "fri", 6: "sat", 7: "sun"}
-    results, excluded = [], []
-    for p in programs:
-        prog_goals = json.loads(p["goal_tags"])
-        matched = sorted(set(prog_goals) & set(goals))
-        if goals and not matched:
-            continue
-        rows = by_program.get(p["id"], [])
-        # Injury guardrail: drop the whole program if ANY of its exercises is contraindicated for a flag.
-        conflicts = sorted({r["name"] for r in rows if set(json.loads(r["injury_contraindications"])) & set(flags)})
-        if conflicts:
-            excluded.append({"name": p["name"], "because_exercises": conflicts})
-            continue
-        # checked_only: also drop programs that use any exercise nobody has tagged for injuries yet.
-        unchecked = sorted({r["name"] for r in rows if r["contraindication_status"] == "untagged"})
-        if checked_only and unchecked:
-            excluded.append({"name": p["name"], "because_exercises": unchecked, "reason": "not_yet_checked"})
-            continue
-        schedule: dict[str, list[dict]] = {}
-        for r in rows:
-            schedule.setdefault(day_names[r["day_of_week"]], []).append(
-                {"exercise_id": r["id"], "name": r["name"], "sets": r["sets"], "reps": r["reps"]})
-        all_reviewed = bool(rows) and all(r["contraindication_status"] == "pt_reviewed" for r in rows)
-        focus = json.loads(p["injury_focus"])
-        results.append({
-            "id": p["id"],
-            "name": p["name"],
-            "goal_tags": prog_goals,
-            "matched_goal_tags": matched,
-            "injury_focus": focus,
-            "designed_for_requested_injuries": sorted(set(focus) & set(flags)),
-            "description": p["description"],
-            "science_rationale": p["science_rationale"],
-            "schedule": schedule,
-            "injury_check": "pt_reviewed" if all_reviewed else "not_pt_reviewed",
-            "injury_note": ("All exercise injury tags in this program were reviewed by a physical therapist."
-                            if all_reviewed else
-                            "No exercise in this program is contraindicated for the requested injuries according "
-                            "to the current tags, but those tags are drafts that a physical therapist has not "
-                            "reviewed. This is not confirmation that the program is safe."),
-            **_review(p),
-        })
-    results.sort(key=lambda r: (-len(r["matched_goal_tags"]), r["name"]))   # best goal match first
-    return {
-        "count": len(results),
-        "programs": results,
-        "injury_filter": {
-            "applied": bool(flags),
-            "flags": flags,
-            "checked_only": checked_only,
-            "excluded_programs": excluded,
-            "note": "A program is removed if any of its exercises is tagged as unsafe for a requested injury"
-                    + (", or (checked_only) if any of its exercises has no injury tags yet." if checked_only else "."),
-        },
-    }
 
 
 # ---------------------------------------------------------------- Fitness Basics knowledge base

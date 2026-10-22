@@ -2,7 +2,7 @@
 # id: lowercase_with_underscores; demo media in this folder is named <id>.gif/.mp4/.jpg/.png
 # equipment_needed: list from none | mat | dumbbells | resistance_band | chair | bench
 # difficulty: beginner | intermediate | advanced
-# injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder).
+# injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder | wrist | ankle).
 #   The app filters these out in code, so be conservative.
 # est_time_seconds: rough time for one set including setup
 

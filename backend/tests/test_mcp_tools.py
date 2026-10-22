@@ -22,7 +22,7 @@ from app.mcp_server import progress
 from app.mcp_server.server import mcp
 
 TODAY = datetime.now(timezone.utc).date()
-EXPECTED_TOOLS = {"get_user_profile", "search_exercises", "search_program_templates", "search_basics_kb",
+EXPECTED_TOOLS = {"get_user_profile", "search_exercises", "search_basics_kb",
                   "get_progress_summary", "compute_strength_equivalents", "check_goal_achievement"}
 
 
@@ -80,7 +80,7 @@ def tag(exercise_id, contraindications, status="draft"):
 
 # ---------------------------------------------------------------- least privilege
 
-def test_exactly_seven_tools_all_read_only(test_db):
+def test_exactly_six_tools_all_read_only(test_db):
     async def run():
         async with Client(mcp) as c:
             return await c.list_tools()
@@ -103,7 +103,6 @@ def test_running_every_tool_leaves_the_database_unchanged(test_db):
     before = hashlib.sha256(test_db.read_bytes()).hexdigest()
     call("get_user_profile", user_id=uid)
     call("search_exercises", muscle_group="legs", injury_flags=["knee"])
-    call("search_program_templates", goal_tags=["rehab"])
     call("search_basics_kb", query="rest between sets")
     call("get_progress_summary", user_id=uid)
     call("compute_strength_equivalents", total_weight_lifted_lbs=1000)
@@ -146,7 +145,7 @@ def test_no_tool_ever_returns_email_or_notes(test_db):
     outputs = [
         call("get_user_profile", user_id=uid), call("get_progress_summary", user_id=uid),
         call("check_goal_achievement", user_id=uid), call("search_exercises", injury_flags=["knee"]),
-        call("search_program_templates"), call("search_basics_kb", query="injury"),
+        call("search_basics_kb", query="injury"),
         call("compute_strength_equivalents", total_weight_lifted_lbs=5000),
     ]
     text = json.dumps(outputs).lower()
@@ -216,33 +215,6 @@ def test_limit_and_bad_arguments(test_db):
                 {"equipment": ["jetpack"]}):
         with pytest.raises(ToolError):
             call("search_exercises", **bad)
-
-
-# ---------------------------------------------------------------- 3. search_program_templates
-
-def test_program_injury_filter(test_db):
-    names = lambda r: [p["name"] for p in r["programs"]]
-    assert len(call("search_program_templates")["programs"]) == 3
-    back = call("search_program_templates", injury_flags=["lower_back"])
-    assert names(back) == ["Back-Friendly Fat Loss"]
-    excluded = {p["name"]: p["because_exercises"] for p in back["injury_filter"]["excluded_programs"]}
-    assert "Dumbbell Goblet Squat" in excluded["Home Strength Foundations"]
-    assert "Burpee" in excluded["Total-Body Tone & Burn"]
-    assert "Back-Friendly Fat Loss" not in names(call("search_program_templates", injury_flags=["knee"]))   # wall sit
-
-
-def test_program_goal_ranking_and_review_fields(test_db):
-    res = call("search_program_templates", goal_tags=["weight_loss", "rehab"])
-    assert res["programs"][0]["name"] == "Back-Friendly Fat Loss"
-    assert res["programs"][0]["matched_goal_tags"] == ["rehab", "weight_loss"]
-    assert [p["name"] for p in res["programs"]] == ["Back-Friendly Fat Loss", "Total-Body Tone & Burn"]
-    p = call("search_program_templates", goal_tags=["rehab"], injury_flags=["lower_back"])["programs"][0]
-    assert p["designed_for_requested_injuries"] == ["lower_back"]
-    assert p["injury_check"] == "not_pt_reviewed" and "not confirmation" in p["injury_note"]
-    assert p["status"] == "placeholder" and p["review_notice"] and p["citations"] == []
-    assert set(p["schedule"]) == {"mon", "wed", "fri"} and p["schedule"]["mon"][0]["exercise_id"] == "cat_cow"
-    with pytest.raises(ToolError):
-        call("search_program_templates", goal_tags=["bulk"])
 
 
 # ---------------------------------------------------------------- 4. search_basics_kb

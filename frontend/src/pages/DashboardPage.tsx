@@ -4,7 +4,7 @@ import { fetchAccount, type Account } from '../api'
 import AccountForm from '../components/AccountForm'
 import AskBasics from '../components/dashboard/AskBasics'
 import CoachCard from '../components/dashboard/CoachCard'
-import ProgramCard from '../components/dashboard/ProgramCard'
+import PlanCard from '../components/dashboard/PlanCard'
 import WorkoutBuilder from '../components/dashboard/WorkoutBuilder'
 import Link from '../components/Link'
 import { setSession, useSession, type Session } from '../session'
@@ -66,7 +66,7 @@ function Dashboard({ session }: { session: Session }) {
 
       <div className="dash-grid">
         <CoachCard token={session.token} userId={session.userId} />
-        <ProgramCard token={session.token} userId={session.userId} />
+        <PlanCard token={session.token} userId={session.userId} />
         <AskBasics token={session.token} />
       </div>
       <WorkoutBuilder token={session.token} compact />

@@ -1514,3 +1514,156 @@ fieldset.question {
   color: var(--pink-deep);
   font-weight: 800;
 }
+
+/* ================================================================ quiz: option descriptions, help, pace note */
+
+.choice-text {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.choice-desc {
+  font-weight: 500;
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+}
+
+.question-help {
+  display: block;
+  font-weight: 500;
+  margin: -0.2rem 0 0.5rem;
+}
+
+.question input[type='date'] {
+  min-height: 48px;
+  padding: 0.5rem 0.9rem;
+  border: 2px solid var(--lavender);
+  border-radius: var(--radius-input);
+  background: #fff;
+}
+
+/* Gentle, never a block: a calm lavender note with its source (design.md 7: no shaming). */
+.pace-note {
+  margin: -0.4rem 0 1rem;
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius-input);
+  background: var(--lavender-tint);
+  border-left: 6px solid var(--lavender);
+}
+
+.pace-note p {
+  margin: 0.2rem 0;
+}
+
+.pace-note a {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+/* ================================================================ the generated weekly plan */
+
+.program-card {
+  grid-column: 1 / -1;
+}
+
+.plan-explanation {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 500;
+  line-height: 1.45;
+  max-width: 52rem;
+}
+
+.chip-safe {
+  background: var(--mint);
+}
+
+.week-strip {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.week-strip li {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  padding: 0.6rem 0.2rem;
+  border-radius: 18px;
+  text-align: center;
+}
+
+.strip-train {
+  background: var(--pink-tint);
+  border: 2px solid var(--pink);
+}
+
+.strip-rest {
+  background: var(--lavender-tint);
+}
+
+.strip-day {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.strip-kind {
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.plan-days {
+  display: grid;
+  gap: 1.1rem;
+  margin-top: 0.75rem;
+}
+
+.plan-day h4 {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+}
+
+.plan-footnotes {
+  margin-top: 1rem;
+}
+
+.plan-footnotes details {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.plan-footnotes summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.plan-footnotes li {
+  margin: 0.3rem 0;
+}
+
+/* Pregnancy / postpartum: plain, calm, full contrast (design.md 7 rule 1). */
+.clinical-box {
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-input);
+  background: #fff;
+  border: 2px solid var(--lavender-deep);
+}
+
+.clinical-box p {
+  margin: 0.35rem 0 0;
+}
+
+@media (max-width: 600px) {
+  .week-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.weekly-plan .chip {
+  text-transform: none;
+}

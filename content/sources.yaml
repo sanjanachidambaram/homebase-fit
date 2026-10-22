@@ -28,14 +28,21 @@ sources:
     name: HomeBase Fit placeholder content (AI-drafted)
     url:
     license: Project content; not yet professionally reviewed
-    used_for: 27 starter exercises, 3 program templates, and 5 Fitness Basics articles, all pending PT review
+    used_for: 27 starter exercises (with drafted injury tags), 15 goal protocols, and 5 Fitness Basics articles, all pending PT review
     status: placeholder
 
-  - id: pt-authored-programs
-    name: PT-authored programs
+  - id: pt-reviewed-protocols
+    name: PT-reviewed goal protocols
     url:
     license: Pending; terms to be confirmed with the PT
-    used_for: Program templates and their science rationale (replacing the placeholders)
+    used_for: The training parameters behind every generated plan (replacing the placeholder protocols)
+    status: pending
+
+  - id: obgyn-pregnancy-guidance
+    name: OB-GYN-reviewed pregnancy and postpartum guidance
+    url:
+    license: Pending; terms to be confirmed with the reviewer
+    used_for: Plans for pregnant and postpartum users (no plan is generated for them until this exists)
     status: pending
 
   - id: pt-obgyn-reviewed-basics
@@ -44,3 +51,10 @@ sources:
     license: Pending; terms to be confirmed with the reviewers
     used_for: Fitness Basics hub articles (replacing the placeholders)
     status: pending
+
+  - id: cdc-losing-weight
+    name: "CDC: Losing Weight"
+    url: https://www.cdc.gov/healthy-weight-growth/losing-weight/index.html
+    license: U.S. government work (public domain)
+    used_for: The quiz note that losing about 1 to 2 pounds a week is more sustainable
+    status: active

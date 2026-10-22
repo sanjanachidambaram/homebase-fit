@@ -46,7 +46,9 @@ def main() -> None:
         h = {"Authorization": f"Bearer {token}"}
         client.put(f"/api/users/{uid}/quiz-profile", headers=h, json={
             "consent_accepted": True, "consent_version": "2026-10-22",
-            "answers": {"goals": ["weight_loss", "rehab"], "timeline": "8_weeks", "injuries": ["lower_back"],
+            "answers": {"goals": ["weight_loss", "rehab"], "timeline": "8_weeks", "experience_level": "beginner",
+                        "days_available": 4, "session_length": "30", "equipment": ["bodyweight", "mat", "resistance_band"],
+                        "other_activity_days": 0, "injuries": ["lower_back"], "pregnancy_status": "none",
                         "age": 34, "weight": 165, "height": 66}})
         today = datetime.now(timezone.utc).date()
         conn = connect()

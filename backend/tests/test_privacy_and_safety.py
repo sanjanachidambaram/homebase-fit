@@ -13,9 +13,9 @@ import pytest
 
 from app import config
 from app.db import connect
+from tests.helpers import quiz_answers
 
-ANSWERS = {"goals": ["weight_loss", "rehab"], "timeline": "8_weeks", "injuries": ["lower_back"],
-           "age": 34, "weight": 165, "height": 66}
+ANSWERS = quiz_answers()
 USER_TABLES = ("quiz_profiles", "workout_logs", "measurements", "safety_events", "exercise_favorites")
 
 
@@ -113,7 +113,7 @@ def test_delete_removes_user_and_all_related_rows(client):
 
 # ---------------------------------------------------------------- citations / status
 
-@pytest.mark.parametrize("route", ["/api/programs", "/api/basics"])
+@pytest.mark.parametrize("route", ["/api/basics"])
 def test_placeholder_content_flagged_with_citations_field(client, route):
     items = client.get(route).json()
     assert items
@@ -125,7 +125,7 @@ def test_placeholder_content_flagged_with_citations_field(client, route):
 
 def test_schema_has_citations_and_status():
     conn = sqlite3.connect(config.ORIGINAL_DB)
-    for table in ("program_templates", "basics_articles"):
+    for table in ("goal_protocols", "basics_articles"):
         cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
         assert {"citations", "status"} <= cols, table
     conn.close()

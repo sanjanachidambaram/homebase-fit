@@ -3,11 +3,12 @@
 -- Conventions:
 --   * JSON columns hold JSON text and are checked with json_valid().
 --   * Dates are ISO text: date = 'YYYY-MM-DD', timestamps = 'YYYY-MM-DDTHH:MM:SSZ' (UTC).
---   * Injury tags are lower_back | knee | shoulder everywhere (quiz answers,
---     exercises.injury_contraindications, program_templates.injury_focus).
---   * Content tables (sources, quiz_questions, exercises, program_templates,
---     program_template_exercises, basics_articles) are loaded from content/
---     by app/db/seed.py. User tables start empty.
+--   * Injury tags are lower_back | knee | shoulder | wrist | ankle everywhere (quiz answers,
+--     exercises.injury_contraindications).
+--   * Content tables (sources, quiz_questions, exercises, goal_protocols, basics_articles)
+--     are loaded from content/ by app/db/seed.py. User tables start empty.
+--   * There are no stored programs: each user's weekly plan is generated on request, in code,
+--     from their quiz profile + goal_protocols + exercises (app/services/program_generator.py).
 
 PRAGMA foreign_keys = ON;
 
@@ -28,23 +29,37 @@ CREATE TABLE quiz_questions (
     id            TEXT PRIMARY KEY,                -- e.g. 'goals', 'injuries'
     order_index   INTEGER NOT NULL,
     prompt        TEXT NOT NULL,
-    question_type TEXT NOT NULL CHECK (question_type IN ('multi_select', 'single_select', 'number', 'text')),
-    options       TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(options)),   -- [{value, label}]
-    settings      TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(settings)),  -- unit, min, max, exclusive, allow_free_text, ...
+    question_type TEXT NOT NULL CHECK (question_type IN ('multi_select', 'single_select', 'number', 'text', 'date')),
+    options       TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(options)),   -- [{value, label, description?}]
+    settings      TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(settings)),  -- unit, min, max, help_text, health, ...
     required      INTEGER NOT NULL DEFAULT 1 CHECK (required IN (0, 1))
 );
 
--- One row per user: the structured UserProfile the Onboarding Agent produces.
+-- One row per user: their quiz answers (structured intake; no LLM involved).
+-- Free text (injury_notes, other_activity_notes) and pregnancy_status are never sent to the AI model
+-- (the PII boundary in app/agents/context.py only exposes goals, timeline, injury flags, age, weight, height).
 CREATE TABLE quiz_profiles (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id      INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     goals        TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(goals)),         -- ["weight_loss", "rehab"]
-    timeline     TEXT,                                                         -- '4_weeks' | '8_weeks' | '12_weeks' | 'no_deadline'
+    timeline     TEXT,                                                         -- '4_weeks' ... '16_weeks' | 'no_deadline'
     injury_flags TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(injury_flags)),  -- ["lower_back"]
     injury_notes TEXT,                                                         -- free text from the quiz
     age          INTEGER CHECK (age BETWEEN 13 AND 120),
     weight       REAL CHECK (weight > 0),                                      -- lb
     height       REAL CHECK (height > 0),                                      -- in
+    experience_level       TEXT CHECK (experience_level IN ('beginner', 'intermediate', 'advanced')),
+    days_available         INTEGER CHECK (days_available BETWEEN 1 AND 7),
+    session_length_minutes INTEGER CHECK (session_length_minutes BETWEEN 10 AND 120),
+    equipment              TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(equipment)),  -- ["dumbbells", "mat"]
+    other_activity_days    INTEGER NOT NULL DEFAULT 0 CHECK (other_activity_days BETWEEN 0 AND 7),
+    other_activity_notes   TEXT,                                                       -- free text
+    goal_weight            REAL CHECK (goal_weight > 0),                               -- lb, optional
+    goal_date              TEXT,                                                       -- YYYY-MM-DD, optional
+    pregnancy_status       TEXT CHECK (pregnancy_status IN ('none', 'pregnant', 'postpartum')),
+    -- Pregnant / postpartum answers are flagged for clinical (OB-GYN) review. Computed by the database,
+    -- so it can never disagree with pregnancy_status. No plan is generated while this is 1.
+    needs_clinical_review  INTEGER GENERATED ALWAYS AS (pregnancy_status IN ('pregnant', 'postpartum')) STORED,
     -- Medical disclaimer acknowledgment. The quiz can't be saved without it,
     -- and the table-level CHECK below means the database refuses it too.
     consent_accepted    INTEGER NOT NULL CHECK (consent_accepted IN (0, 1)),
@@ -101,33 +116,28 @@ CREATE TABLE exercises (
 CREATE INDEX idx_exercises_muscle_group ON exercises(muscle_group);
 CREATE INDEX idx_exercises_source ON exercises(source_dataset);
 
-CREATE TABLE program_templates (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    name              TEXT NOT NULL UNIQUE,
-    goal_tags         TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(goal_tags)),     -- ["weight_loss", "rehab"]
-    injury_focus      TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(injury_focus)),  -- ["lower_back"]
-    description       TEXT NOT NULL,
-    science_rationale TEXT NOT NULL,
-    created_by        TEXT NOT NULL,
-    source_id         TEXT NOT NULL REFERENCES sources(id),
-    source_file       TEXT,                                                         -- content/programs/<file>.yaml
-    -- Citation integrity: science claims need a source. [{"claim": ..., "source": ...}]
-    citations         TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(citations) AND json_type(citations) = 'array'),
-    -- 'placeholder' content is flagged "Content pending expert review" by the API.
-    status            TEXT NOT NULL DEFAULT 'placeholder' CHECK (status IN ('placeholder', 'pt_reviewed'))
+-- The training parameters behind every generated plan: one row per goal x experience level
+-- (from content/protocols/goal_protocols.yaml). Small on purpose, so a PT can review all of it.
+-- The generator reads sets/reps/rest from here and never invents them per exercise.
+CREATE TABLE goal_protocols (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    goal                   TEXT NOT NULL CHECK (goal IN ('weight_loss', 'strength', 'tone', 'rehab', 'general_health')),
+    experience_level       TEXT NOT NULL CHECK (experience_level IN ('beginner', 'intermediate', 'advanced')),
+    sessions_per_week      INTEGER NOT NULL CHECK (sessions_per_week BETWEEN 1 AND 6),
+    session_length_minutes INTEGER NOT NULL CHECK (session_length_minutes BETWEEN 10 AND 120),
+    split_type             TEXT NOT NULL CHECK (split_type IN ('full_body', 'upper_lower', 'push_pull_legs', 'circuit')),
+    sets_range             TEXT NOT NULL,      -- "2-3" or "3"
+    reps_range             TEXT NOT NULL,      -- "12-15" or "10"
+    rest_seconds           INTEGER NOT NULL CHECK (rest_seconds BETWEEN 0 AND 300),
+    progression_note       TEXT NOT NULL,
+    reference_notes        TEXT,               -- background notes, e.g. from the retired program templates
+    source_id              TEXT NOT NULL REFERENCES sources(id),
+    -- Citation integrity: [{"claim": ..., "source": ...}]; 'placeholder' rows are flagged
+    -- "Content pending expert review" everywhere they're shown.
+    citations              TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(citations) AND json_type(citations) = 'array'),
+    status                 TEXT NOT NULL DEFAULT 'placeholder' CHECK (status IN ('placeholder', 'pt_reviewed')),
+    UNIQUE (goal, experience_level)
 );
-
-CREATE TABLE program_template_exercises (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    program_id  INTEGER NOT NULL REFERENCES program_templates(id) ON DELETE CASCADE,
-    exercise_id TEXT NOT NULL REFERENCES exercises(id),
-    day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),  -- 1 = Monday ... 7 = Sunday
-    sets        INTEGER NOT NULL CHECK (sets > 0),
-    reps        TEXT NOT NULL,                                         -- "12", "30s", "8 each side"
-    order_index INTEGER NOT NULL,
-    UNIQUE (program_id, day_of_week, order_index)
-);
-CREATE INDEX idx_pte_program ON program_template_exercises(program_id, day_of_week, order_index);
 
 CREATE TABLE basics_articles (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -148,7 +158,7 @@ CREATE TABLE workout_logs (
     user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     date             TEXT NOT NULL,                                   -- YYYY-MM-DD
     exercise_id      TEXT REFERENCES exercises(id),                   -- NULL for a whole-session entry
-    program_id       INTEGER REFERENCES program_templates(id),        -- NULL for a custom session
+    plan_day         TEXT CHECK (plan_day IN ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')),  -- set when logged from the weekly plan
     sets             INTEGER CHECK (sets >= 0),
     reps             INTEGER CHECK (reps >= 0),
     weight_used      REAL CHECK (weight_used >= 0),                   -- lb; NULL for bodyweight

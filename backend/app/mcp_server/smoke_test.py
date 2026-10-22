@@ -1,7 +1,7 @@
 """Smoke test for the HomeBase Fit MCP server.
 
 Starts the server exactly as .mcp.json describes it (a real stdio subprocess, the same way Claude Code
-launches it), calls all 7 tools over the MCP protocol, and checks the answers. In particular it proves
+launches it), calls all 6 tools over the MCP protocol, and checks the answers. In particular it proves
 the injury filter really removes a contraindicated exercise.
 
 Safe by design: user-data tools need a user and logs, and the injury proof needs a tagged exercise, so
@@ -29,7 +29,7 @@ from app.config import ORIGINAL_DB  # noqa: E402
 from app.db import connect, copy_db  # noqa: E402
 
 TEST_EXERCISE = "Adductor"          # an imported exercise we tag for the test (only in the throwaway copy)
-EXPECTED_TOOLS = {"get_user_profile", "search_exercises", "search_program_templates", "search_basics_kb",
+EXPECTED_TOOLS = {"get_user_profile", "search_exercises", "search_basics_kb",
                   "get_progress_summary", "compute_strength_equivalents", "check_goal_achievement"}
 failures: list[str] = []
 
@@ -90,7 +90,7 @@ async def main() -> None:
         tools = await c.list_tools()
         names = {t.name for t in tools}
         print("   ", sorted(names))
-        check(names == EXPECTED_TOOLS, "exactly the 7 expected tools")
+        check(names == EXPECTED_TOOLS, "exactly the 6 expected tools")
         check(all(t.annotations and t.annotations.read_only_hint for t in tools), "every tool is marked read-only")
 
         show("1. get_user_profile")
@@ -124,15 +124,6 @@ async def main() -> None:
                                                        "checked_only": True})).data
         check(only["count"] > 0 and not any(e["injury_unchecked"] for e in only["exercises"]),
               "checked_only=true returns only exercises that have injury tags")
-
-        show("3. search_program_templates (goal weight_loss+rehab, injury lower_back)")
-        progs = (await c.call_tool("search_program_templates", {"goal_tags": ["weight_loss", "rehab"],
-                                                                "injury_flags": ["lower_back"]})).data
-        print("    returned:", [p["name"] for p in progs["programs"]])
-        print("    excluded:", [(x["name"], x["because_exercises"]) for x in progs["injury_filter"]["excluded_programs"]])
-        check([p["name"] for p in progs["programs"]] == ["Back-Friendly Fat Loss"], "only the lower-back-safe program remains")
-        check(progs["programs"][0]["status"] == "placeholder" and progs["programs"][0]["review_notice"],
-              "status and review notice included")
 
         show("4. search_basics_kb")
         kb = (await c.call_tool("search_basics_kb", {"query": "how long should I rest between sets?"})).data

@@ -1,46 +1,114 @@
 # =====================================================================
-# PLACEHOLDER QUIZ: Sanjana will replace this file with the real quiz.
+# HomeBase Fit onboarding quiz (placeholder wording: review before launch).
 # =====================================================================
 # After editing, rebuild the database from backend/:
 #   .venv\Scripts\python.exe -m app.db.seed
 #
 # Each question:
-#   id             stable key; the Onboarding Agent maps answers by this id
-#   prompt         text shown to the user
-#   type           multi_select | single_select | number
-#   options        (select types) list of {value, label}; value is what's stored
-#   exclusive      (multi_select, optional) a value that clears all others, e.g. "none"
-#   allow_free_text (optional) also show a text box under the options
-#   unit, min, max (number types, optional)
-#   required       true/false
-#   health         true = health/injury question. These are only shown AFTER the user
-#                  accepts the medical disclaimer, so keep this flag on the real quiz too.
+#   id               stable key; maps to a quiz_profiles column (app/users.py), so don't rename ids
+#   prompt           the question shown to the user
+#   type             multi_select | single_select | number | text | date
+#   options          (select types) list of {value, label, description?}; value is what's stored.
+#                    description is a short plain-language line shown under the option.
+#   help_text        (optional) a line shown under the question
+#   exclusive        (multi_select, optional) a value that clears all others, e.g. "none"
+#   allow_free_text  (optional) also show a text box under the options (stored, never sent to the AI)
+#   unit, min, max   (number types, optional)
+#   required         true/false
+#   health           true = health/injury question. Only shown AFTER the user accepts the medical
+#                    disclaimer, so keep this flag on every health question.
 #
-# The injury option values (lower_back, knee, shoulder) must match the
-# injury_contraindications tags in content/exercises/*/exercises.yaml,
-# because that's how unsafe exercises get filtered out.
+# Values the program generator relies on (app/services/program_generator.py):
+#   goals:            weight_loss | strength | tone | rehab | general_health (must match goal_protocols.yaml)
+#   experience_level: beginner | intermediate | advanced
+#   injuries:         lower_back | knee | shoulder | wrist | ankle (must match exercise injury tags)
+#   equipment:        bodyweight | dumbbells | resistance_band | mat | bench | pull_up_bar | kettlebells | full_gym
 
 questions:
+  # ---------------------------------------------------------------- general (before the disclaimer)
   - id: goals
-    prompt: What are your goals? Pick all that apply.
+    prompt: What do you want your training to do? Pick all that apply.
     type: multi_select
     required: true
+    help_text: If you pick more than one, we blend them and use the gentler setting wherever they differ.
     options:
-      - { value: weight_loss, label: Lose weight }
-      - { value: tone,        label: Tone up }
-      - { value: strength,    label: Get stronger }
-      - { value: rehab,       label: Rehab an injury }
+      - { value: weight_loss,    label: Lose weight,             description: "Full-body circuits more days of the week, with short rests to keep you moving." }
+      - { value: strength,       label: Get stronger,            description: "Fewer reps with heavier effort, and longer rests between sets." }
+      - { value: tone,           label: Tone up,                 description: "Moderate reps and moderate rest, with more total sets across the week." }
+      - { value: rehab,          label: Rehab an injury,         description: "Controlled, low-impact movement that avoids the injury areas you flag." }
+      - { value: general_health, label: Feel healthier overall,  description: "A balanced mix of strength and movement a few times a week." }
 
   - id: timeline
-    prompt: What timeline are you working toward?
+    prompt: Over how many weeks are you hoping to see a change?
     type: single_select
     required: true
     options:
-      - { value: 4_weeks,     label: 4 weeks }
-      - { value: 8_weeks,     label: 8 weeks }
-      - { value: 12_weeks,    label: 12 weeks }
+      - { value: 4_weeks,     label: About 4 weeks }
+      - { value: 8_weeks,     label: About 8 weeks }
+      - { value: 12_weeks,    label: About 12 weeks }
+      - { value: 16_weeks,    label: About 16 weeks }
       - { value: no_deadline, label: No deadline, just building a habit }
 
+  - id: experience_level
+    prompt: How much strength training have you done?
+    type: single_select
+    required: true
+    options:
+      - { value: beginner,     label: Just starting out,   description: "New to strength training, or coming back after a long break (6+ months)." }
+      - { value: intermediate, label: Some experience,     description: "You've trained fairly regularly for 6+ months and know the basic moves." }
+      - { value: advanced,     label: Very experienced,    description: "You've trained consistently for 2+ years and are confident with heavier loads." }
+
+  - id: days_available
+    prompt: How many days a week can you realistically work out?
+    type: number
+    unit: days
+    min: 1
+    max: 7
+    required: true
+    help_text: Be honest with yourself. We'll always keep at least one full rest day.
+
+  - id: session_length
+    prompt: How long do you want each workout to be?
+    type: single_select
+    required: true
+    options:
+      - { value: "15", label: 15 minutes }
+      - { value: "20", label: 20 minutes }
+      - { value: "30", label: 30 minutes }
+      - { value: "45", label: 45 minutes }
+      - { value: "60", label: 60 minutes }
+
+  - id: equipment
+    prompt: What equipment do you regularly have access to?
+    type: multi_select
+    required: true
+    help_text: Bodyweight moves are always included.
+    options:
+      - { value: bodyweight,      label: Just my bodyweight }
+      - { value: dumbbells,       label: Dumbbells }
+      - { value: resistance_band, label: Resistance bands }
+      - { value: mat,             label: Exercise mat }
+      - { value: bench,           label: Bench }
+      - { value: pull_up_bar,     label: Pull-up bar }
+      - { value: kettlebells,     label: Kettlebell }
+      - { value: full_gym,        label: A full gym }
+
+  - id: other_activity_days
+    prompt: On how many days a week do you already do other physical activity?
+    type: number
+    unit: days
+    min: 0
+    max: 7
+    required: false
+    help_text: Things like running, a dance class, sports, or a physically demanding job. We'll plan around them.
+
+  - id: other_activity_notes
+    prompt: What is that other activity? (optional)
+    type: text
+    required: false
+    help_text: This stays in our database and is never sent to the AI.
+
+  # ---------------------------------------------------------------- health (after the disclaimer)
   - id: injuries
     health: true
     prompt: Any injuries or areas that need extra care?
@@ -53,7 +121,23 @@ questions:
       - { value: lower_back, label: Lower back }
       - { value: knee,       label: Knee }
       - { value: shoulder,   label: Shoulder }
+      - { value: wrist,      label: Wrist }
+      - { value: ankle,      label: Ankle }
       - { value: none,       label: None }
+
+  - id: pregnancy_status
+    health: true
+    prompt: Are you currently pregnant or postpartum?
+    type: single_select
+    required: true
+    help_text: >
+      Exercise during pregnancy and after giving birth needs guidance from a clinician. Our pregnancy and
+      postpartum guidance is still waiting on review by an OB-GYN, so for now we won't generate a plan for
+      these answers. Please talk with your OB-GYN or midwife.
+    options:
+      - { value: none,       label: Neither }
+      - { value: pregnant,   label: Pregnant }
+      - { value: postpartum, label: Postpartum, description: "You've had a baby in the past year." }
 
   - id: age
     health: true
@@ -81,3 +165,29 @@ questions:
     min: 48
     max: 90
     required: true
+
+  - id: goal_weight
+    health: true
+    prompt: Do you have a goal weight? (optional)
+    type: number
+    unit: lb
+    min: 60
+    max: 700
+    required: false
+    help_text: >
+      Totally optional: leave it blank if you'd rather not set one. If you do, the CDC describes losing about
+      1 to 2 pounds a week as the more sustainable pace.
+    # Gentle note shown (never a block) when the goal implies losing faster than this pace.
+    rate_note:
+      max_lbs_per_week: 2
+      text: >
+        People who lose weight gradually, about 1 to 2 pounds a week, are more likely to keep it off,
+        so faster isn't healthier. A later date might feel easier on you, but it's your call.
+      source: "CDC, Losing Weight: https://www.cdc.gov/healthy-weight-growth/losing-weight/index.html"
+
+  - id: goal_date
+    health: true
+    prompt: By when? (optional)
+    type: date
+    required: false
+    help_text: Only if you set a goal weight.

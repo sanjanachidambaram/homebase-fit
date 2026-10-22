@@ -63,28 +63,6 @@ def list_sources() -> list[dict]:
     return [dict(r) for r in rows]
 
 
-@app.get("/api/programs")
-def list_programs() -> list[dict]:
-    conn = connect()
-    try:
-        rows = conn.execute("SELECT * FROM program_templates ORDER BY name").fetchall()
-    finally:
-        conn.close()
-    return [
-        {
-            "id": r["id"],
-            "name": r["name"],
-            "goal_tags": json.loads(r["goal_tags"]),
-            "injury_focus": json.loads(r["injury_focus"]),
-            "description": r["description"],
-            "science_rationale": r["science_rationale"],
-            **review_info(r),
-            "source_id": r["source_id"],
-        }
-        for r in rows
-    ]
-
-
 @app.get("/api/basics")
 def list_basics() -> list[dict]:
     conn = connect()

@@ -12,7 +12,7 @@ Routes:
 import json
 import re
 import sqlite3
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -27,9 +27,17 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 # Quiz question id -> quiz_profiles column. The quiz file can change wording and
 # options freely, but these ids must stay (see content/quiz/quiz_questions.yaml).
-QUIZ_COLUMNS = {"goals": "goals", "timeline": "timeline", "injuries": "injury_flags",
-                "age": "age", "weight": "weight", "height": "height"}
-LIST_COLUMNS = {"goals", "injury_flags"}
+QUIZ_COLUMNS = {
+    "goals": "goals", "timeline": "timeline", "injuries": "injury_flags", "age": "age", "weight": "weight",
+    "height": "height", "experience_level": "experience_level", "days_available": "days_available",
+    "session_length": "session_length_minutes", "equipment": "equipment",
+    "other_activity_days": "other_activity_days", "other_activity_notes": "other_activity_notes",
+    "pregnancy_status": "pregnancy_status", "goal_weight": "goal_weight", "goal_date": "goal_date",
+}
+LIST_COLUMNS = {"goals", "injury_flags", "equipment"}
+INT_COLUMNS = {"age", "days_available", "session_length_minutes", "other_activity_days"}
+TEXT_MAX = 500
+GOAL_DATE_MAX_YEARS = 5
 
 # Every table holding a user's data. DELETE /api/users/{id} clears all of them.
 USER_DATA_TABLES = ("safety_events", "measurements", "workout_logs", "exercise_favorites", "quiz_profiles")
@@ -86,9 +94,10 @@ def profile_dict(row: sqlite3.Row | None) -> dict | None:
     if row is None:
         return None
     p = dict(row)
-    for col in ("goals", "injury_flags"):
+    for col in ("goals", "injury_flags", "equipment"):
         p[col] = json.loads(p[col])
     p["consent_accepted"] = bool(p["consent_accepted"])
+    p["needs_clinical_review"] = bool(p.get("needs_clinical_review"))
     return p
 
 
@@ -163,7 +172,19 @@ def validate_answer(q: sqlite3.Row, value: Any) -> Any:
         if (lo is not None and value < lo) or (hi is not None and value > hi):
             raise HTTPException(422, f"'{qid}' must be between {lo} and {hi}.")
         return value
-    return str(value)
+    if qtype == "date":
+        try:
+            day = date.fromisoformat(str(value))
+        except ValueError:
+            raise HTTPException(422, f"'{qid}' must be a date like 2027-03-01.")
+        today = datetime.now(timezone.utc).date()
+        if not today < day <= today.replace(year=today.year + GOAL_DATE_MAX_YEARS):
+            raise HTTPException(422, f"'{qid}' must be a future date within {GOAL_DATE_MAX_YEARS} years.")
+        return day.isoformat()
+    text = str(value).strip()
+    if len(text) > TEXT_MAX:
+        raise HTTPException(422, f"'{qid}' must be {TEXT_MAX} characters or fewer.")
+    return text
 
 
 @router.put("/users/{user_id}/quiz-profile")
@@ -193,22 +214,20 @@ def save_quiz(user_id: int, body: QuizSubmission, uid: int = Depends(token_user_
 
     for col in LIST_COLUMNS:
         values[col] = json.dumps(values.get(col, []))
-    now = now_utc()
+    for col in INT_COLUMNS & values.keys():
+        values[col] = int(values[col])
+    values.setdefault("other_activity_days", 0)
+
+    # Every quiz column is written on every save, so a retake clears answers that were left blank.
+    row = {col: values.get(col) for col in QUIZ_COLUMNS.values()}
+    row.update(user_id=user_id, injury_notes=(body.injury_notes or "").strip() or None,
+               consent_accepted=1, consent_accepted_at=now_utc(), consent_version=body.consent_version)
+    row["updated_at"] = row["consent_accepted_at"]
+    cols = list(row)
+    updates = ", ".join(f"{c} = excluded.{c}" for c in cols if c != "user_id")
     conn.execute(
-        """INSERT INTO quiz_profiles (user_id, goals, timeline, injury_flags, injury_notes, age, weight, height,
-                                      consent_accepted, consent_accepted_at, consent_version, updated_at)
-           VALUES (:user_id, :goals, :timeline, :injury_flags, :injury_notes, :age, :weight, :height,
-                   1, :now, :consent_version, :now)
-           ON CONFLICT(user_id) DO UPDATE SET
-               goals = excluded.goals, timeline = excluded.timeline, injury_flags = excluded.injury_flags,
-               injury_notes = excluded.injury_notes, age = excluded.age, weight = excluded.weight,
-               height = excluded.height, consent_accepted = 1, consent_accepted_at = excluded.consent_accepted_at,
-               consent_version = excluded.consent_version, updated_at = excluded.updated_at""",
-        {"user_id": user_id, "goals": values["goals"], "timeline": values.get("timeline"),
-         "injury_flags": values["injury_flags"], "injury_notes": (body.injury_notes or "").strip() or None,
-         "age": values.get("age"), "weight": values.get("weight"), "height": values.get("height"),
-         "now": now, "consent_version": body.consent_version},
-    )
+        f"INSERT INTO quiz_profiles ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)}) "
+        f"ON CONFLICT(user_id) DO UPDATE SET {updates}", row)
     conn.commit()
     row = conn.execute("SELECT * FROM quiz_profiles WHERE user_id = ?", (user_id,)).fetchone()
     return profile_dict(row)

@@ -27,6 +27,44 @@ function rangeError(q: QuizQuestion, value: Answer | undefined): string | null {
   return null
 }
 
+function OptionLabel({ label, description }: { label: string; description?: string }) {
+  return (
+    <span className="choice-text">
+      <span>{label}</span>
+      {description && <span className="choice-desc">{description}</span>}
+    </span>
+  )
+}
+
+/** Gentle, cited note (never a block) when a goal weight + date means losing faster than the guidance pace. */
+function WeightPaceNote({ questions, answers }: { questions: QuizQuestion[]; answers: Record<string, Answer> }) {
+  const [now] = useState(() => Date.now())   // read the clock once, not on every render
+  const note = questions.find((q) => q.rate_note)?.rate_note
+  const { weight, goal_weight: goal, goal_date: when } = answers
+  if (!note || typeof weight !== 'number' || typeof goal !== 'number' || typeof when !== 'string' || !when) return null
+  const weeks = (new Date(when).getTime() - now) / (7 * 24 * 3600 * 1000)
+  const perWeek = (weight - goal) / weeks
+  if (!(weeks > 0) || !(perWeek > note.max_lbs_per_week)) return null
+  const [label, url] = note.source.split(/:\s(?=https?:)/)
+  return (
+    <div className="pace-note" role="note">
+      <p>
+        <strong>That works out to about {perWeek.toFixed(1)} lb a week.</strong> {note.text}
+      </p>
+      <p className="hint">
+        Source:{' '}
+        {url ? (
+          <a href={url} target="_blank" rel="noopener noreferrer">
+            {label}
+          </a>
+        ) : (
+          note.source
+        )}
+      </p>
+    </div>
+  )
+}
+
 function QuestionField({
   q,
   value,
@@ -36,6 +74,8 @@ function QuestionField({
   value: Answer | undefined
   onChange: (v: Answer) => void
 }) {
+  const [tomorrow] = useState(() => new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 10))
+  const help = q.help_text && <span className="hint question-help">{q.help_text}</span>
   if (q.type === 'multi_select') {
     const selected = Array.isArray(value) ? value : []
     const toggle = (v: string, checked: boolean) => {
@@ -46,6 +86,7 @@ function QuestionField({
     return (
       <fieldset className="question">
         <legend>{q.prompt}</legend>
+        {help}
         {q.options.map((o) => (
           <label key={o.value} className="choice">
             <input
@@ -53,7 +94,7 @@ function QuestionField({
               checked={selected.includes(o.value)}
               onChange={(e) => toggle(o.value, e.target.checked)}
             />
-            {o.label}
+            <OptionLabel label={o.label} description={o.description} />
           </label>
         ))}
       </fieldset>
@@ -63,10 +104,11 @@ function QuestionField({
     return (
       <fieldset className="question">
         <legend>{q.prompt}</legend>
+        {help}
         {q.options.map((o) => (
           <label key={o.value} className="choice">
             <input type="radio" name={q.id} checked={value === o.value} onChange={() => onChange(o.value)} />
-            {o.label}
+            <OptionLabel label={o.label} description={o.description} />
           </label>
         ))}
       </fieldset>
@@ -75,11 +117,13 @@ function QuestionField({
   return (
     <label className="question">
       <span className="legend">{q.prompt}</span>
+      {help}
       <span className="number-row">
         <input
-          type={q.type === 'number' ? 'number' : 'text'}
-          min={q.min}
+          type={q.type === 'number' ? 'number' : q.type === 'date' ? 'date' : 'text'}
+          min={q.type === 'date' ? tomorrow : q.min}
           max={q.max}
+          maxLength={q.type === 'text' ? 500 : undefined}
           value={value === undefined ? '' : String(value)}
           onChange={(e) => {
             const raw = e.target.value
@@ -226,6 +270,7 @@ export default function QuizPage() {
                   <span className="hint">This stays in our database and is never sent to the AI model.</span>
                 </label>
               )}
+              {q.id === 'goal_date' && <WeightPaceNote questions={questions} answers={answers} />}
             </div>
           ))}
           {error && <p className="error">{error}</p>}

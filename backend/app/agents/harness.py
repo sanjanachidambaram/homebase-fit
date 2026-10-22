@@ -37,6 +37,7 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 
 from app.config import MODEL_NAME, PORTKEY_BASE_URL, PROMPTS_DIR, get_secret
 from app.db import connect
+from app.safety_rules import checked_only_for
 
 # Cost guards per agent call. Every agent here needs only a few tool calls.
 USAGE_LIMITS = UsageLimits(request_limit=8, tool_calls_limit=12, total_tokens_limit=60_000)
@@ -196,7 +197,7 @@ class AgentDeps:
 def harness_flags(profile: dict | None) -> tuple[list[str], bool]:
     """Injury flags and checked_only, decided by code from the profile (never by the model)."""
     flags = list(profile.get("injury_flags") or []) if profile and profile.get("found") else []
-    return flags, bool(flags)
+    return flags, checked_only_for(flags)   # same rule as the program generator (app/safety_rules.py)
 
 
 # ---------------------------------------------------------------- claims check (shared_rules rule 1)

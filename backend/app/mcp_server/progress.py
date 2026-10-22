@@ -120,7 +120,8 @@ def get_progress_summary(user_id: int, today: date | None = None) -> dict:
 
 # Simple, transparent product heuristics. Not science. PT TO REVIEW.
 THRESHOLDS = {
-    "target_sessions_per_week_by_timeline": {"4_weeks": 4, "8_weeks": 3, "12_weeks": 3, "no_deadline": 2},
+    "target_sessions_per_week_by_timeline": {"4_weeks": 4, "8_weeks": 3, "12_weeks": 3, "16_weeks": 3,
+                                             "no_deadline": 2},
     "default_target_sessions_per_week": 3,
     "ahead_if_ratio_at_least": 1.25,       # sessions per week / target
     "on_track_if_ratio_at_least": 0.75,
@@ -129,7 +130,7 @@ THRESHOLDS = {
     "min_days_since_quiz_to_judge": 7,
     "min_days_between_weigh_ins_to_judge": 7,
 }
-TIMELINE_WEEKS = {"4_weeks": 4, "8_weeks": 8, "12_weeks": 12}
+TIMELINE_WEEKS = {"4_weeks": 4, "8_weeks": 8, "12_weeks": 12, "16_weeks": 16}
 HEURISTIC_NOTE = ("These statuses come from simple app thresholds (listed in thresholds_used), not from scientific "
                   "or medical guidance. They have not been reviewed by a physical therapist. Do not present them "
                   "as science-backed.")

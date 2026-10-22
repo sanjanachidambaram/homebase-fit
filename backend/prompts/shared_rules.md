@@ -10,13 +10,14 @@ Exactly four LLM agents, each started by one user action. They never call each o
 
 | Agent | Route | Model-visible tools | Code |
 |---|---|---|---|
-| Program Architect | `POST /api/programs/recommend` | get_user_profile, search_program_templates | `app/agents/program_architect.py` |
+| Program Architect | `POST /api/programs/recommend` | none: it explains a plan the code already built | `app/agents/program_architect.py` |
 | Workout Builder | `POST /api/workouts/build` | get_user_profile, search_exercises | `app/agents/workout_builder.py` |
 | Coach | `GET /api/coach/summary` | get_progress_summary, check_goal_achievement, compute_strength_equivalents | `app/agents/coach.py` |
 | Fitness Basics | `POST /api/basics/ask` | search_basics_kb | `app/agents/basics.py` |
 
-Deliberately NOT LLM agents: onboarding (the quiz is structured intake, `app/users.py`) and the safety
-check (a code-level red-flag filter, `app/agents/safety.py`, rule 3). Cheaper, more reliable, testable.
+Deliberately NOT LLM agents: onboarding (the quiz is structured intake, `app/users.py`), the safety
+check (a code-level red-flag filter, `app/agents/safety.py`, rule 3), and **plan building** (a deterministic
+generator, `app/services/program_generator.py`, rule 6). Cheaper, more reliable, testable.
 
 All data access goes through the MCP tool server (`app/mcp_server/server.py`) via `McpGateway` in
 `app/agents/harness.py`. Every agent call is logged with measured tokens in `agent_runs`.
@@ -24,28 +25,28 @@ All data access goes through the MCP tool server (`app/mcp_server/server.py`) vi
 ## 1. Citation integrity (Program Architect and Fitness Basics)
 
 - Never state anything as scientific fact ("research shows", "science says", "proven", "studies",
-  "evidence-based", "backed by science") unless the program or article it comes from has a citation in
-  its `citations` list in the database.
+  "evidence-based", "backed by science") unless the goal protocol or article it comes from has a citation
+  in its `citations` list in the database.
 - If the verified content doesn't cover the question, the answer is:
   **"I don't have verified information on that. Please consult a doctor or physical therapist."**
   Never guess or fill gaps from general knowledge.
-- Content with `status: placeholder` may be passed on as "our guide says" / "this program", but always
+- Content with `status: placeholder` may be passed on as "our guide says" / "your plan", but always
   with its "pending expert review" flag, and never as established or scientific fact.
-- Every answer names the programs or articles it comes from, and their status and citations are shown.
+- Every answer names the articles (or the plan's protocol) it comes from, and their status and citations are shown.
 - Numbers from `check_goal_achievement` come from simple app thresholds, not science. Never present them
   as science-backed.
 
 **Enforced in code:**
-1. Sources must be things the tool returned in this run (output validators in `program_architect.py` and
-   `basics.py`). Status, review notice and citations are copied from the tool result by code; the model
-   can't write or upgrade them.
+1. Basics sources must be articles the tool returned in this run (output validator in `basics.py`). Status,
+   review notice and citations are copied by code; the model can't write or upgrade them. The Program
+   Architect gets the plan's protocol status and citations in its prompt and has no tools at all.
 2. A science-claim check (`harness.makes_science_claim`) runs on every rationale and answer whose sources
    have no citations. The Basics agent is asked to rewrite, then falls back to the "no verified
-   information" reply. The Program Architect's rationale is replaced with a plain one.
+   information" reply. The Program Architect's explanation is replaced with a plain one.
 3. The Fitness Basics agent's ONLY tool is `search_basics_kb`. When the knowledge base has nothing for the
    question (`answerable: false`), the code replies "I don't have verified information..." itself
-   **without calling the model**. Same for the Program Architect when no program fits: the code says so
-   without calling the model, and a program built for different goals is never recommended.
+   **without calling the model**. Same for the Program Architect when no plan can be generated (pregnant or
+   postpartum, rule 6): the code explains why without calling the model.
 
 ## 2. Privacy and user identity (all agents)
 
@@ -75,21 +76,22 @@ agent is never called (no tokens are spent), a `safety_events` row is written (`
 Test: `test_red_flag_question_never_reaches_the_agent` (spies on the agent and checks the row).
 The term list is a placeholder for the PT/OB-GYN to review.
 
-## 4. Injury filtering (Program Architect and Workout Builder)
+## 4. Injury filtering (the plan generator and the Workout Builder)
 
-- Exercises and programs tagged unsafe for the user's `injury_flags` are removed by the SQL inside the
-  MCP tools before the model sees anything. A program is removed if any one of its exercises is unsafe.
+- Exercises tagged unsafe for the user's `injury_flags` (lower_back, knee, shoulder, wrist, ankle) are removed
+  by the SQL in `app/mcp_server/search.py: search_exercises`, which both the MCP tool and the plan generator use.
 - Most exercises have no injury tags yet (`untagged`). Untagged exercises always carry
   `injury_check: "not_yet_checked"` and must never be described as safe.
 - **DECIDED (2026-10-22, project owner): users with an injury flag only ever get exercises that have
-  injury tags.** For them the agent code always passes `checked_only=true`, to `search_exercises` AND
-  `search_program_templates` (which then also drops any program containing an untagged exercise).
+  injury tags.** For them `checked_only=true` is always passed to `search_exercises`, by the plan generator and
+  by the Workout Builder alike. One function decides it: `app/safety_rules.py: checked_only_for`.
   Users with no injury flags can see untagged exercises, still flagged `not_yet_checked`.
-- Programs' injury tags are drafts (`injury_check: "not_pt_reviewed"`). That isn't confirmation of safety.
+- The injury tags are drafts (`injury_check: "drafted_not_pt_reviewed"`). That isn't confirmation of safety.
 
 **Enforced in code:** `harness.harness_flags` sets `injury_flags` and `checked_only` from the profile, and the
 tool wrappers add them to every MCP call. The model can't see or change them.
-Tests: `test_injured_user_always_gets_checked_only`, `test_program_architect_uses_checked_only_and_tool_facts`.
+Tests: `test_injured_user_always_gets_checked_only`, `test_injury_filter_is_applied_during_generation`,
+`test_every_injury_flag_forces_checked_only`.
 
 ## 5. Coach tone (design.md, section 7)
 
@@ -100,3 +102,33 @@ Tests: `test_injured_user_always_gets_checked_only`, `test_program_architect_use
 **Enforced in code:** `coach.py` tone guard (a blocklist) sends a failing message back for a rewrite and
 replaces it with a plain encouraging line if it still fails. The flags and the strength fun fact are
 built by code from the tool results.
+
+## 6. Building the weekly plan (code, not the model)
+
+Every plan comes from `app/services/program_generator.py`: plain Python, no LLM call. Same profile in, same
+plan out. The training parameters come only from `goal_protocols` (content/protocols/goal_protocols.yaml,
+one row per goal x experience level, PT-reviewable); the generator never invents sets, reps, or rest.
+
+- **Safety first.** Pregnant or postpartum (`needs_clinical_review`): no plan is generated until
+  OB-GYN-reviewed guidance exists; the user is pointed to their OB-GYN or midwife. Any injury flag:
+  `checked_only=true` on every exercise search, no exceptions (rule 4).
+- **Blending several goals** (e.g. weight loss + rehab). Where the goals' protocols differ, the more
+  conservative value wins:
+  - sessions per week: the fewest
+  - session length: the shortest (and never longer than the user asked for)
+  - split: the gentlest, in this order: full body > circuit > upper/lower > push/pull/legs
+  - sets: the lower range
+  - reps: the lighter-load (higher-rep) range
+  - rest: the longest
+  - status: placeholder if any goal's protocol is a placeholder; citations: all of them
+- **Training days** = min(days the user has, the protocol's sessions per week), never more than 6 (a full
+  rest day every week), and fewer if training + other regular activity would exceed 6 active days. At least 1.
+- **Exercises**: per day, muscle groups from the split; picked from `search_exercises` with the user's
+  equipment, injury flags and `checked_only`; matched to experience level; no Olympic lifts, strongman,
+  powerlifting, or stretches in the main sets; no jumping/landing moves for rehab, any injury, or beginners.
+  Muscle groups with nothing safe to offer are left out and the plan says so.
+- **The Program Architect** only explains the finished plan, from the plan, the goals, and the protocol's
+  status and citations. It has no tools and never sees age, weight, pregnancy status, notes, or the user id.
+
+**Enforced in code and tested:** `tests/test_program_generator.py` (blending, days, the injury filter during
+generation, equipment, pregnancy), `tests/test_plan_agent.py` (the agent's inputs, claims, and logging).
