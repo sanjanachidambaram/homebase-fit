@@ -10,6 +10,9 @@ Security: the user is ALWAYS the one in the sign-in token (token_user_id). No ro
 from the URL, query, or body, and the request bodies forbid extra fields, so nothing the user types (or a
 model outputs) can point an agent at someone else's data.
 
+Pregnant / postpartum users (needs_clinical_review) never reach a model: the Program Architect and Basics
+answer from code, and the Workout Builder and Coach return 403 pointing to /pregnancy-support.
+
 Every agent call is logged to agent_runs with measured token counts (app/agents/harness.py: run_logged).
 """
 
@@ -20,6 +23,7 @@ from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior, Usag
 from app.agents import basics, coach, program_architect, workout_builder
 from app.agents.harness import AgentUnavailable
 from app.db import connect
+from app.safety_rules import CLINICAL_REVIEW_NO_AI, CLINICAL_REVIEW_PAGE, profile_needs_clinical_review
 from app.security import token_user_id
 from app.services.program_generator import NoProfile, generate_for_user
 
@@ -40,6 +44,15 @@ def signed_in_user(uid: int = Depends(token_user_id)) -> int:
             raise HTTPException(401, "Your sign-in is invalid or expired. Please sign in again.")
     finally:
         conn.close()
+    return uid
+
+
+def no_ai_for_clinical_review(uid: int = Depends(signed_in_user)) -> int:
+    """Pregnant / postpartum users never reach an AI agent (shared_rules.md rule 6). Checked in code before
+    the agent runs, so the model is never called and no tokens are spent."""
+    if profile_needs_clinical_review(uid):
+        raise HTTPException(403, {"code": "needs_clinical_review", "message": CLINICAL_REVIEW_NO_AI,
+                                  "page": CLINICAL_REVIEW_PAGE})
     return uid
 
 
@@ -71,15 +84,17 @@ async def recommend_program(body: NoBody | None = None, uid: int = Depends(signe
 
 
 @router.post("/workouts/build")
-async def build_workout(body: workout_builder.WorkoutRequest, uid: int = Depends(signed_in_user)) -> dict:
+async def build_workout(body: workout_builder.WorkoutRequest, uid: int = Depends(no_ai_for_clinical_review)) -> dict:
     return await _run(workout_builder.build_workout(uid, body, route="POST /api/workouts/build"))
 
 
 @router.get("/coach/summary")
-async def coach_summary(uid: int = Depends(signed_in_user)) -> dict:
+async def coach_summary(uid: int = Depends(no_ai_for_clinical_review)) -> dict:
     return await _run(coach.coach_summary(uid, route="GET /api/coach/summary"))
 
 
 @router.post("/basics/ask")
 async def ask_basics(body: basics.BasicsQuestion, uid: int = Depends(signed_in_user)) -> dict:
-    return await _run(basics.answer_question(uid, body.question, route="POST /api/basics/ask"))
+    # The red-flag safety check still runs for everyone; for pregnant / postpartum users the AI step is skipped.
+    return await _run(basics.answer_question(uid, body.question, route="POST /api/basics/ask",
+                                             clinical_review=profile_needs_clinical_review(uid)))

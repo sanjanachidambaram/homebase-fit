@@ -58,3 +58,10 @@ sources:
     license: U.S. government work (public domain)
     used_for: The quiz note that losing about 1 to 2 pounds a week is more sustainable
     status: active
+
+  - id: acog-co-804
+    name: "ACOG Committee Opinion No. 804: Physical Activity and Exercise During Pregnancy and the Postpartum Period (2020)"
+    url: https://www.acog.org/clinical/clinical-guidance/committee-opinion/articles/2020/04/physical-activity-and-exercise-during-pregnancy-and-the-postpartum-period
+    license: Cited by link only (American College of Obstetricians and Gynecologists; Obstet Gynecol 2020;135:e178-e188)
+    used_for: Why pregnant and postpartum users are sent to their own clinician instead of a generated plan (the pregnancy support page)
+    status: active

@@ -110,7 +110,10 @@ plan out. The training parameters come only from `goal_protocols` (content/proto
 one row per goal x experience level, PT-reviewable); the generator never invents sets, reps, or rest.
 
 - **Safety first.** Pregnant or postpartum (`needs_clinical_review`): no plan is generated until
-  OB-GYN-reviewed guidance exists; the user is pointed to their OB-GYN or midwife. Any injury flag:
+  OB-GYN-reviewed guidance exists; the user is pointed to their OB-GYN or midwife. They also never reach
+  ANY AI agent: the Workout Builder and Coach routes return 403, the Program Architect and Basics answer
+  from code (the Basics red-flag check still runs and still logs), and the frontend sends them to
+  `/pregnancy-support`. One check, `app/safety_rules.py: profile_needs_clinical_review`, decides it. Any injury flag:
   `checked_only=true` on every exercise search, no exceptions (rule 4).
 - **Blending several goals** (e.g. weight loss + rehab). Where the goals' protocols differ, the more
   conservative value wins:

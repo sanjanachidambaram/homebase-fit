@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { MUSCLE_GROUP_LABELS, type WeeklyProgram } from '../api'
 import { useFavorites } from '../favorites'
 import ExerciseDetail from './ExerciseDetail'
+import Link from './Link'
 import ReviewInfo from './ReviewInfo'
 
 const DAY_NAMES: Record<string, string> = {
@@ -23,6 +24,9 @@ export default function WeeklyPlanView({ plan, startOpen = true }: { plan: Weekl
       <div className="clinical-box" role="note">
         <strong>Needs clinical review</strong>
         <p>{plan.blocked_reason}</p>
+        <p>
+          <Link to="/pregnancy-support">Read the message from our OB-GYN</Link>
+        </p>
       </div>
     )
   }

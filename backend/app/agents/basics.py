@@ -17,6 +17,7 @@ from pydantic_ai import Agent, ModelRetry, RunContext
 
 from app.agents.harness import AgentDeps, McpGateway, load_prompt, makes_science_claim, run_logged
 from app.agents.safety import REDIRECT_MESSAGE, log_safety_event, red_flags_in
+from app.safety_rules import CLINICAL_REVIEW_NO_AI, CLINICAL_REVIEW_PAGE
 
 NO_INFO_MESSAGE = "I don't have verified information on that. Please consult a doctor or physical therapist."
 PENDING_NOTE = "This comes from our Fitness Basics guide, which is still pending expert review."
@@ -91,13 +92,19 @@ def finalize(draft: BasicsDraft, deps: AgentDeps) -> BasicsAnswer:
                         review_note=PENDING_NOTE if pending else None)
 
 
-async def answer_question(user_id: int, question: str, route: str) -> tuple[BasicsAnswer, dict]:
+async def answer_question(user_id: int, question: str, route: str,
+                          clinical_review: bool = False) -> tuple[BasicsAnswer, dict]:
     # 1. Red-flag pre-filter: code only. The agent is never called for these questions.
     flags = red_flags_in(question)
     if flags:
         event_id = log_safety_event(user_id, "basics_qa", question)
         return (BasicsAnswer(answer=REDIRECT_MESSAGE, answered=False, redirected_to_professional=True),
                 {"safety_event_id": event_id, "red_flags": flags, "agent_called": False})
+
+    # Pregnant / postpartum: no AI answers (they need individual clinical clearance). Code reply, no model call.
+    if clinical_review:
+        return (BasicsAnswer(answer=CLINICAL_REVIEW_NO_AI, answered=False),
+                {"agent_called": False, "needs_clinical_review": True, "page": CLINICAL_REVIEW_PAGE})
 
     deps = AgentDeps(gateway=McpGateway(), user_id=user_id)
     # 2. Nothing relevant in the knowledge base: say so without calling the model.

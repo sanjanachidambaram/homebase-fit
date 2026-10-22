@@ -8,6 +8,7 @@ import AccountForm from '../components/AccountForm'
 import { ConsentStep } from '../components/Legal'
 import { CONSENT_VERSION } from '../legal'
 import Link from '../components/Link'
+import { navigate } from '../router'
 import { setSession, useSession } from '../session'
 
 type Answer = string | number | string[] | ''
@@ -189,6 +190,11 @@ export default function QuizPage() {
         answers: filled,
         injury_notes: injuryNotes.trim() || undefined,
       })
+      // Pregnant / postpartum: straight to the support page, not the Dashboard (no plan or AI for them).
+      if (profile.needs_clinical_review) {
+        navigate('/pregnancy-support')
+        return
+      }
       setSaved(profile)
       setStep('done')
     } catch (e) {

@@ -15,3 +15,24 @@ def checked_only_for(injury_flags: list[str] | None) -> bool:
 def needs_clinical_review(pregnancy_status: str | None) -> bool:
     """Pregnant and postpartum users need OB-GYN-reviewed guidance; until it exists, no plan is generated."""
     return pregnancy_status in CLINICAL_REVIEW_STATUSES
+
+
+# Where pregnant / postpartum users are sent instead of any AI feature (frontend route).
+CLINICAL_REVIEW_PAGE = "/pregnancy-support"
+CLINICAL_REVIEW_NO_AI = (
+    "While you're pregnant or postpartum, HomeBase Fit's AI features and generated workouts are switched off, "
+    "because exercise in this period needs individual clearance from a clinician who knows you. Please talk with "
+    "your OB-GYN or midwife."
+)
+
+
+def profile_needs_clinical_review(user_id: int) -> bool:
+    """True if this user's quiz says pregnant or postpartum (the generated needs_clinical_review column)."""
+    from app.db import connect_readonly   # local import: this module stays free of DB imports for the generator
+
+    conn = connect_readonly()
+    try:
+        row = conn.execute("SELECT needs_clinical_review FROM quiz_profiles WHERE user_id = ?", (user_id,)).fetchone()
+    finally:
+        conn.close()
+    return bool(row and row[0])

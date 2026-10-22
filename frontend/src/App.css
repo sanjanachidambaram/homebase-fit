@@ -1787,3 +1787,74 @@ fieldset.question {
 .example-notes li {
   margin-bottom: 0.3rem;
 }
+
+/* Pregnancy support page and the card that replaces the plan / builder. Calm, plain, full contrast. */
+.clinical-card {
+  border: 2px solid var(--lavender-deep);
+  background: #fff;
+}
+
+.support-page {
+  max-width: 44rem;
+  margin: 0 auto;
+}
+
+.support-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-input);
+  background: #000;
+  margin-bottom: 1.25rem;
+}
+
+.video-placeholder {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.4rem;
+  background: var(--lavender-tint);
+  border: 2px dashed var(--lavender-deep);
+  color: inherit;
+}
+
+.video-placeholder span {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.video-placeholder p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.support-body p {
+  line-height: 1.65;
+}
+
+.support-citation {
+  font-size: 0.92rem;
+}
+
+.support-next,
+.support-more {
+  margin-top: 1.25rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-input);
+  background: #fff;
+  border: 2px solid var(--lavender-deep);
+}
+
+.support-more {
+  border-style: dashed;
+}
+
+.support-next h3,
+.support-more h3 {
+  margin: 0 0 0.4rem;
+}
+
+.support-next p,
+.support-more p {
+  margin: 0;
+}

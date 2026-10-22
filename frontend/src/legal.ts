@@ -10,6 +10,10 @@ export const DISCLAIMER =
   'Consult a doctor or physical therapist before starting any exercise program, especially if you ' +
   'have an injury or medical condition.'
 
+// The OB-GYN who recorded the pregnancy/postpartum message (content/video/obgyn_pregnancy_message.mp4).
+// Placeholder: swap in the real name.
+export const OBGYN_NAME = 'Dr. [Name]'
+
 export const CLASS_PROJECT_NOTE =
   'HomeBase Fit is a class project, not a commercial product. Use it at your own risk.'
 

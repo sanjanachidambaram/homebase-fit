@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { fetchAccount, type Account } from '../api'
 import AccountForm from '../components/AccountForm'
+import ClinicalSupportCard from '../components/ClinicalSupport'
 import AskBasics from '../components/dashboard/AskBasics'
 import CoachCard from '../components/dashboard/CoachCard'
 import PlanCard from '../components/dashboard/PlanCard'
@@ -33,6 +34,7 @@ function Welcome() {
 
 function Dashboard({ session }: { session: Session }) {
   const [account, setAccount] = useState<Account | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -41,6 +43,7 @@ function Dashboard({ session }: { session: Session }) {
       .catch((e: Error) => {
         // Only a bad sign-in (expired, or the account was deleted) signs you out; a server hiccup doesn't.
         if (!cancelled && /sign in|not found/i.test(e.message)) setSession(null)
+        else if (!cancelled) setLoadFailed(true)
       })
     return () => {
       cancelled = true
@@ -64,12 +67,21 @@ function Dashboard({ session }: { session: Session }) {
         </section>
       )}
 
-      <div className="dash-grid">
-        <CoachCard token={session.token} userId={session.userId} />
-        <PlanCard token={session.token} userId={session.userId} />
-        <AskBasics token={session.token} />
-      </div>
-      <WorkoutBuilder token={session.token} compact />
+      {/* Pregnant / postpartum: no plan, no build-your-own, and no AI cards (all blocked server-side too). */}
+      {account?.quiz_profile?.needs_clinical_review ? (
+        <ClinicalSupportCard />
+      ) : (
+        (account || loadFailed) && (
+          <>
+            <div className="dash-grid">
+              <CoachCard token={session.token} userId={session.userId} />
+              <PlanCard token={session.token} userId={session.userId} />
+              <AskBasics token={session.token} />
+            </div>
+            <WorkoutBuilder token={session.token} compact />
+          </>
+        )
+      )}
     </div>
   )
 }

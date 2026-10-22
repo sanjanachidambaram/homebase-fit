@@ -139,6 +139,20 @@ export interface AuthResult {
   token: string
 }
 
+/** An API error. `code` and `page` are set when the server says where to send the user instead
+ *  (e.g. code "needs_clinical_review", page "/pregnancy-support"). */
+export class ApiError extends Error {
+  status: number
+  code?: string
+  page?: string
+  constructor(message: string, status: number, code?: string, page?: string) {
+    super(message)
+    this.status = status
+    this.code = code
+    this.page = page
+  }
+}
+
 /** fetch + JSON with the API's error message ("detail") surfaced as the Error text. */
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   const headers = new Headers(init.headers)
@@ -148,8 +162,9 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
   const body = await res.json().catch(() => null)
   if (!res.ok) {
     const detail = body?.detail
-    const message = typeof detail === 'string' ? detail : Array.isArray(detail) ? detail[0]?.msg : null
-    throw new Error(message ?? `Request failed (${res.status})`)
+    const message =
+      typeof detail === 'string' ? detail : Array.isArray(detail) ? detail[0]?.msg : detail?.message ?? null
+    throw new ApiError(message ?? `Request failed (${res.status})`, res.status, detail?.code, detail?.page)
   }
   return body as T
 }
