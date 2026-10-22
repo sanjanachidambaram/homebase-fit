@@ -62,7 +62,7 @@ CREATE TABLE sources (
 CREATE TABLE exercises (
     id                       TEXT PRIMARY KEY,       -- hand-authored: slug; imported: the dataset's own id
     name                     TEXT NOT NULL,
-    muscle_group             TEXT NOT NULL CHECK (muscle_group IN ('legs', 'arms', 'back', 'core', 'full_body')),
+    muscle_group             TEXT NOT NULL CHECK (muscle_group IN ('legs', 'arms', 'chest', 'shoulders', 'back', 'core', 'full_body')),
     equipment_needed         TEXT NOT NULL DEFAULT '["none"]' CHECK (json_valid(equipment_needed)),        -- ["dumbbells"]
     difficulty               TEXT NOT NULL CHECK (difficulty IN ('beginner', 'intermediate', 'advanced')),
     injury_contraindications TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(injury_contraindications)),       -- ["knee"]

@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import CONTENT_DIR, MODEL_NAME, PROJECT_ROOT, WORKING_DB, is_production, llm_provider
 from app.db import connect, ensure_working_db, table_counts
 
-MuscleGroup = Literal["legs", "arms", "back", "core", "full_body"]
+MuscleGroup = Literal["legs", "arms", "chest", "shoulders", "back", "core", "full_body"]
 
 
 @asynccontextmanager

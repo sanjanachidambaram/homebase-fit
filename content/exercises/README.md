@@ -4,7 +4,7 @@ Two sources feed the `exercises` table (see `content/sources.yaml`):
 
 | Folder | `source_dataset` | Injury tags |
 |---|---|---|
-| `legs/`, `arms/`, `back/`, `core/`, `full_body/` (`exercises.yaml` in each) | `placeholder-authored` | drafted, not yet PT-reviewed (`draft`) |
+| `legs/`, `arms/`, `chest/`, `shoulders/`, `back/`, `core/`, `full_body/` (`exercises.yaml` in each) | `placeholder-authored` | drafted, not yet PT-reviewed (`draft`) |
 | `source_free_exercise_db/` (see its `ATTRIBUTION.md`) | `free-exercise-db` | none yet (`untagged`) |
 
 Program templates can only use the hand-authored exercises for now, because those are the only ones with injury tags.

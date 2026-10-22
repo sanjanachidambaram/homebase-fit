@@ -21,7 +21,7 @@ from app.config import CONTENT_DIR, DB_DIR, ORIGINAL_DB, PROJECT_ROOT
 from app.db import connect, table_counts
 from app.db.reset import reset
 
-MUSCLE_GROUPS = ("legs", "arms", "back", "core", "full_body")
+MUSCLE_GROUPS = ("legs", "arms", "chest", "shoulders", "back", "core", "full_body")
 INJURY_TAGS = {"lower_back", "knee", "shoulder"}
 DAYS = {"mon": 1, "tue": 2, "wed": 3, "thu": 4, "fri": 5, "sat": 6, "sun": 7}
 MEDIA_EXTS = (".gif", ".mp4", ".webm", ".jpg", ".jpeg", ".png", ".webp")
@@ -36,8 +36,8 @@ FEDB_MUSCLE_TO_GROUP = {
     "lower back": "back", "middle back": "back", "lats": "back", "traps": "back", "neck": "back",
     "quadriceps": "legs", "hamstrings": "legs", "glutes": "legs", "calves": "legs",
     "adductors": "legs", "abductors": "legs",
-    # No chest/shoulders group in the app yet, so upper-body pushing work lands in "arms".
-    "biceps": "arms", "triceps": "arms", "forearms": "arms", "chest": "arms", "shoulders": "arms",
+    "biceps": "arms", "triceps": "arms", "forearms": "arms",
+    "chest": "chest", "shoulders": "shoulders",
 }
 FEDB_FULL_BODY_CATEGORIES = {"cardio", "olympic weightlifting", "strongman"}
 FEDB_EQUIPMENT = {

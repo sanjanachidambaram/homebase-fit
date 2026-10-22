@@ -1,10 +1,12 @@
 // Types and fetch helpers for the FastAPI backend (proxied at /api in dev).
 
-export type MuscleGroup = 'legs' | 'arms' | 'back' | 'core' | 'full_body'
+export type MuscleGroup = 'legs' | 'arms' | 'chest' | 'shoulders' | 'back' | 'core' | 'full_body'
 
 export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
   legs: 'Legs',
-  arms: 'Arms, chest & shoulders',
+  arms: 'Arms',
+  chest: 'Chest',
+  shoulders: 'Shoulders',
   back: 'Back',
   core: 'Core',
   full_body: 'Full body',
