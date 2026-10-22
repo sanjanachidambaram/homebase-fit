@@ -1,86 +1,102 @@
 # HARD RULES FOR ALL HOMEBASE FIT AGENTS
 
-These rules go into every agent's system prompt. The prompt text is only one layer.
-**Each rule marked ENFORCE IN CODE must also be enforced by code when the agents are
-built (next prompt). A prompt instruction alone does not count as meeting the requirement.**
+These are the rules every agent follows. Each agent's prompt file restates the ones that apply to it,
+but **a prompt instruction alone never counts**: every rule below is also enforced by code, and the
+"Enforced in code" lines say exactly where. Tests: `backend/tests/test_agents.py`, `test_mcp_tools.py`.
 
-## 1. Citation integrity (Program Architect and Fitness Basics agents)
+## The agent team (decided 2026-10-22)
 
-- Never state a claim as scientific fact ("research shows", "science says", "proven",
-  "studies", "evidence-based", "backed by science", or any specific physiological
-  mechanism or number) unless that claim is backed by a citation stored in the database:
-  the `citations` list on a `program_templates` row or a `basics_articles` row.
-- If the user asks something the verified content doesn't cover, the answer is:
-  **"I don't have verified information on that. Please consult a doctor or physical
-  therapist."** Do not guess, generalize, or fill gaps from general knowledge.
-- Content whose `status` is `placeholder` is not verified. Describe it as
-  "pending expert review" and never present it as established fact.
-- Every factual statement in an answer must name the citation (claim + source) it
-  comes from.
+Exactly four LLM agents, each started by one user action. They never call each other.
 
-**ENFORCE IN CODE (requirement for the next prompt):**
-1. The agents' structured output must include the citation(s) each claim relies on,
-   referenced by the program/article they came from.
-2. A validator checks that every cited claim/source actually exists in the DB for
-   that program or article. Unknown or invented citations are rejected.
-3. If an answer has no valid citation, or relies only on `placeholder` content, the
-   code replaces it with the "I don't have verified information..." response
-   instead of returning the model's text.
-4. The agents get retrieved content only through the MCP tools (`mcp_server/server.py`); they
-   have no open-ended web or knowledge tools. The Fitness Basics agent's ONLY source is
-   `search_basics_kb`. When it returns `answerable: false`, the harness replies with the
-   "I don't have verified information..." message itself, without calling the model.
-5. Numbers from `check_goal_achievement` come from simple app thresholds, not science
-   (the tool says so in `note`). Never present them as science-backed.
+| Agent | Route | Model-visible tools | Code |
+|---|---|---|---|
+| Program Architect | `POST /api/programs/recommend` | get_user_profile, search_program_templates | `app/agents/program_architect.py` |
+| Workout Builder | `POST /api/workouts/build` | get_user_profile, search_exercises | `app/agents/workout_builder.py` |
+| Coach | `GET /api/coach/summary` | get_progress_summary, check_goal_achievement, compute_strength_equivalents | `app/agents/coach.py` |
+| Fitness Basics | `POST /api/basics/ask` | search_basics_kb | `app/agents/basics.py` |
 
-## 2. Privacy: no PII in prompts (all agents)
+Deliberately NOT LLM agents: onboarding (the quiz is structured intake, `app/users.py`) and the safety
+check (a code-level red-flag filter, `app/agents/safety.py`, rule 3). Cheaper, more reliable, testable.
 
-- User context comes only from `app/agents/context.py` → `AgentUserProfile`
-  (goals, timeline, injury_flags, age, weight, height).
-- Never include email, name, user id, password data, or free-text injury notes in a
-  prompt or tool result sent to the model.
+All data access goes through the MCP tool server (`app/mcp_server/server.py`) via `McpGateway` in
+`app/agents/harness.py`. Every agent call is logged with measured tokens in `agent_runs`.
 
-**ENFORCE IN CODE:** agent code builds user context only via `agent_profile_for()`;
-tools that return user data return only `AgentUserProfile` fields. The MCP tool
-`get_user_profile` already does this (it calls `agent_profile_for`).
+## 1. Citation integrity (Program Architect and Fitness Basics)
 
-- Three MCP tools take a `user_id` (`get_user_profile`, `get_progress_summary`,
-  `check_goal_achievement`), and the MCP server cannot tell who is asking.
+- Never state anything as scientific fact ("research shows", "science says", "proven", "studies",
+  "evidence-based", "backed by science") unless the program or article it comes from has a citation in
+  its `citations` list in the database.
+- If the verified content doesn't cover the question, the answer is:
+  **"I don't have verified information on that. Please consult a doctor or physical therapist."**
+  Never guess or fill gaps from general knowledge.
+- Content with `status: placeholder` may be passed on as "our guide says" / "this program", but always
+  with its "pending expert review" flag, and never as established or scientific fact.
+- Every answer names the programs or articles it comes from, and their status and citations are shown.
+- Numbers from `check_goal_achievement` come from simple app thresholds, not science. Never present them
+  as science-backed.
 
-**ENFORCE IN CODE (requirement for the next prompt):** the agent harness sets `user_id`
-from the signed-in session, never from model output, and removes `user_id` from the
-tool schema the model sees. A manipulated prompt must not be able to request another
-user's data, and the id never needs to enter the model's context.
+**Enforced in code:**
+1. Sources must be things the tool returned in this run (output validators in `program_architect.py` and
+   `basics.py`). Status, review notice and citations are copied from the tool result by code; the model
+   can't write or upgrade them.
+2. A science-claim check (`harness.makes_science_claim`) runs on every rationale and answer whose sources
+   have no citations. The Basics agent is asked to rewrite, then falls back to the "no verified
+   information" reply. The Program Architect's rationale is replaced with a plain one.
+3. The Fitness Basics agent's ONLY tool is `search_basics_kb`. When the knowledge base has nothing for the
+   question (`answerable: false`), the code replies "I don't have verified information..." itself
+   **without calling the model**. Same for the Program Architect when no program fits: the code says so
+   without calling the model, and a program built for different goals is never recommended.
 
-## 3. Safety redirect (all agents)
+## 2. Privacy and user identity (all agents)
 
-- Red-flag language (e.g. "sharp pain", "numbness", "tingling", "chest pain",
-  "dizzy", "can't bear weight") gets: "That could be a sign of something that needs
-  medical attention. Please stop exercising that area and see a doctor or physical
-  therapist." No exercise advice in that answer.
+- User context comes only from `app/agents/context.py` (`agent_profile_for`): goals, timeline,
+  injury_flags, age, weight, height. Never email, name, user id, password data, or free-text notes.
+- The user is always the one in the sign-in token. Nothing the user types and nothing the model outputs
+  can choose which user's data is read.
 
-**ENFORCE IN CODE:** a deterministic keyword check runs *before* the model is called,
-returns the redirect itself, and logs a row in `safety_events`.
+**Enforced in code:**
+1. The FastAPI routes (`app/agent_routes.py`) take the user only from the token; request bodies forbid
+   extra fields, so `{"user_id": ...}` is rejected with 422, and query strings are ignored.
+2. The tools the model sees have **no `user_id` parameter** (nor `injury_flags`, `checked_only`, or
+   `equipment`). The agent code adds the session's user id before calling the MCP server. If the model
+   tries to pass one, PydanticAI rejects the call as invalid arguments.
+3. `test_user_cannot_reach_another_users_data` and `test_model_never_sees_user_id_injury_flags_or_checked_only`
+   prove both: a manipulated model asking for another user's id only ever reaches the signed-in user's data.
+
+## 3. Safety redirect (red flags, before any model call)
+
+- A question with pain/injury warning signs (e.g. "sharp pain", "numbness", "can't move", "severe",
+  "chest pain", "dizzy", "I think I tore my...", "my knee hurts") gets a fixed message pointing to a
+  doctor or physical therapist. No exercise advice.
+
+**Enforced in code:** `app/agents/safety.py` runs a regex check **before** the Basics agent. On a match the
+agent is never called (no tokens are spent), a `safety_events` row is written (`source = 'basics_qa'`,
+`action_taken = 'redirected_to_professional'`), and the fixed message is returned.
+Test: `test_red_flag_question_never_reaches_the_agent` (spies on the agent and checks the row).
+The term list is a placeholder for the PT/OB-GYN to review.
 
 ## 4. Injury filtering (Program Architect and Workout Builder)
 
-- Exercises and programs tagged unsafe for the user's `injury_flags` are removed by the SQL
-  inside the MCP tools (`search_exercises`, `search_program_templates`) before the model
-  sees anything. A program is removed if any one of its exercises is tagged unsafe.
-- Most exercises have no injury tags yet (`contraindication_status: untagged`). Without
-  `checked_only`, the tool still returns them, but every one carries
-  `injury_check: "not_yet_checked"`, and the model must never describe those as safe.
-- **DECIDED (2026-10-22, project owner): users with an injury flag only ever get exercises
-  that have injury tags.** For them the agent harness always passes `checked_only=true`,
-  so an untagged exercise never reaches an injured user until the PT has tagged it.
+- Exercises and programs tagged unsafe for the user's `injury_flags` are removed by the SQL inside the
+  MCP tools before the model sees anything. A program is removed if any one of its exercises is unsafe.
+- Most exercises have no injury tags yet (`untagged`). Untagged exercises always carry
+  `injury_check: "not_yet_checked"` and must never be described as safe.
+- **DECIDED (2026-10-22, project owner): users with an injury flag only ever get exercises that have
+  injury tags.** For them the agent code always passes `checked_only=true`, to `search_exercises` AND
+  `search_program_templates` (which then also drops any program containing an untagged exercise).
   Users with no injury flags can see untagged exercises, still flagged `not_yet_checked`.
-- Programs' injury tags are drafts, so `search_program_templates` reports
-  `injury_check: "not_pt_reviewed"`. That is not confirmation that a program is safe.
+- Programs' injury tags are drafts (`injury_check: "not_pt_reviewed"`). That isn't confirmation of safety.
 
-**ENFORCE IN CODE (requirement for the next prompt):**
-1. The harness, not the model, supplies `injury_flags` (from `AgentUserProfile`) on every
-   call, so the model cannot ask for an unfiltered list.
-2. For any user with an injury flag, the harness sets `checked_only=true` on every
-   `search_exercises` call from the Program Architect and Workout Builder (the decision
-   above). The model cannot turn it off. Programs already only contain exercises that have
-   drafted tags, so `search_program_templates` needs no equivalent switch.
+**Enforced in code:** `harness.harness_flags` sets `injury_flags` and `checked_only` from the profile, and the
+tool wrappers add them to every MCP call. The model can't see or change them.
+Tests: `test_injured_user_always_gets_checked_only`, `test_program_architect_uses_checked_only_and_tool_facts`.
+
+## 5. Coach tone (design.md, section 7)
+
+- Warm, upbeat, a little cheeky. Never body-shaming, guilt-tripping, or about food, eating, diets, or body
+  weight. Celebrate showing up and consistency.
+- `goal_status` and `overtraining_flag` (10+ days in a row) come from the tools, never from the model.
+
+**Enforced in code:** `coach.py` tone guard (a blocklist) sends a failing message back for a rewrite and
+replaces it with a plain encouraging line if it still fails. The flags and the strength fun fact are
+built by code from the tool results.

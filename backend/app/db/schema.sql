@@ -190,6 +190,30 @@ CREATE TABLE safety_events (
 CREATE INDEX idx_safety_events_time ON safety_events(timestamp);
 CREATE INDEX idx_safety_events_source ON safety_events(source, timestamp);
 
+-- ---------------------------------------------------------------- agent token log
+
+-- One row per agent call (every call, including failed ones), with token counts measured
+-- by PydanticAI's usage tracking. This is the source for the tokenomics report.
+-- Deleting a user keeps their rows for the token statistics but clears user_id.
+-- app/db/reset.py carries these rows over when it resets the working database.
+CREATE TABLE agent_runs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_name    TEXT NOT NULL,      -- program_architect | workout_builder | coach | basics
+    user_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    input_tokens  INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    cached_tokens INTEGER NOT NULL DEFAULT 0,   -- input tokens served from the provider's prompt cache
+    requests      INTEGER NOT NULL DEFAULT 0,   -- model round trips in this call
+    tool_calls    INTEGER NOT NULL DEFAULT 0,
+    model         TEXT NOT NULL,
+    route         TEXT NOT NULL,      -- e.g. 'POST /api/basics/ask'
+    status        TEXT NOT NULL CHECK (status IN ('ok', 'error')),
+    error_type    TEXT,               -- exception class name when status = 'error'
+    duration_ms   INTEGER,
+    timestamp     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+CREATE INDEX idx_agent_runs_agent_time ON agent_runs(agent_name, timestamp);
+
 -- Display-ready view for the safety report: newest first, with the user's email.
 CREATE VIEW safety_events_report AS
 SELECT s.id,

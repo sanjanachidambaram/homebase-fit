@@ -114,8 +114,10 @@ def delete_user(user_id: int, uid: int = Depends(token_user_id), conn: sqlite3.C
     with conn:  # one transaction: all or nothing
         for table in USER_DATA_TABLES:
             deleted[table] = conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,)).rowcount
+        # The AI token log holds no content, only counts; keep it for the statistics but cut the link.
+        unlinked = conn.execute("UPDATE agent_runs SET user_id = NULL WHERE user_id = ?", (user_id,)).rowcount
         deleted["users"] = conn.execute("DELETE FROM users WHERE id = ?", (user_id,)).rowcount
-    return {"deleted": True, "rows_removed": deleted}
+    return {"deleted": True, "rows_removed": deleted, "agent_runs_unlinked": unlinked}
 
 
 # ---------------------------------------------------------------- quiz

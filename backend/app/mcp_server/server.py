@@ -99,16 +99,18 @@ def search_exercises(
 def search_program_templates(
     goal_tags: list[GoalTag] | None = None,
     injury_flags: list[InjuryFlag] | None = None,
+    checked_only: bool = False,
 ) -> dict:
     """Search the trainer program templates.
 
     goal_tags: weight_loss, tone, strength, rehab. Programs matching more of the goals come first; omit for all.
     injury_flags: lower_back, knee, shoulder. A program is removed if ANY of its exercises is tagged as unsafe
       for any of them.
+    checked_only: true also removes programs that use any exercise with no injury tags yet.
 
     Each result has the weekly schedule, status, review_notice, and citations. The injury tags behind a program
     are drafts a physical therapist has not reviewed, so injury_check will say "not_pt_reviewed"."""
-    return _run(search.search_program_templates, goal_tags, injury_flags)
+    return _run(search.search_program_templates, goal_tags, injury_flags, checked_only)
 
 
 @mcp.tool(annotations=READ_ONLY)

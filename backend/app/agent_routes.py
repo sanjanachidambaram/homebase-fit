@@ -1,0 +1,71 @@
+"""The four agent routes. Each one is a specific user action; the agents never call each other.
+
+  POST /api/programs/recommend   Program Architect
+  POST /api/workouts/build       Workout Builder
+  GET  /api/coach/summary        Coach (dashboard load)
+  POST /api/basics/ask           Fitness Basics (red-flag pre-filter runs first)
+
+Security: the user is ALWAYS the one in the sign-in token (token_user_id). No route accepts a user_id
+from the URL, query, or body, and the request bodies forbid extra fields, so nothing the user types (or a
+model outputs) can point an agent at someone else's data.
+
+Every agent call is logged to agent_runs with measured token counts (app/agents/harness.py: run_logged).
+"""
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior, UsageLimitExceeded
+
+from app.agents import basics, coach, program_architect, workout_builder
+from app.agents.harness import AgentUnavailable
+from app.db import connect
+from app.security import token_user_id
+
+router = APIRouter(prefix="/api")
+
+AI_FAILED = "The AI helper couldn't finish that just now. Please try again in a moment."
+
+
+class NoBody(BaseModel):
+    model_config = {"extra": "forbid"}   # an empty body is fine; {"user_id": 2} is rejected
+
+
+def signed_in_user(uid: int = Depends(token_user_id)) -> int:
+    """The user from the token, and only if the account still exists."""
+    conn = connect()
+    try:
+        if not conn.execute("SELECT 1 FROM users WHERE id = ?", (uid,)).fetchone():
+            raise HTTPException(401, "Your sign-in is invalid or expired. Please sign in again.")
+    finally:
+        conn.close()
+    return uid
+
+
+async def _run(coro):
+    try:
+        output, meta = await coro
+    except AgentUnavailable as e:
+        raise HTTPException(503, str(e)) from e
+    except (UsageLimitExceeded, UnexpectedModelBehavior, ModelHTTPError) as e:
+        raise HTTPException(502, AI_FAILED) from e
+    return {"result": output.model_dump(), "meta": meta}
+
+
+@router.post("/programs/recommend")
+async def recommend_program(body: NoBody | None = None, uid: int = Depends(signed_in_user)) -> dict:
+    return await _run(program_architect.recommend_program(uid, route="POST /api/programs/recommend"))
+
+
+@router.post("/workouts/build")
+async def build_workout(body: workout_builder.WorkoutRequest, uid: int = Depends(signed_in_user)) -> dict:
+    return await _run(workout_builder.build_workout(uid, body, route="POST /api/workouts/build"))
+
+
+@router.get("/coach/summary")
+async def coach_summary(uid: int = Depends(signed_in_user)) -> dict:
+    return await _run(coach.coach_summary(uid, route="GET /api/coach/summary"))
+
+
+@router.post("/basics/ask")
+async def ask_basics(body: basics.BasicsQuestion, uid: int = Depends(signed_in_user)) -> dict:
+    return await _run(basics.answer_question(uid, body.question, route="POST /api/basics/ask"))

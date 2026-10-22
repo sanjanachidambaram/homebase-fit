@@ -41,6 +41,6 @@ export const PRIVACY_POINTS: { heading: string; text: string }[] = [
   },
   {
     heading: 'Deleting your data',
-    text: 'Go to Settings and choose "Delete my data". That permanently deletes your account and everything listed above, right away.',
+    text: 'Go to Settings and choose "Delete my data". That permanently deletes your account and everything listed above, right away. We keep only anonymous AI usage counts (how many tokens each AI feature used, no content), with the link to your account removed.',
   },
 ]

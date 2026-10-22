@@ -1,0 +1,509 @@
+{
+  "ran_at": "2026-10-22T12:38:55+00:00",
+  "calls": [
+    {
+      "agent": "Program Architect",
+      "request": "POST /api/programs/recommend",
+      "body": null,
+      "status": 200,
+      "seconds": 8.5,
+      "response": {
+        "result": {
+          "recommended": true,
+          "program_id": 1,
+          "name": "Back-Friendly Fat Loss",
+          "rationale": "Back-Friendly Fat Loss matches both your weight-loss and rehab goals, with three low-impact sessions a week and strengthening for the muscles that support your lower back. It avoids jumping and loaded spinal bending; please note this program is a placeholder pending expert review, not a verified safety recommendation.",
+          "goal_tags": [
+            "weight_loss",
+            "rehab"
+          ],
+          "matched_goals": [
+            "rehab",
+            "weight_loss"
+          ],
+          "status": "placeholder",
+          "review_notice": "Content pending expert review",
+          "review_note": "Pending expert review: this program hasn't been checked by a physical therapist yet, so treat it as a starting point, not verified advice.",
+          "citations": [],
+          "injury_note": "No exercise in this program is contraindicated for the requested injuries according to the current tags, but those tags are drafts that a physical therapist has not reviewed. This is not confirmation that the program is safe.",
+          "schedule": {
+            "mon": [
+              {
+                "exercise_id": "cat_cow",
+                "name": "Cat-Cow",
+                "sets": 1,
+                "reps": "10"
+              },
+              {
+                "exercise_id": "march_in_place",
+                "name": "March in Place",
+                "sets": 3,
+                "reps": "60s"
+              },
+              {
+                "exercise_id": "glute_bridge",
+                "name": "Glute Bridge",
+                "sets": 3,
+                "reps": "12"
+              },
+              {
+                "exercise_id": "bird_dog",
+                "name": "Bird Dog",
+                "sets": 3,
+                "reps": "8 each side"
+              },
+              {
+                "exercise_id": "dead_bug",
+                "name": "Dead Bug",
+                "sets": 3,
+                "reps": "8 each side"
+              }
+            ],
+            "wed": [
+              {
+                "exercise_id": "pelvic_tilt",
+                "name": "Pelvic Tilt",
+                "sets": 1,
+                "reps": "10"
+              },
+              {
+                "exercise_id": "step_jacks",
+                "name": "Step Jacks (Low Impact)",
+                "sets": 3,
+                "reps": "45s"
+              },
+              {
+                "exercise_id": "side_lying_leg_raise",
+                "name": "Side-Lying Leg Raise",
+                "sets": 3,
+                "reps": "12 each side"
+              },
+              {
+                "exercise_id": "band_seated_row",
+                "name": "Band Seated Row",
+                "sets": 3,
+                "reps": "12"
+              },
+              {
+                "exercise_id": "wall_sit",
+                "name": "Wall Sit",
+                "sets": 3,
+                "reps": "30s"
+              }
+            ],
+            "fri": [
+              {
+                "exercise_id": "cat_cow",
+                "name": "Cat-Cow",
+                "sets": 1,
+                "reps": "10"
+              },
+              {
+                "exercise_id": "march_in_place",
+                "name": "March in Place",
+                "sets": 3,
+                "reps": "60s"
+              },
+              {
+                "exercise_id": "glute_bridge",
+                "name": "Glute Bridge",
+                "sets": 3,
+                "reps": "15"
+              },
+              {
+                "exercise_id": "band_pull_apart",
+                "name": "Band Pull-Apart",
+                "sets": 3,
+                "reps": "15"
+              },
+              {
+                "exercise_id": "dead_bug",
+                "name": "Dead Bug",
+                "sets": 3,
+                "reps": "10 each side"
+              }
+            ]
+          },
+          "message": null
+        },
+        "meta": {
+          "agent_run_id": 1,
+          "usage": {
+            "input_tokens": 2568,
+            "output_tokens": 252,
+            "cached_tokens": 0,
+            "requests": 3,
+            "tool_calls": 2
+          },
+          "tool_calls": [
+            {
+              "tool": "get_user_profile",
+              "args": {
+                "user_id": "(from your sign-in)"
+              },
+              "called_by": "code"
+            },
+            {
+              "tool": "search_program_templates",
+              "args": {
+                "goal_tags": [
+                  "rehab",
+                  "weight_loss"
+                ],
+                "injury_flags": [
+                  "lower_back"
+                ],
+                "checked_only": true
+              },
+              "called_by": "code"
+            },
+            {
+              "tool": "get_user_profile",
+              "args": {
+                "user_id": "(from your sign-in)"
+              },
+              "called_by": "model"
+            },
+            {
+              "tool": "search_program_templates",
+              "args": {
+                "goal_tags": [
+                  "rehab",
+                  "weight_loss"
+                ],
+                "injury_flags": [
+                  "lower_back"
+                ],
+                "checked_only": true
+              },
+              "called_by": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "agent": "Workout Builder",
+      "request": "POST /api/workouts/build",
+      "body": {
+        "picks": {
+          "legs": 2,
+          "core": 2
+        },
+        "time_budget_minutes": 25,
+        "equipment": [
+          "mat",
+          "resistance_band"
+        ]
+      },
+      "status": 200,
+      "seconds": 4.2,
+      "response": {
+        "result": {
+          "exercises": [
+            {
+              "order": 1,
+              "exercise_id": "bodyweight_squat",
+              "name": "Bodyweight Squat",
+              "muscle_group": "legs",
+              "sets": 3,
+              "reps": "10",
+              "rest_seconds": 45,
+              "est_minutes": 3.8,
+              "injury_check": "drafted_not_pt_reviewed"
+            },
+            {
+              "order": 2,
+              "exercise_id": "dead_bug",
+              "name": "Dead Bug",
+              "muscle_group": "core",
+              "sets": 3,
+              "reps": "8 each side",
+              "rest_seconds": 45,
+              "est_minutes": 4.5,
+              "injury_check": "drafted_not_pt_reviewed"
+            },
+            {
+              "order": 3,
+              "exercise_id": "glute_bridge",
+              "name": "Glute Bridge",
+              "muscle_group": "legs",
+              "sets": 3,
+              "reps": "12",
+              "rest_seconds": 45,
+              "est_minutes": 3.8,
+              "injury_check": "drafted_not_pt_reviewed"
+            },
+            {
+              "order": 4,
+              "exercise_id": "forearm_plank",
+              "name": "Forearm Plank",
+              "muscle_group": "core",
+              "sets": 3,
+              "reps": "30s",
+              "rest_seconds": 45,
+              "est_minutes": 3.8,
+              "injury_check": "drafted_not_pt_reviewed"
+            }
+          ],
+          "total_estimated_minutes": 15.9,
+          "time_budget_minutes": 25,
+          "balance_note": "Alternates legs and core, with both squat and hip-bridge work. This is lower-body/core focused, with no upper-body push or pull work.",
+          "notes": [
+            "Exercises flagged as unsafe for your injuries, or not yet checked for injury safety, were left out automatically."
+          ]
+        },
+        "meta": {
+          "agent_run_id": 2,
+          "usage": {
+            "input_tokens": 1732,
+            "output_tokens": 425,
+            "cached_tokens": 0,
+            "requests": 2,
+            "tool_calls": 2
+          },
+          "tool_calls": [
+            {
+              "tool": "get_user_profile",
+              "args": {
+                "user_id": "(from your sign-in)"
+              },
+              "called_by": "code"
+            },
+            {
+              "tool": "search_exercises",
+              "args": {
+                "muscle_group": "legs",
+                "equipment": [
+                  "mat",
+                  "resistance_band"
+                ],
+                "limit": 15,
+                "injury_flags": [
+                  "lower_back"
+                ],
+                "checked_only": true
+              },
+              "called_by": "model"
+            },
+            {
+              "tool": "search_exercises",
+              "args": {
+                "muscle_group": "core",
+                "equipment": [
+                  "mat",
+                  "resistance_band"
+                ],
+                "limit": 15,
+                "injury_flags": [
+                  "lower_back"
+                ],
+                "checked_only": true
+              },
+              "called_by": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "agent": "Coach",
+      "request": "GET /api/coach/summary",
+      "body": null,
+      "status": 200,
+      "seconds": 6.0,
+      "response": {
+        "result": {
+          "encouragement": "Eleven straight days of showing up\u2014now that\u2019s some serious consistency! You\u2019ve lifted the equivalent of about 5.6 concert grand pianos, and a rest day is part of training too. Take a breather and come back ready to roll!",
+          "fun_fact": "In the last 30 days you've lifted about 5.6 concert grand pianos!",
+          "goal_status": "insufficient_data",
+          "overtraining_flag": true,
+          "rest_suggestion": "You've trained 11 days in a row. Your muscles get stronger while you rest, so take a rest day (or an easy walk) before your next session.",
+          "current_streak_days": 11,
+          "sessions_last_30_days": 11,
+          "total_weight_lifted_lbs": 5940.0
+        },
+        "meta": {
+          "agent_run_id": 3,
+          "usage": {
+            "input_tokens": 3482,
+            "output_tokens": 155,
+            "cached_tokens": 1033,
+            "requests": 3,
+            "tool_calls": 3
+          },
+          "tool_calls": [
+            {
+              "tool": "get_progress_summary",
+              "args": {
+                "user_id": "(from your sign-in)"
+              },
+              "called_by": "model"
+            },
+            {
+              "tool": "check_goal_achievement",
+              "args": {
+                "user_id": "(from your sign-in)"
+              },
+              "called_by": "model"
+            },
+            {
+              "tool": "compute_strength_equivalents",
+              "args": {
+                "total_weight_lifted_lbs": 5940.0
+              },
+              "called_by": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "agent": "Fitness Basics",
+      "request": "POST /api/basics/ask",
+      "body": {
+        "question": "How long should I rest between sets?"
+      },
+      "status": 200,
+      "seconds": 4.7,
+      "response": {
+        "result": {
+          "answer": "Our guide says rest about 1.5\u20133 minutes between sets for heavier strength work, 60\u201390 seconds for moderate work (8\u201315 reps), and 15\u201345 seconds for circuits or endurance work. This article is a placeholder pending expert review.",
+          "answered": true,
+          "redirected_to_professional": false,
+          "sources": [
+            {
+              "slug": "rest_between_sets",
+              "title": "How Long to Rest Between Sets",
+              "status": "placeholder",
+              "review_notice": "Content pending expert review",
+              "citations": []
+            }
+          ],
+          "review_note": "This comes from our Fitness Basics guide, which is still pending expert review."
+        },
+        "meta": {
+          "agent_run_id": 4,
+          "usage": {
+            "input_tokens": 1654,
+            "output_tokens": 111,
+            "cached_tokens": 0,
+            "requests": 2,
+            "tool_calls": 1
+          },
+          "tool_calls": [
+            {
+              "tool": "search_basics_kb",
+              "args": {
+                "query": "How long should I rest between sets?"
+              },
+              "called_by": "code"
+            },
+            {
+              "tool": "search_basics_kb",
+              "args": {
+                "query": "How long should I rest between sets?"
+              },
+              "called_by": "model"
+            }
+          ],
+          "agent_called": true
+        }
+      }
+    },
+    {
+      "agent": "Fitness Basics (red flag)",
+      "request": "POST /api/basics/ask",
+      "body": {
+        "question": "I get a sharp pain in my lower back when I do glute bridges. Should I push through?"
+      },
+      "status": 200,
+      "seconds": 0.0,
+      "response": {
+        "result": {
+          "answer": "That sounds like something a professional should look at, so I'm not going to give exercise advice for it. Please stop any exercise that causes it and talk to a doctor or physical therapist. If it's severe or sudden, like chest pain, trouble breathing, or fainting, get medical help right away.",
+          "answered": false,
+          "redirected_to_professional": true,
+          "sources": [],
+          "review_note": null
+        },
+        "meta": {
+          "safety_event_id": 1,
+          "red_flags": [
+            "sharp/severe pain",
+            "pain in my"
+          ],
+          "agent_called": false
+        }
+      }
+    }
+  ],
+  "agent_runs": [
+    {
+      "id": 1,
+      "agent_name": "program_architect",
+      "user_id": 1,
+      "input_tokens": 2568,
+      "output_tokens": 252,
+      "cached_tokens": 0,
+      "requests": 3,
+      "tool_calls": 2,
+      "route": "POST /api/programs/recommend",
+      "status": "ok",
+      "duration_ms": 7977,
+      "timestamp": "2026-10-22T12:39:04Z"
+    },
+    {
+      "id": 2,
+      "agent_name": "workout_builder",
+      "user_id": 1,
+      "input_tokens": 1732,
+      "output_tokens": 425,
+      "cached_tokens": 0,
+      "requests": 2,
+      "tool_calls": 2,
+      "route": "POST /api/workouts/build",
+      "status": "ok",
+      "duration_ms": 4134,
+      "timestamp": "2026-10-22T12:39:08Z"
+    },
+    {
+      "id": 3,
+      "agent_name": "coach",
+      "user_id": 1,
+      "input_tokens": 3482,
+      "output_tokens": 155,
+      "cached_tokens": 1033,
+      "requests": 3,
+      "tool_calls": 3,
+      "route": "GET /api/coach/summary",
+      "status": "ok",
+      "duration_ms": 5937,
+      "timestamp": "2026-10-22T12:39:14Z"
+    },
+    {
+      "id": 4,
+      "agent_name": "basics",
+      "user_id": 1,
+      "input_tokens": 1654,
+      "output_tokens": 111,
+      "cached_tokens": 0,
+      "requests": 2,
+      "tool_calls": 1,
+      "route": "POST /api/basics/ask",
+      "status": "ok",
+      "duration_ms": 4622,
+      "timestamp": "2026-10-22T12:39:18Z"
+    }
+  ],
+  "safety_events": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "timestamp": "2026-10-22T12:39:18Z",
+      "source": "basics_qa",
+      "trigger_text": "I get a sharp pain in my lower back when I do glute bridges. Should I push through?",
+      "action_taken": "redirected_to_professional"
+    }
+  ]
+}

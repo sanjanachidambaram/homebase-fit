@@ -186,6 +186,7 @@ def search_exercises(
 def search_program_templates(
     goal_tags: list[str] | None = None,
     injury_flags: list[str] | None = None,
+    checked_only: bool = False,
 ) -> dict:
     goals = sorted(set(goal_tags or []))
     bad = [g for g in goals if g not in GOAL_TAGS]
@@ -221,6 +222,11 @@ def search_program_templates(
         if conflicts:
             excluded.append({"name": p["name"], "because_exercises": conflicts})
             continue
+        # checked_only: also drop programs that use any exercise nobody has tagged for injuries yet.
+        unchecked = sorted({r["name"] for r in rows if r["contraindication_status"] == "untagged"})
+        if checked_only and unchecked:
+            excluded.append({"name": p["name"], "because_exercises": unchecked, "reason": "not_yet_checked"})
+            continue
         schedule: dict[str, list[dict]] = {}
         for r in rows:
             schedule.setdefault(day_names[r["day_of_week"]], []).append(
@@ -252,8 +258,10 @@ def search_program_templates(
         "injury_filter": {
             "applied": bool(flags),
             "flags": flags,
+            "checked_only": checked_only,
             "excluded_programs": excluded,
-            "note": "A program is removed if any of its exercises is tagged as unsafe for a requested injury.",
+            "note": "A program is removed if any of its exercises is tagged as unsafe for a requested injury"
+                    + (", or (checked_only) if any of its exercises has no injury tags yet." if checked_only else "."),
         },
     }
 
@@ -264,6 +272,10 @@ STOPWORDS = {
     "a", "an", "the", "is", "are", "was", "do", "does", "did", "to", "of", "in", "on", "for", "and", "or", "it",
     "i", "my", "me", "we", "you", "your", "how", "what", "when", "why", "should", "can", "could", "would", "be",
     "this", "that", "with", "about", "much", "many", "long", "get", "have", "has", "if", "so", "at", "as", "by",
+    "which", "who", "whom", "whose", "where", "there", "their", "they", "them", "these", "those", "any", "some",
+    "all", "best", "good", "better", "way", "really", "very", "just", "need", "want", "like", "also", "than",
+    "then", "more", "most", "will", "its", "am", "were", "been", "being", "from", "into", "out", "up", "down",
+    "over", "under", "again", "too", "not", "no", "yes", "one", "make", "ok", "okay", "normal", "thing", "things",
 }
 MAX_ARTICLES = 3
 NO_MATCH_MESSAGE = ("No article in the Fitness Basics knowledge base matches this question. Do not answer from "

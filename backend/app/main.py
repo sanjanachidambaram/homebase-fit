@@ -15,6 +15,7 @@ from app import config
 from app.config import CONTENT_DIR, MODEL_NAME, is_production, llm_provider
 from app.content import media_url, review_info
 from app.db import connect, ensure_working_db, table_counts
+from app.agent_routes import router as agent_router
 from app.exercises import router as exercises_router
 from app.users import router as users_router
 
@@ -40,6 +41,7 @@ app.mount("/content", StaticFiles(directory=CONTENT_DIR), name="content")
 
 app.include_router(users_router)
 app.include_router(exercises_router)
+app.include_router(agent_router)
 
 
 @app.get("/api/health")

@@ -7,7 +7,7 @@ Exactly **7 tools**, all **read-only**. There is no delete tool, no write tool, 
 |---|---|---|
 | 1 | `get_user_profile(user_id)` | goals, timeline, injury_flags, age, weight_lb, height_in. Nothing else. Uses `agents/context.py` |
 | 2 | `search_exercises(muscle_group, equipment, injury_flags, limit, checked_only)` | Exercise library. Injury filter is in the SQL. Untagged exercises are flagged `not_yet_checked` |
-| 3 | `search_program_templates(goal_tags, injury_flags)` | Program templates, best goal match first; a program is dropped if any exercise is unsafe for a flag |
+| 3 | `search_program_templates(goal_tags, injury_flags, checked_only)` | Program templates, best goal match first; a program is dropped if any exercise is unsafe for a flag (or, with checked_only, has no injury tags) |
 | 4 | `search_basics_kb(query)` | Keyword search over Fitness Basics. The only source for answering basics questions |
 | 5 | `get_progress_summary(user_id)` | Last 30 days: sessions, weight lifted, streak, measurement trends |
 | 6 | `compute_strength_equivalents(total_weight_lifted_lbs)` | Fun comparisons with real weights and sources. No database |
@@ -64,7 +64,8 @@ They are placeholders for the PT to review, not science. How it decides:
    can't be measured from the logs, so they're judged on consistency only.
 4. Overall: `behind` if any check is behind; `ahead` only if every judged check is ahead; otherwise `on_track`.
 
-## For the agent harness (next step)
+## How the agents use it
 
-Three tools take a `user_id` and this server can't tell who is asking. The harness must set `user_id` from the signed-in
-session and hide it from the model. See `backend/prompts/shared_rules.md`, rules 2 and 4.
+The four agents (`app/agents/`) call these tools through `McpGateway` (in-process MCP). Three tools take a `user_id`
+and this server can't tell who is asking, so the agent code sets `user_id`, `injury_flags` and `checked_only` from the
+signed-in session and profile; the model never sees those parameters. See `backend/prompts/shared_rules.md`.
