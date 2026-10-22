@@ -105,7 +105,7 @@ export default function SettingsPage() {
       <section className="settings-section danger-zone">
         <h3>Delete my data</h3>
         <p>
-          Permanently deletes your account, quiz answers, workout logs, measurements, and safety notices. This can't be
+          Permanently deletes your account, quiz answers, favorite exercises, workout logs, measurements, and safety notices. This can't be
           undone.
         </p>
         {!confirming ? (

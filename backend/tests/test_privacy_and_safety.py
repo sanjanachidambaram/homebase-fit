@@ -10,25 +10,13 @@ import json
 import sqlite3
 
 import pytest
-from fastapi.testclient import TestClient
 
 from app import config
-from app.db import connect, copy_db
+from app.db import connect
 
 ANSWERS = {"goals": ["weight_loss", "rehab"], "timeline": "8_weeks", "injuries": ["lower_back"],
            "age": 34, "weight": 165, "height": 66}
-USER_TABLES = ("quiz_profiles", "workout_logs", "measurements", "safety_events")
-
-
-@pytest.fixture
-def client(tmp_path, monkeypatch):
-    test_db = tmp_path / "test.db"
-    copy_db(config.ORIGINAL_DB, test_db)
-    monkeypatch.setattr(config, "WORKING_DB", test_db)
-    monkeypatch.setenv("APP_SECRET_KEY", "test-secret")
-    from app.main import app
-    with TestClient(app) as c:
-        yield c
+USER_TABLES = ("quiz_profiles", "workout_logs", "measurements", "safety_events", "exercise_favorites")
 
 
 def sign_up(client, email):
@@ -102,6 +90,7 @@ def test_delete_removes_user_and_all_related_rows(client):
                          "VALUES (?, '2026-10-20', 'glute_bridge', 3, 12)", (uid,))
             conn.execute("INSERT INTO workout_logs (user_id, date, duration_seconds) VALUES (?, '2026-10-21', 1200)", (uid,))
             conn.execute("INSERT INTO measurements (user_id, date, body_weight) VALUES (?, '2026-10-20', 165)", (uid,))
+            conn.execute("INSERT INTO exercise_favorites (user_id, exercise_id) VALUES (?, 'glute_bridge')", (uid,))
             conn.execute("INSERT INTO safety_events (user_id, source, trigger_text, action_taken) "
                          "VALUES (?, 'basics_qa', 'sharp pain in my back', 'redirected_to_professional')", (uid,))
     conn.close()
@@ -111,7 +100,7 @@ def test_delete_removes_user_and_all_related_rows(client):
     r = client.delete(f"/api/users/{a}", headers=ha)
     assert r.status_code == 200, r.text
     assert r.json()["rows_removed"] == {"safety_events": 1, "measurements": 1, "workout_logs": 2,
-                                        "quiz_profiles": 1, "users": 1}
+                                        "exercise_favorites": 1, "quiz_profiles": 1, "users": 1}
 
     for table in USER_TABLES:
         assert count(table, a) == 0, table

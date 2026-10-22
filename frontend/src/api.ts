@@ -12,7 +12,20 @@ export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
   full_body: 'Full body',
 }
 
-export interface Exercise {
+export interface Citation {
+  claim: string
+  source: string
+}
+
+export interface ReviewFields {
+  status: 'placeholder' | 'pt_reviewed'
+  review_notice: string | null // "Content pending expert review" while status is placeholder
+  citations: Citation[]
+}
+
+export type MediaType = 'image' | 'gif' | 'video'
+
+export interface Exercise extends ReviewFields {
   id: string
   name: string
   muscle_group: MuscleGroup
@@ -20,12 +33,15 @@ export interface Exercise {
   difficulty: 'beginner' | 'intermediate' | 'advanced'
   category: string | null
   primary_muscles: string[]
+  secondary_muscles: string[]
   injury_contraindications: string[]
   contraindication_status: 'untagged' | 'draft' | 'pt_reviewed'
   est_time_seconds: number
-  instructions: string
-  demo_image_url: string | null
+  instructions: string // steps separated by newlines
+  demo_media_url: string | null // null until the file exists
+  media_type: MediaType | null // how to render demo_media_url
   source_dataset: string
+  source: { name: string; url: string | null; license: string; status: 'active' | 'placeholder' | 'pending' }
 }
 
 export interface Source {
@@ -48,25 +64,16 @@ export function fetchExercises(muscleGroup: MuscleGroup | ''): Promise<Exercise[
   return getJson<Exercise[]>(`/api/exercises${query}`)
 }
 
+export const fetchExercise = (id: string) => getJson<Exercise>(`/api/exercises/${encodeURIComponent(id)}`)
+
 export function fetchSources(): Promise<Source[]> {
   return getJson<Source[]>('/api/sources')
 }
 
 // ---------------------------------------------------------------- reviewed content
 
-export interface Citation {
-  claim: string
-  source: string
-}
-
-export interface ReviewFields {
-  status: 'placeholder' | 'pt_reviewed'
-  review_notice: string | null // "Content pending expert review" while status is placeholder
-  citations: Citation[]
-  source_id: string
-}
-
 export interface Program extends ReviewFields {
+  source_id: string
   id: number
   name: string
   goal_tags: string[]
@@ -76,6 +83,7 @@ export interface Program extends ReviewFields {
 }
 
 export interface Article extends ReviewFields {
+  source_id: string
   slug: string
   title: string
   category: string
@@ -164,3 +172,13 @@ export function submitQuiz(
 
 export const deleteAccount = (userId: number, token: string) =>
   request<{ deleted: boolean; rows_removed: Record<string, number> }>(`/api/users/${userId}`, { method: 'DELETE' }, token)
+
+// ---------------------------------------------------------------- favorites
+
+export const fetchFavorites = (token: string) => request<Exercise[]>('/api/favorites', {}, token)
+
+export const addFavorite = (exerciseId: string, token: string) =>
+  request<{ favorited: boolean }>('/api/favorites', { method: 'POST', body: JSON.stringify({ exercise_id: exerciseId }) }, token)
+
+export const removeFavorite = (exerciseId: string, token: string) =>
+  request<{ favorited: boolean }>(`/api/favorites/${encodeURIComponent(exerciseId)}`, { method: 'DELETE' }, token)

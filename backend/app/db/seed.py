@@ -24,7 +24,8 @@ from app.db.reset import reset
 MUSCLE_GROUPS = ("legs", "arms", "chest", "shoulders", "back", "core", "full_body")
 INJURY_TAGS = {"lower_back", "knee", "shoulder"}
 DAYS = {"mon": 1, "tue": 2, "wed": 3, "thu": 4, "fri": 5, "sat": 6, "sun": 7}
-MEDIA_EXTS = (".gif", ".mp4", ".webm", ".jpg", ".jpeg", ".png", ".webp")
+VIDEO_EXTS = (".mp4", ".webm")
+MEDIA_EXTS = (".gif", *VIDEO_EXTS, ".jpg", ".jpeg", ".png", ".webp")
 DEFAULT_MEDIA_EXT = ".gif"
 DEFAULT_SOURCE = "placeholder-authored"   # the hand-authored drafts in content/
 
@@ -143,14 +144,27 @@ def find_media(folder: Path, exercise_id: str) -> Path:
     return folder / f"{exercise_id}{DEFAULT_MEDIA_EXT}"
 
 
+def media_type_for(path: str | None) -> str | None:
+    """'image' | 'gif' | 'video' from a media path's extension (None if there's no path)."""
+    if not path:
+        return None
+    ext = Path(path).suffix.lower()
+    if ext == ".gif":
+        return "gif"
+    return "video" if ext in VIDEO_EXTS else "image"
+
+
 def insert_exercise(conn: sqlite3.Connection, **ex) -> None:
+    ex["media_type"] = media_type_for(ex["demo_media_path"])
+    ex.setdefault("status", "placeholder")
+    ex.setdefault("citations", "[]")
     conn.execute(
         "INSERT INTO exercises (id, name, muscle_group, equipment_needed, difficulty,"
-        " injury_contraindications, contraindication_status, demo_media_path, instructions,"
-        " est_time_seconds, category, primary_muscles, secondary_muscles, source_dataset)"
+        " injury_contraindications, contraindication_status, demo_media_path, media_type, instructions,"
+        " est_time_seconds, category, primary_muscles, secondary_muscles, source_dataset, status, citations)"
         " VALUES (:id, :name, :muscle_group, :equipment_needed, :difficulty,"
-        " :injury_contraindications, :contraindication_status, :demo_media_path, :instructions,"
-        " :est_time_seconds, :category, :primary_muscles, :secondary_muscles, :source_dataset)",
+        " :injury_contraindications, :contraindication_status, :demo_media_path, :media_type, :instructions,"
+        " :est_time_seconds, :category, :primary_muscles, :secondary_muscles, :source_dataset, :status, :citations)",
         ex,
     )
 
@@ -176,6 +190,9 @@ def seed_authored_exercises(conn: sqlite3.Connection, errors: list[str]) -> dict
             unknown = set(contra) - INJURY_TAGS
             if unknown:
                 errors.append(f"{where}: unknown injury tag(s) {sorted(unknown)}")
+            review = review_fields(ex, where, errors)   # optional status + citations in the yaml
+            if review is None:
+                continue
             contraindications[ex["id"]] = set(contra)
             insert_exercise(
                 conn, id=ex["id"], name=ex["name"], muscle_group=group,
@@ -184,6 +201,7 @@ def seed_authored_exercises(conn: sqlite3.Connection, errors: list[str]) -> dict
                 contraindication_status="draft", demo_media_path=rel(find_media(folder, ex["id"])),
                 instructions=ex["instructions"].strip(), est_time_seconds=int(ex["est_time_seconds"]),
                 category=None, primary_muscles="[]", secondary_muscles="[]", source_dataset=DEFAULT_SOURCE,
+                status=review[0], citations=review[1],
             )
     return contraindications
 

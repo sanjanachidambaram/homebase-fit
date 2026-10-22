@@ -9,6 +9,8 @@ Two sources feed the `exercises` table (see `content/sources.yaml`):
 
 Program templates can only use the hand-authored exercises for now, because those are the only ones with injury tags.
 
+Every exercise starts as `status: placeholder` with no citations, so the app shows "Content pending expert review" on it. For hand-authored exercises you can add `status: pt_reviewed` and a `citations:` list (each `{claim, source}`) in `exercises.yaml`; `pt_reviewed` requires at least one citation. Demo media type (image, gif, or video) is picked from the file extension when you rerun the seed.
+
 ## Injury tagging for the PT
 
 `contraindication_tags_TEMPLATE.csv` lists **every** exercise from both sources, one row each.

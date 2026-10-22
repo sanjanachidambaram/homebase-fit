@@ -14,7 +14,7 @@ PRAGMA foreign_keys = ON;
 -- ---------------------------------------------------------------- users
 
 -- Deleting a user (DELETE /api/users/{id}) removes their quiz_profiles,
--- workout_logs, measurements, and safety_events too (ON DELETE CASCADE, plus
+-- exercise_favorites, workout_logs, measurements, and safety_events too (ON DELETE CASCADE, plus
 -- explicit deletes in app/users.py). AUTOINCREMENT means ids are never reused.
 CREATE TABLE users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -81,13 +81,22 @@ CREATE TABLE exercises (
     --   draft        tags drafted but not yet reviewed by a PT
     --   pt_reviewed  tags confirmed by a PT
     contraindication_status  TEXT NOT NULL CHECK (contraindication_status IN ('untagged', 'draft', 'pt_reviewed')),
-    demo_media_path          TEXT,                   -- relative to project root
+    demo_media_path          TEXT,                   -- relative to project root; the file may not exist yet
+    -- How the frontend should render demo_media_path: <img> for 'image' and 'gif',
+    -- <video> for 'video'. Set by the seed from the file extension; NULL when
+    -- there is no media path. A video can replace an image with no schema change.
+    media_type               TEXT CHECK (media_type IN ('image', 'gif', 'video')),
     instructions             TEXT NOT NULL,
     est_time_seconds         INTEGER NOT NULL CHECK (est_time_seconds > 0),
     category                 TEXT,                   -- dataset category: strength, stretching, cardio, ... (NULL for hand-authored)
     primary_muscles          TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(primary_muscles)),     -- dataset's own muscle names
     secondary_muscles        TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(secondary_muscles)),
-    source_dataset           TEXT NOT NULL REFERENCES sources(id)  -- 'placeholder-authored' | 'free-exercise-db' | ...
+    source_dataset           TEXT NOT NULL REFERENCES sources(id),  -- 'placeholder-authored' | 'free-exercise-db' | ...
+    -- Same review fields as programs and articles: 'placeholder' content is
+    -- flagged "Content pending expert review" by the API. Every exercise starts
+    -- as placeholder, including the imported ones, until a PT reviews it.
+    citations                TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(citations) AND json_type(citations) = 'array'),
+    status                   TEXT NOT NULL DEFAULT 'placeholder' CHECK (status IN ('placeholder', 'pt_reviewed'))
 );
 CREATE INDEX idx_exercises_muscle_group ON exercises(muscle_group);
 CREATE INDEX idx_exercises_source ON exercises(source_dataset);
@@ -147,6 +156,15 @@ CREATE TABLE workout_logs (
     notes            TEXT
 );
 CREATE INDEX idx_workout_logs_user_date ON workout_logs(user_id, date);
+
+-- A user's favorited ("faved") exercises. Deleted with the user.
+CREATE TABLE exercise_favorites (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    exercise_id TEXT NOT NULL REFERENCES exercises(id),
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    UNIQUE (user_id, exercise_id)
+);
 
 CREATE TABLE measurements (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -32,7 +32,7 @@ QUIZ_COLUMNS = {"goals": "goals", "timeline": "timeline", "injuries": "injury_fl
 LIST_COLUMNS = {"goals", "injury_flags"}
 
 # Every table holding a user's data. DELETE /api/users/{id} clears all of them.
-USER_DATA_TABLES = ("safety_events", "measurements", "workout_logs", "quiz_profiles")
+USER_DATA_TABLES = ("safety_events", "measurements", "workout_logs", "exercise_favorites", "quiz_profiles")
 
 
 def now_utc() -> str:

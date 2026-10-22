@@ -1,32 +1,7 @@
 // Programs and Fitness Basics articles with their review status and citations.
 import { useEffect, useState } from 'react'
-import { fetchArticles, fetchPrograms, type Article, type Program, type ReviewFields } from '../api'
-
-function ReviewInfo({ item }: { item: ReviewFields }) {
-  return (
-    <div className="review-info">
-      {item.review_notice ? (
-        <span className="review-tag">{item.review_notice}</span>
-      ) : (
-        <span className="review-tag review-tag-ok">Reviewed by a professional</span>
-      )}
-      <div className="citations">
-        <strong>Citations:</strong>{' '}
-        {item.citations.length === 0 ? (
-          <em>None yet</em>
-        ) : (
-          <ul>
-            {item.citations.map((c) => (
-              <li key={c.claim + c.source}>
-                {c.claim}: {c.source}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  )
-}
+import { fetchArticles, fetchPrograms, type Article, type Program } from '../api'
+import ReviewInfo from '../components/ReviewInfo'
 
 export default function ContentPage() {
   const [programs, setPrograms] = useState<Program[]>([])

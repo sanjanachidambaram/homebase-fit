@@ -29,7 +29,7 @@ export const CONSENT_LABEL =
 export const PRIVACY_POINTS: { heading: string; text: string }[] = [
   {
     heading: 'What we store',
-    text: 'Your email and a scrambled (hashed) password; your quiz answers (goals, timeline, injuries, age, weight, height); the workouts and measurements you log; and, if you describe symptoms we redirect to a professional, the words that triggered it.',
+    text: 'Your email and a scrambled (hashed) password; your quiz answers (goals, timeline, injuries, age, weight, height); your favorite exercises; the workouts and measurements you log; and, if you describe symptoms we redirect to a professional, the words that triggered it.',
   },
   {
     heading: 'Why',

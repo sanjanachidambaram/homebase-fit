@@ -6,22 +6,17 @@ Run locally from backend/ (no auto-reload, so edits never spawn extra servers):
 
 import json
 from contextlib import asynccontextmanager
-from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app import config
-from app.config import CONTENT_DIR, MODEL_NAME, PROJECT_ROOT, is_production, llm_provider
+from app.config import CONTENT_DIR, MODEL_NAME, is_production, llm_provider
+from app.content import media_url, review_info
 from app.db import connect, ensure_working_db, table_counts
+from app.exercises import router as exercises_router
 from app.users import router as users_router
-
-MuscleGroup = Literal["legs", "arms", "chest", "shoulders", "back", "core", "full_body"]
-
-# Shown on any program/article whose status is still 'placeholder', so no UI
-# can present unreviewed content as if it were verified.
-REVIEW_NOTICE = "Content pending expert review"
 
 
 @asynccontextmanager
@@ -44,55 +39,13 @@ app.add_middleware(
 app.mount("/content", StaticFiles(directory=CONTENT_DIR), name="content")
 
 app.include_router(users_router)
-
-
-def media_url(path: str | None) -> str | None:
-    """URL for a media file, or None if the file isn't there yet."""
-    return f"/{path}" if path and (PROJECT_ROOT / path).is_file() else None
+app.include_router(exercises_router)
 
 
 @app.get("/api/health")
 def health() -> dict:
     # Reports only whether a key is configured, never its value.
     return {"status": "ok", "model": MODEL_NAME, "llm_provider": llm_provider()}
-
-
-@app.get("/api/exercises")
-def list_exercises(
-    muscle_group: MuscleGroup | None = None,
-    source: str | None = Query(None, description="source_dataset id, e.g. free-exercise-db"),
-) -> list[dict]:
-    sql, args = "SELECT * FROM exercises WHERE 1 = 1", []
-    if muscle_group:
-        sql += " AND muscle_group = ?"
-        args.append(muscle_group)
-    if source:
-        sql += " AND source_dataset = ?"
-        args.append(source)
-    sql += " ORDER BY source_dataset = 'free-exercise-db', name"
-    conn = connect()
-    try:
-        rows = conn.execute(sql, args).fetchall()
-    finally:
-        conn.close()
-    return [
-        {
-            "id": r["id"],
-            "name": r["name"],
-            "muscle_group": r["muscle_group"],
-            "equipment_needed": json.loads(r["equipment_needed"]),
-            "difficulty": r["difficulty"],
-            "category": r["category"],
-            "primary_muscles": json.loads(r["primary_muscles"]),
-            "injury_contraindications": json.loads(r["injury_contraindications"]),
-            "contraindication_status": r["contraindication_status"],
-            "est_time_seconds": r["est_time_seconds"],
-            "instructions": r["instructions"],
-            "demo_image_url": media_url(r["demo_media_path"]),
-            "source_dataset": r["source_dataset"],
-        }
-        for r in rows
-    ]
 
 
 @app.get("/api/sources")
@@ -106,16 +59,6 @@ def list_sources() -> list[dict]:
     finally:
         conn.close()
     return [dict(r) for r in rows]
-
-
-def review_fields(r) -> dict:
-    """status + citations for a program or article, with the pending-review flag."""
-    return {
-        "status": r["status"],
-        "review_notice": REVIEW_NOTICE if r["status"] == "placeholder" else None,
-        "citations": json.loads(r["citations"]),
-        "source_id": r["source_id"],
-    }
 
 
 @app.get("/api/programs")
@@ -133,7 +76,8 @@ def list_programs() -> list[dict]:
             "injury_focus": json.loads(r["injury_focus"]),
             "description": r["description"],
             "science_rationale": r["science_rationale"],
-            **review_fields(r),
+            **review_info(r),
+            "source_id": r["source_id"],
         }
         for r in rows
     ]
@@ -153,7 +97,8 @@ def list_basics() -> list[dict]:
             "category": r["category"],
             "content": r["content"],
             "media_url": media_url(r["media_path"]),
-            **review_fields(r),
+            **review_info(r),
+            "source_id": r["source_id"],
         }
         for r in rows
     ]
