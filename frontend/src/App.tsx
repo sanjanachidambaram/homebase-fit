@@ -1,7 +1,7 @@
-import { useEffect, useState, type JSX } from 'react'
-import { fetchSources, type Source } from './api'
+import { type JSX } from 'react'
 import { DisclaimerBar } from './components/Legal'
 import Link from './components/Link'
+import AboutPage from './pages/AboutPage'
 import BuildPage from './pages/BuildPage'
 import CalendarPage from './pages/CalendarPage'
 import ContentPage from './pages/ContentPage'
@@ -25,6 +25,7 @@ const PAGES: Record<string, () => JSX.Element> = {
   '/settings': SettingsPage,
   '/quiz': QuizPage, // reached from the dashboard and sign-up, not the nav
   '/legal': LegalPage, // linked from the footer on every page
+  '/about': AboutPage, // public; the class-project disclaimer, the data and its sources, the team
   '/how-we-build': HowWeBuildPage, // public; linked from the plan on the Dashboard and Your Plan page
   '/pregnancy-support': PregnancySupportPage, // pregnant / postpartum users are sent here (quiz, Dashboard, blocks)
 }
@@ -38,43 +39,11 @@ const NAV: { path: string; label: string }[] = [
   { path: '/faves', label: 'My Faves' },
   { path: '/exercises', label: 'Exercise Library' },
   { path: '/settings', label: 'Settings' },
+  { path: '/about', label: 'About' },
 ]
-
-function SourcesFooter({ sources }: { sources: Source[] }) {
-  return (
-    <div className="sources">
-      <h2>Data &amp; Sources</h2>
-      <ul>
-        {sources.map((s) => (
-          <li key={s.id}>
-            {s.url ? (
-              <a href={s.url} target="_blank" rel="noopener noreferrer">
-                {s.name}
-              </a>
-            ) : (
-              <span className="source-name">{s.name}</span>
-            )}{' '}
-            <span className={`status status-${s.status}`}>{s.status}</span>
-            <br />
-            <span className="source-detail">
-              License: {s.license} · Used for: {s.used_for}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
 
 export default function App() {
   const path = usePath()
-  const [sources, setSources] = useState<Source[]>([])
-
-  useEffect(() => {
-    fetchSources()
-      .then(setSources)
-      .catch(() => setSources([]))
-  }, [])
 
   const Page = PAGES[path]
 
@@ -110,8 +79,8 @@ export default function App() {
         )}
       </main>
 
+      {/* Sources and data credits live on the About page now; contextual review tags stay where they apply. */}
       <footer>
-        <SourcesFooter sources={sources} />
         <DisclaimerBar />
       </footer>
     </div>

@@ -66,6 +66,47 @@ def list_sources() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+@app.get("/api/data-summary")
+def data_summary() -> dict:
+    """Live counts for the About page's "About the Data" section, so its numbers can never go stale:
+    where the exercises come from, how many have any injury-safety review, and how much of the content
+    is still placeholder vs reviewed or cited."""
+    conn = connect()
+    try:
+        one = lambda sql: conn.execute(sql).fetchone()[0]   # noqa: E731
+        by_source = conn.execute(
+            "SELECT s.id, s.name, s.url, s.license, COUNT(e.id) AS count FROM exercises e "
+            "JOIN sources s ON s.id = e.source_dataset GROUP BY s.id ORDER BY count DESC").fetchall()
+        summary = {
+            "exercises": {
+                "total": one("SELECT COUNT(*) FROM exercises"),
+                "by_source": [dict(r) for r in by_source],
+                # "checked" = someone looked at it for injuries (draft or PT-reviewed), even if it got no caution
+                "injury_checked": one("SELECT COUNT(*) FROM exercises WHERE contraindication_status <> 'untagged'"),
+                "injury_unchecked": one("SELECT COUNT(*) FROM exercises WHERE contraindication_status = 'untagged'"),
+                "injury_pt_reviewed": one("SELECT COUNT(*) FROM exercises WHERE contraindication_status = 'pt_reviewed'"),
+                "with_cautions": one("SELECT COUNT(*) FROM exercises WHERE injury_contraindications <> '[]'"),
+                "cautions": one("SELECT COUNT(*) FROM exercises e, json_each(e.injury_contraindications)"),
+                "reasons_ai_drafted": one("SELECT COUNT(*) FROM exercises e, json_each(e.injury_rationale) r "
+                                          "WHERE json_extract(r.value, '$.tier') = 'ai_drafted'"),
+                "reasons_pt_reviewed": one("SELECT COUNT(*) FROM exercises e, json_each(e.injury_rationale) r "
+                                           "WHERE json_extract(r.value, '$.tier') = 'pt_reviewed'"),
+            },
+            "protocols": {
+                "total": one("SELECT COUNT(*) FROM goal_protocols"),
+                "placeholder": one("SELECT COUNT(*) FROM goal_protocols WHERE status = 'placeholder'"),
+                "with_citations": one("SELECT COUNT(*) FROM goal_protocols WHERE citations <> '[]'"),
+            },
+            "basics_articles": {
+                "total": one("SELECT COUNT(*) FROM basics_articles"),
+                "placeholder": one("SELECT COUNT(*) FROM basics_articles WHERE status = 'placeholder'"),
+            },
+        }
+    finally:
+        conn.close()
+    return summary
+
+
 @app.get("/api/plan/example")
 def plan_example() -> dict:
     """Public: the worked example on the "How We Build Your Plan" page. A live run of the real generator

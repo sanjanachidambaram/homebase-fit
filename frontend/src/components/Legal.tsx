@@ -6,7 +6,8 @@ import Link from './Link'
 export function DisclaimerBar() {
   return (
     <div className="disclaimer-bar" role="note" aria-label="Medical disclaimer">
-      <strong>Medical disclaimer:</strong> {DISCLAIMER} <Link to="/legal">Legal &amp; privacy</Link>
+      <strong>Medical disclaimer:</strong> {DISCLAIMER} <Link to="/legal">Legal &amp; privacy</Link> ·{' '}
+      <Link to="/about">About, data &amp; sources</Link>
     </div>
   )
 }

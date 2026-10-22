@@ -91,6 +91,25 @@ export function fetchExercises(filters: ExerciseFilters): Promise<Exercise[]> {
 
 export const fetchExercise = (id: string) => getJson<Exercise>(`/api/exercises/${encodeURIComponent(id)}`)
 
+/** Live counts for the About page (GET /api/data-summary), so its numbers never go stale. */
+export interface DataSummary {
+  exercises: {
+    total: number
+    by_source: { id: string; name: string; url: string | null; license: string; count: number }[]
+    injury_checked: number // looked at for injuries (draft or PT-reviewed), even if it got no caution
+    injury_unchecked: number
+    injury_pt_reviewed: number
+    with_cautions: number
+    cautions: number
+    reasons_ai_drafted: number
+    reasons_pt_reviewed: number
+  }
+  protocols: { total: number; placeholder: number; with_citations: number }
+  basics_articles: { total: number; placeholder: number }
+}
+
+export const fetchDataSummary = () => getJson<DataSummary>('/api/data-summary')
+
 export function fetchSources(): Promise<Source[]> {
   return getJson<Source[]>('/api/sources')
 }
