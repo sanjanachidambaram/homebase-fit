@@ -42,7 +42,7 @@ asks you to approve a project server the first time, so open a new session in th
   cannot change data. All tools carry the MCP `readOnlyHint`. A test asserts the tool list is exactly these 7.
 - **Injury filter:** `search.py`, `NOT_CONTRAINDICATED`. The model can't switch it off; the agent harness supplies the flags.
 - **Honest about unchecked exercises:** most exercises have no injury tags. They come back with
-  `injury_check: "not_yet_checked"` and a note saying so. `checked_only=true` returns only tagged ones.
+  `injury_check: "not_yet_checked"` and a note saying so. `checked_only=true` returns only tagged ones; for users with an injury flag the agent harness always sets it (decided 2026-10-22, see `shared_rules.md`).
 - **No PII:** `get_user_profile` calls `agent_profile_for`, the same function the agents use for prompts.
 - **Citation fields:** every exercise, program, and article carries `status`, `review_notice`, and `citations`.
 

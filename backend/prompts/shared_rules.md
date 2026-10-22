@@ -67,18 +67,20 @@ returns the redirect itself, and logs a row in `safety_events`.
 - Exercises and programs tagged unsafe for the user's `injury_flags` are removed by the SQL
   inside the MCP tools (`search_exercises`, `search_program_templates`) before the model
   sees anything. A program is removed if any one of its exercises is tagged unsafe.
-- Most exercises have no injury tags yet (`contraindication_status: untagged`). The tools
-  still return them, but every one carries `injury_check: "not_yet_checked"`. The model must
-  never describe those as safe, and must say they haven't been checked for injury safety.
-  (Decision 2026-10-22: flag them rather than exclude them, so people with injuries still
-  get a useful library. `checked_only=true` returns only exercises that have injury tags.)
+- Most exercises have no injury tags yet (`contraindication_status: untagged`). Without
+  `checked_only`, the tool still returns them, but every one carries
+  `injury_check: "not_yet_checked"`, and the model must never describe those as safe.
+- **DECIDED (2026-10-22, project owner): users with an injury flag only ever get exercises
+  that have injury tags.** For them the agent harness always passes `checked_only=true`,
+  so an untagged exercise never reaches an injured user until the PT has tagged it.
+  Users with no injury flags can see untagged exercises, still flagged `not_yet_checked`.
 - Programs' injury tags are drafts, so `search_program_templates` reports
   `injury_check: "not_pt_reviewed"`. That is not confirmation that a program is safe.
 
 **ENFORCE IN CODE (requirement for the next prompt):**
 1. The harness, not the model, supplies `injury_flags` (from `AgentUserProfile`) on every
    call, so the model cannot ask for an unfiltered list.
-2. Recommended, owner to confirm: for any user with an injury flag, the harness also sets
-   `checked_only=true` for the Program Architect and Workout Builder, so an injured user is
-   only ever handed exercises that at least have drafted injury tags, until the PT has tagged
-   the rest.
+2. For any user with an injury flag, the harness sets `checked_only=true` on every
+   `search_exercises` call from the Program Architect and Workout Builder (the decision
+   above). The model cannot turn it off. Programs already only contain exercises that have
+   drafted tags, so `search_program_templates` needs no equivalent switch.
