@@ -20,6 +20,7 @@ the model forbids extra fields, so PII can't slip in by accident.
 """
 
 import json
+import sqlite3
 
 from pydantic import BaseModel, ConfigDict
 
@@ -46,14 +47,20 @@ class AgentUserProfile(BaseModel):
 ALLOWED_COLUMNS = "goals, timeline, injury_flags, age, weight, height"
 
 
-def agent_profile_for(user_id: int) -> AgentUserProfile | None:
+def agent_profile_for(user_id: int, conn: sqlite3.Connection | None = None) -> AgentUserProfile | None:
     """The PII-free profile for a user, or None if they haven't taken the quiz.
-    user_id is used only for this local lookup; it is not part of the result."""
-    conn = connect()
+    user_id is used only for this local lookup; it is not part of the result.
+
+    This is the single source of truth for what an agent may know about a user: the MCP tool
+    get_user_profile calls it too (passing its read-only connection), so there is no second copy
+    of the field list to drift out of sync."""
+    own_conn = conn is None
+    conn = conn or connect()
     try:
         row = conn.execute(f"SELECT {ALLOWED_COLUMNS} FROM quiz_profiles WHERE user_id = ?", (user_id,)).fetchone()
     finally:
-        conn.close()
+        if own_conn:
+            conn.close()
     if row is None:
         return None
     return AgentUserProfile(

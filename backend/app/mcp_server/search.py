@@ -1,0 +1,333 @@
+"""Read-only searches over exercises, program templates, and Fitness Basics articles.
+
+Everything here opens the database read-only (see app.db.connect_readonly). The injury filters are
+SQL, not prompt text: a contraindicated exercise is never returned, whatever the caller asks for.
+
+Honesty rule used in every response: an exercise with no injury tags is NOT confirmed safe. Untagged
+exercises are returned with injury_check = "not_yet_checked" and a plain-language note, and are never
+described as safe.
+"""
+
+import json
+import re
+import sqlite3
+from typing import Literal
+
+from app.content import REVIEW_NOTICE
+from app.db import connect_readonly
+
+MuscleGroup = Literal["legs", "arms", "chest", "shoulders", "back", "core", "full_body"]
+InjuryFlag = Literal["lower_back", "knee", "shoulder"]
+GoalTag = Literal["weight_loss", "tone", "strength", "rehab"]
+
+MUSCLE_GROUPS = ("legs", "arms", "chest", "shoulders", "back", "core", "full_body")
+INJURY_FLAGS = ("lower_back", "knee", "shoulder")
+GOAL_TAGS = ("weight_loss", "tone", "strength", "rehab")
+MAX_LIMIT = 50
+
+# Callers (an LLM) may use natural names; map them onto the equipment values stored in the database.
+EQUIPMENT_ALIASES = {
+    "bodyweight": "none", "body_only": "none", "no_equipment": "none", "none": "none",
+    "dumbbell": "dumbbells", "dumbbells": "dumbbells",
+    "band": "resistance_band", "bands": "resistance_band", "resistance_band": "resistance_band",
+    "resistance_bands": "resistance_band",
+    "kettlebell": "kettlebells", "kettlebells": "kettlebells",
+    "foam_roll": "foam_roller", "foam_roller": "foam_roller",
+    "exercise_ball": "exercise_ball", "stability_ball": "exercise_ball",
+    "medicine_ball": "medicine_ball", "ez_curl_bar": "ez_curl_bar", "e_z_curl_bar": "ez_curl_bar",
+    "mat": "mat", "yoga_mat": "mat", "chair": "chair", "bench": "bench",
+    "barbell": "barbell", "machine": "machine", "cable": "cable", "other": "other",
+}
+
+
+class ToolInputError(ValueError):
+    """Bad arguments from the caller. The server turns this into an MCP tool error the model can read."""
+
+
+def _clean_flags(injury_flags: list[str] | None) -> list[str]:
+    flags = sorted(set(injury_flags or []))
+    bad = [f for f in flags if f not in INJURY_FLAGS]
+    if bad:
+        raise ToolInputError(f"Unknown injury flag(s) {bad}. Valid: {list(INJURY_FLAGS)}.")
+    return flags
+
+
+def _clean_equipment(equipment: list[str] | str | None) -> list[str] | None:
+    if equipment is None:
+        return None
+    items = [equipment] if isinstance(equipment, str) else list(equipment)
+    cleaned = set()
+    for raw in items:
+        key = re.sub(r"[\s-]+", "_", str(raw).strip().lower())
+        if key not in EQUIPMENT_ALIASES:
+            raise ToolInputError(f"Unknown equipment '{raw}'. Valid: {sorted(set(EQUIPMENT_ALIASES.values()))}.")
+        cleaned.add(EQUIPMENT_ALIASES[key])
+    return sorted(cleaned)
+
+
+# ---------------------------------------------------------------- injury-safety wording (shared)
+
+INJURY_CHECK = {
+    "untagged": ("not_yet_checked",
+                 "Not yet checked for injury safety. Do not treat this as safe for any injury."),
+    "draft": ("drafted_not_pt_reviewed",
+              "Injury cautions are a draft that a physical therapist has not reviewed yet."),
+    "pt_reviewed": ("pt_reviewed", "Injury cautions reviewed by a physical therapist."),
+}
+
+
+def _review(row: sqlite3.Row) -> dict:
+    return {
+        "status": row["status"],
+        "review_notice": REVIEW_NOTICE if row["status"] == "placeholder" else None,
+        "citations": json.loads(row["citations"]),
+    }
+
+
+# ---------------------------------------------------------------- exercises
+
+# True when NONE of the exercise's contraindications is in the caller's injury flags.
+NOT_CONTRAINDICATED = (
+    "NOT EXISTS (SELECT 1 FROM json_each(e.injury_contraindications) c "
+    "WHERE c.value IN (SELECT value FROM json_each(:flags)))"
+)
+
+# True when every piece of equipment the exercise needs is something the caller has (or is "none").
+EQUIPMENT_AVAILABLE = (
+    "NOT EXISTS (SELECT 1 FROM json_each(e.equipment_needed) n "
+    "WHERE n.value <> 'none' AND n.value NOT IN (SELECT value FROM json_each(:equipment)))"
+)
+
+
+def search_exercises(
+    muscle_group: str | None = None,
+    equipment: list[str] | str | None = None,
+    injury_flags: list[str] | None = None,
+    limit: int = 20,
+    checked_only: bool = False,
+) -> dict:
+    if muscle_group is not None and muscle_group not in MUSCLE_GROUPS:
+        raise ToolInputError(f"Unknown muscle_group '{muscle_group}'. Valid: {list(MUSCLE_GROUPS)}.")
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= MAX_LIMIT:
+        raise ToolInputError(f"limit must be a whole number from 1 to {MAX_LIMIT}.")
+    flags = _clean_flags(injury_flags)
+    have = _clean_equipment(equipment)
+
+    where, params = ["1 = 1"], {"flags": json.dumps(flags), "equipment": json.dumps(have or [])}
+    if muscle_group:
+        where.append("e.muscle_group = :muscle_group")
+        params["muscle_group"] = muscle_group
+    if have is not None:
+        where.append(EQUIPMENT_AVAILABLE)
+    if checked_only:
+        where.append("e.contraindication_status <> 'untagged'")
+    base = " AND ".join(where)
+    inj = f" AND {NOT_CONTRAINDICATED}" if flags else ""
+
+    conn = connect_readonly()
+    try:
+        total_before_injury_filter = conn.execute(f"SELECT COUNT(*) FROM exercises e WHERE {base}", params).fetchone()[0]
+        total = conn.execute(f"SELECT COUNT(*) FROM exercises e WHERE {base}{inj}", params).fetchone()[0]
+        # Checked-for-safety exercises first, so a small limit isn't filled entirely by unchecked ones.
+        rows = conn.execute(
+            f"SELECT e.* FROM exercises e WHERE {base}{inj} "
+            "ORDER BY (e.contraindication_status = 'untagged'), e.source_dataset = 'free-exercise-db', e.name "
+            "LIMIT :limit", {**params, "limit": limit}).fetchall()
+        unchecked_in_pool = conn.execute(
+            f"SELECT COUNT(*) FROM exercises e WHERE {base}{inj} AND e.contraindication_status = 'untagged'",
+            params).fetchone()[0]
+    finally:
+        conn.close()
+
+    exercises = []
+    for r in rows:
+        check, note = INJURY_CHECK[r["contraindication_status"]]
+        exercises.append({
+            "id": r["id"],
+            "name": r["name"],
+            "muscle_group": r["muscle_group"],
+            "equipment_needed": json.loads(r["equipment_needed"]),
+            "difficulty": r["difficulty"],
+            "est_time_seconds": r["est_time_seconds"],
+            "category": r["category"],
+            "primary_muscles": json.loads(r["primary_muscles"]),
+            "injury_contraindications": json.loads(r["injury_contraindications"]),
+            "injury_check": check,
+            "injury_unchecked": r["contraindication_status"] == "untagged",
+            "injury_note": note,
+            "source_dataset": r["source_dataset"],
+            **_review(r),
+        })
+
+    result = {
+        "count": len(exercises),
+        "total_matching": total,
+        "exercises": exercises,
+        "injury_filter": {
+            "applied": bool(flags),
+            "flags": flags,
+            "excluded_as_contraindicated": total_before_injury_filter - total if flags else 0,
+            "checked_only": checked_only,
+            "unchecked_in_matching": unchecked_in_pool,
+            "note": ("Exercises tagged as unsafe for these injuries were removed by the database query. "
+                     if flags else "No injury filter was applied. ")
+                    + "Exercises with injury_check 'not_yet_checked' have NO injury tags because nobody has "
+                      "reviewed them yet; that does not mean they are safe. Pass checked_only=true to return only "
+                      "exercises that have injury tags (draft or PT-reviewed)."
+        },
+    }
+    if total > len(exercises):
+        result["truncated"] = f"Showing {len(exercises)} of {total}. Narrow the search or raise limit (max {MAX_LIMIT})."
+    return result
+
+
+# ---------------------------------------------------------------- program templates
+
+def search_program_templates(
+    goal_tags: list[str] | None = None,
+    injury_flags: list[str] | None = None,
+) -> dict:
+    goals = sorted(set(goal_tags or []))
+    bad = [g for g in goals if g not in GOAL_TAGS]
+    if bad:
+        raise ToolInputError(f"Unknown goal tag(s) {bad}. Valid: {list(GOAL_TAGS)}.")
+    flags = _clean_flags(injury_flags)
+
+    conn = connect_readonly()
+    try:
+        programs = conn.execute("SELECT * FROM program_templates ORDER BY name").fetchall()
+        items = conn.execute(
+            "SELECT p.program_id, p.day_of_week, p.order_index, p.sets, p.reps, e.id, e.name, "
+            "e.injury_contraindications, e.contraindication_status "
+            "FROM program_template_exercises p JOIN exercises e ON e.id = p.exercise_id "
+            "ORDER BY p.program_id, p.day_of_week, p.order_index").fetchall()
+    finally:
+        conn.close()
+
+    by_program: dict[int, list[sqlite3.Row]] = {}
+    for it in items:
+        by_program.setdefault(it["program_id"], []).append(it)
+
+    day_names = {1: "mon", 2: "tue", 3: "wed", 4: "thu", 5: "fri", 6: "sat", 7: "sun"}
+    results, excluded = [], []
+    for p in programs:
+        prog_goals = json.loads(p["goal_tags"])
+        matched = sorted(set(prog_goals) & set(goals))
+        if goals and not matched:
+            continue
+        rows = by_program.get(p["id"], [])
+        # Injury guardrail: drop the whole program if ANY of its exercises is contraindicated for a flag.
+        conflicts = sorted({r["name"] for r in rows if set(json.loads(r["injury_contraindications"])) & set(flags)})
+        if conflicts:
+            excluded.append({"name": p["name"], "because_exercises": conflicts})
+            continue
+        schedule: dict[str, list[dict]] = {}
+        for r in rows:
+            schedule.setdefault(day_names[r["day_of_week"]], []).append(
+                {"exercise_id": r["id"], "name": r["name"], "sets": r["sets"], "reps": r["reps"]})
+        all_reviewed = bool(rows) and all(r["contraindication_status"] == "pt_reviewed" for r in rows)
+        focus = json.loads(p["injury_focus"])
+        results.append({
+            "id": p["id"],
+            "name": p["name"],
+            "goal_tags": prog_goals,
+            "matched_goal_tags": matched,
+            "injury_focus": focus,
+            "designed_for_requested_injuries": sorted(set(focus) & set(flags)),
+            "description": p["description"],
+            "science_rationale": p["science_rationale"],
+            "schedule": schedule,
+            "injury_check": "pt_reviewed" if all_reviewed else "not_pt_reviewed",
+            "injury_note": ("All exercise injury tags in this program were reviewed by a physical therapist."
+                            if all_reviewed else
+                            "No exercise in this program is contraindicated for the requested injuries according "
+                            "to the current tags, but those tags are drafts that a physical therapist has not "
+                            "reviewed. This is not confirmation that the program is safe."),
+            **_review(p),
+        })
+    results.sort(key=lambda r: (-len(r["matched_goal_tags"]), r["name"]))   # best goal match first
+    return {
+        "count": len(results),
+        "programs": results,
+        "injury_filter": {
+            "applied": bool(flags),
+            "flags": flags,
+            "excluded_programs": excluded,
+            "note": "A program is removed if any of its exercises is tagged as unsafe for a requested injury.",
+        },
+    }
+
+
+# ---------------------------------------------------------------- Fitness Basics knowledge base
+
+STOPWORDS = {
+    "a", "an", "the", "is", "are", "was", "do", "does", "did", "to", "of", "in", "on", "for", "and", "or", "it",
+    "i", "my", "me", "we", "you", "your", "how", "what", "when", "why", "should", "can", "could", "would", "be",
+    "this", "that", "with", "about", "much", "many", "long", "get", "have", "has", "if", "so", "at", "as", "by",
+}
+MAX_ARTICLES = 3
+NO_MATCH_MESSAGE = ("No article in the Fitness Basics knowledge base matches this question. Do not answer from "
+                    "general knowledge. Reply: \"I don't have verified information on that. Please consult a "
+                    "doctor or physical therapist.\"")
+
+
+def _tokens(text: str) -> list[str]:
+    """Lowercase words with a light plural fix (injuries -> injury, sets -> set), minus filler words."""
+    out = []
+    for w in re.findall(r"[a-z0-9]+", text.lower()):
+        if w in STOPWORDS or len(w) < 2:
+            continue
+        if w.endswith("ies") and len(w) > 4:
+            w = w[:-3] + "y"
+        elif w.endswith("s") and not w.endswith("ss") and len(w) > 3:
+            w = w[:-1]
+        out.append(w)
+    return out
+
+
+def search_basics_kb(query: str) -> dict:
+    if not isinstance(query, str) or not query.strip():
+        raise ToolInputError("query must be a non-empty string.")
+    if len(query) > 500:
+        raise ToolInputError("query must be 500 characters or fewer.")
+    terms = sorted(set(_tokens(query)))
+
+    conn = connect_readonly()
+    try:
+        articles = conn.execute("SELECT * FROM basics_articles ORDER BY title").fetchall()
+    finally:
+        conn.close()
+
+    scored = []
+    for a in articles:
+        title, cat, body = set(_tokens(a["title"])), set(_tokens(a["category"])), _tokens(a["content"])
+        matched = [t for t in terms if t in title or t in cat or t in body]
+        if not matched:
+            continue
+        # title match weighs 3, category 2, body 1 (capped at 5 mentions per term so long text can't dominate)
+        score = sum((3 if t in title else 0) + (2 if t in cat else 0) + min(body.count(t), 5) for t in matched)
+        scored.append((score, a, matched))
+    scored.sort(key=lambda s: (-s[0], s[1]["title"]))
+
+    matches = [{
+        "slug": a["slug"],
+        "title": a["title"],
+        "category": a["category"],
+        "score": score,
+        "matched_terms": matched,
+        "content": a["content"],
+        **_review(a),
+    } for score, a, matched in scored[:MAX_ARTICLES]]
+    result = {
+        "query": query,
+        "searched_terms": terms,
+        "answerable": bool(matches),
+        "matches": matches,
+        "instructions": ("Answer ONLY from the content of these articles, and only claim what they say. Cite the "
+                         "article title. Content with status 'placeholder' is pending expert review: say so. "
+                         "If the articles don't actually answer the question, say you don't have verified "
+                         "information and suggest consulting a doctor or physical therapist."),
+    }
+    if not matches:
+        result["message"] = NO_MATCH_MESSAGE
+    return result

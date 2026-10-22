@@ -19,6 +19,17 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     return conn
 
 
+def connect_readonly(path: Path | None = None) -> sqlite3.Connection:
+    """A connection that SQLite itself refuses to write through (mode=ro). The MCP tools use
+    this, so "read-only" holds even if a query is ever written wrongly."""
+    path = path or config.WORKING_DB
+    if not path.exists():
+        raise FileNotFoundError(f"Database not found: {path}. Build it with: python -m app.db.seed")
+    conn = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
 def copy_db(src: Path, dst: Path) -> None:
     """Copy one SQLite file over another using SQLite's backup API, which is
     safe even if the app has the destination open (a plain file copy isn't)."""

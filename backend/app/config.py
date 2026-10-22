@@ -19,7 +19,6 @@ CONTENT_DIR = PROJECT_ROOT / "content"
 
 DB_DIR = BACKEND_DIR / "app" / "db"
 ORIGINAL_DB = DB_DIR / "homebase_original.db"  # clean, seeded; never modified by the app
-WORKING_DB = DB_DIR / "homebase.db"            # what the app reads and writes
 
 ENV_PATHS = (PROJECT_ROOT / ".env", PROJECT_ROOT.parent / ".env")
 
@@ -36,6 +35,12 @@ def get_secret(name: str) -> str | None:
         if path.exists():
             value = dotenv_values(path).get(name)
     return value or None
+
+
+# What the app reads and writes. HOMEBASE_DB_PATH (not a secret, but looked up the same way: environment
+# variable, then .env) points it at another file, e.g. a persistent disk on the host, or a throwaway copy
+# for the MCP smoke test.
+WORKING_DB = Path(get_secret("HOMEBASE_DB_PATH") or DB_DIR / "homebase.db")
 
 
 _dev_secret: str | None = None

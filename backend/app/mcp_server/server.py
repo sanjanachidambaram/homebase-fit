@@ -1,0 +1,151 @@
+"""HomeBase Fit MCP server: the only tools the AI agents can call.
+
+Run (stdio, as Claude Code and the agents launch it), from the project root:
+    backend/.venv/Scripts/python.exe backend/app/mcp_server/server.py
+
+Least privilege: exactly seven tools, listed below, and none of them writes anything.
+  1-5 read the database through a SQLite connection opened read-only (mode=ro), so even a bug
+      in a query cannot change data. 6 and 7 compute from what 1-5 return (6 touches no database).
+Logging workouts and measurements stays a direct REST call from the calendar page; it is not a tool.
+There is no delete tool and no tool that returns an email address.
+
+Privacy: get_user_profile is the only tool that returns profile data, and it goes through
+app.agents.context.agent_profile_for, so email, name, user id, and free-text injury notes never
+come out of this server.
+
+NOTE FOR THE AGENT HARNESS (next step): three tools take a user_id. This server cannot tell WHO is
+asking, so the code that calls these tools must set user_id from the signed-in session and must not
+let the model pick it, or a manipulated prompt could ask about someone else. See
+backend/prompts/shared_rules.md, rule 2.
+"""
+
+import sys
+from pathlib import Path
+from typing import Any, Callable
+
+if __package__ in (None, ""):   # started as a script: make `import app...` work
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
+
+from app.agents.context import agent_profile_for
+from app.db import connect_readonly
+from app.mcp_server import progress, search
+from app.mcp_server.search import GoalTag, InjuryFlag, MuscleGroup, ToolInputError
+from app.mcp_server.strength import compute_strength_equivalents as _strength
+
+mcp = FastMCP(
+    "homebase-fit",
+    instructions=(
+        "HomeBase Fit data tools. All read-only. Exercises with injury_check 'not_yet_checked' have no injury "
+        "tags because nobody has reviewed them; never describe them as safe. Anything with status 'placeholder' "
+        "is pending expert review and must not be presented as verified or science-backed."
+    ),
+)
+
+READ_ONLY = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
+
+
+def _run(fn: Callable[..., dict], *args: Any, **kwargs: Any) -> dict:
+    """Call a tool body; turn bad arguments into an MCP tool error the model can read and fix."""
+    try:
+        return fn(*args, **kwargs)
+    except (ToolInputError, ValueError) as e:
+        raise ToolError(str(e)) from e
+
+
+@mcp.tool(annotations=READ_ONLY)
+def get_user_profile(user_id: int) -> dict:
+    """Get a user's profile for personalization: goals, timeline, injury_flags, age, weight_lb, height_in.
+
+    Returns ONLY those fields. No email, name, or free-text notes are ever returned. If the user has not taken
+    the quiz yet, returns found=false."""
+    conn = connect_readonly()
+    try:
+        profile = agent_profile_for(user_id, conn)
+    finally:
+        conn.close()
+    if profile is None:
+        return {"found": False, "message": "This user has no quiz profile yet."}
+    return {"found": True, **profile.model_dump()}
+
+
+@mcp.tool(annotations=READ_ONLY)
+def search_exercises(
+    muscle_group: MuscleGroup | None = None,
+    equipment: list[str] | None = None,
+    injury_flags: list[InjuryFlag] | None = None,
+    limit: int = 20,
+    checked_only: bool = False,
+) -> dict:
+    """Search the exercise library.
+
+    muscle_group: legs, arms, chest, shoulders, back, core, or full_body.
+    equipment: the equipment the user HAS (e.g. ["dumbbells", "resistance_band"]); returns exercises that need
+      only those items, plus bodyweight exercises. Omit to ignore equipment.
+    injury_flags: lower_back, knee, shoulder. Exercises tagged as unsafe for ANY of these are removed by the
+      database query itself, so they can never appear.
+    limit: 1 to 50 (default 20). Exercises with injury tags come first.
+    checked_only: true returns only exercises that have injury tags (draft or PT-reviewed).
+
+    IMPORTANT: most exercises have no injury tags yet. Those come back with injury_check "not_yet_checked" and
+    injury_unchecked=true: that means nobody has reviewed them, NOT that they are safe. Every result also carries
+    status, review_notice, and citations."""
+    return _run(search.search_exercises, muscle_group, equipment, injury_flags, limit, checked_only)
+
+
+@mcp.tool(annotations=READ_ONLY)
+def search_program_templates(
+    goal_tags: list[GoalTag] | None = None,
+    injury_flags: list[InjuryFlag] | None = None,
+) -> dict:
+    """Search the trainer program templates.
+
+    goal_tags: weight_loss, tone, strength, rehab. Programs matching more of the goals come first; omit for all.
+    injury_flags: lower_back, knee, shoulder. A program is removed if ANY of its exercises is tagged as unsafe
+      for any of them.
+
+    Each result has the weekly schedule, status, review_notice, and citations. The injury tags behind a program
+    are drafts a physical therapist has not reviewed, so injury_check will say "not_pt_reviewed"."""
+    return _run(search.search_program_templates, goal_tags, injury_flags)
+
+
+@mcp.tool(annotations=READ_ONLY)
+def search_basics_kb(query: str) -> dict:
+    """Keyword search of the Fitness Basics articles. This is the ONLY source for answering Fitness Basics questions.
+
+    Returns the matching articles (full text) with status, review_notice, and citations. If answerable is false,
+    nothing matches: say "I don't have verified information on that. Please consult a doctor or physical
+    therapist." Never answer from outside these results."""
+    return _run(search.search_basics_kb, query)
+
+
+@mcp.tool(annotations=READ_ONLY)
+def get_progress_summary(user_id: int) -> dict:
+    """Summarize the user's last 30 days: sessions logged, total weight lifted (lb),
+    current streak in days, rest_day_suggested (true at a 10+ day streak), and body-weight and other measurement
+    trends. Read-only. Returns found=false for an unknown user."""
+    return _run(progress.get_progress_summary, user_id)
+
+
+@mcp.tool(annotations=READ_ONLY)
+def compute_strength_equivalents(total_weight_lifted_lbs: float) -> dict:
+    """Turn a total weight lifted (pounds) into fun comparisons: bowling balls, concert grand pianos, cars, trees,
+    elephants, blue whales. Each comparison lists the real approximate weight it uses and its source. Pure
+    calculation; no database."""
+    return _run(_strength, total_weight_lifted_lbs)
+
+
+@mcp.tool(annotations=READ_ONLY)
+def check_goal_achievement(user_id: int) -> dict:
+    """Compare the user's last 30 days of progress with their quiz goals and timeline.
+
+    Returns status: on_track, ahead, behind, or insufficient_data, plus per-check reasons. The thresholds are simple
+    app heuristics (returned in thresholds_used), not science or medical guidance; do not present them as
+    science-backed. Rehab and tone goals are not measurable from the logs and are judged on consistency only."""
+    return _run(progress.check_goal_achievement, user_id)
+
+
+if __name__ == "__main__":
+    mcp.run(show_banner=False)   # stdout is the MCP channel; keep the console quiet

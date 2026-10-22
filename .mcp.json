@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "homebase-fit": {
+      "type": "stdio",
+      "command": "backend/.venv/Scripts/python.exe",
+      "args": [
+        "backend/app/mcp_server/server.py"
+      ]
+    }
+  }
+}

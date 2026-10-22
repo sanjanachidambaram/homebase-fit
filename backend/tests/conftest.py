@@ -9,10 +9,15 @@ from app.db import copy_db
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch):
-    test_db = tmp_path / "test.db"
-    copy_db(config.ORIGINAL_DB, test_db)
-    monkeypatch.setattr(config, "WORKING_DB", test_db)
+def test_db(tmp_path, monkeypatch):
+    path = tmp_path / "test.db"
+    copy_db(config.ORIGINAL_DB, path)
+    monkeypatch.setattr(config, "WORKING_DB", path)
+    return path
+
+
+@pytest.fixture
+def client(test_db, monkeypatch):
     monkeypatch.setenv("APP_SECRET_KEY", "test-secret")
     from app.main import app
     with TestClient(app) as c:
