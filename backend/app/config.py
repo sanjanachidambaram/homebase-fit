@@ -5,6 +5,8 @@ Lookup order for each key:
   1. a real environment variable (how a hosting platform provides it)
   2. <project root>/.env
   3. the folder one level above the project root (e.g. a "submissions" dir)
+In production (APP_ENV=production set as a real environment variable) only step 1 is used: a .env file lying
+around on a server is never read.
 """
 
 import os
@@ -16,6 +18,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = BACKEND_DIR.parent
 PROMPTS_DIR = BACKEND_DIR / "prompts"
 CONTENT_DIR = PROJECT_ROOT / "content"
+FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"   # the built React app (npm run build); served by FastAPI
 
 DB_DIR = BACKEND_DIR / "app" / "db"
 ORIGINAL_DB = DB_DIR / "homebase_original.db"  # clean, seeded; never modified by the app
@@ -26,10 +29,15 @@ MODEL_NAME = "gpt-6-luna"
 PORTKEY_BASE_URL = "https://api.portkey.ai/v1"
 
 
+def _env_only() -> bool:
+    """Production reads real environment variables only (checked without get_secret, to avoid recursion)."""
+    return (os.getenv("APP_ENV") or "").strip().lower() == "production"
+
+
 def get_secret(name: str) -> str | None:
     """Return a secret by name, or None if it is not set anywhere."""
     value = os.getenv(name)
-    for path in ENV_PATHS:
+    for path in () if _env_only() else ENV_PATHS:
         if value:
             break
         if path.exists():

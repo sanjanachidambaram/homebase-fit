@@ -1,0 +1,22 @@
+# Render Blueprint: one free web service that serves the API, the media in content/, and the built React app.
+# Secrets are NOT in this file: each `sync: false` variable is asked for in the Render dashboard the first time the
+# Blueprint is created (see README.md, "Deployment"). Python and Node versions are pinned by .python-version (3.13)
+# and .node-version (24) in the repo root.
+#
+# Free tier: the service sleeps after ~15 minutes idle and its disk is temporary, so the working database
+# (accounts, logs, calendars) starts fresh from backend/app/db/homebase_original.db whenever the service restarts.
+services:
+  - type: web
+    name: homebase-fit
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt && cd frontend && npm ci && npm run build
+    startCommand: cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_ENV          # enter: production
+        sync: false
+      - key: APP_SECRET_KEY   # enter: a long random string (signs sign-in tokens)
+        sync: false
+      - key: PORTKEY_API_KEY  # enter: the course Portkey key
+        sync: false

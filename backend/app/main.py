@@ -2,17 +2,25 @@
 
 Run locally from backend/ (no auto-reload, so edits never spawn extra servers):
     .venv\\Scripts\\python.exe -m uvicorn app.main:app --port 8000
+
+One service serves everything (how it runs on Render, see render.yaml):
+  /api/*      the API
+  /content/*  exercise images, videos, team photos (the content/ folder)
+  anything else: the built React app (frontend/dist). Real files are served as files; every other path gets
+              index.html so the app's own router can show the page (/calendar, /about/data, ...).
+In development the Vite dev server serves the app instead and proxies /api and /content here.
 """
 
 import json
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app import config
-from app.config import CONTENT_DIR, MODEL_NAME, is_production, llm_provider
+from app.config import CONTENT_DIR, FRONTEND_DIST, MODEL_NAME, is_production, llm_provider
 from app.content import media_url, review_info
 from app.db import connect, ensure_working_db, table_counts
 from app.agent_routes import router as agent_router
@@ -30,7 +38,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="HomeBase Fit API", lifespan=lifespan)
 
-# Vite dev server; the hosted origin gets added at deploy time.
+# Only the Vite dev server needs CORS: in production the app and the API share one origin.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -145,3 +153,22 @@ def debug_tables() -> dict:
         return {"database": config.WORKING_DB.name, "tables": table_counts(conn)}
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------- the built frontend (production)
+# Registered last, so every /api route and the /content mount above win. Only active once `npm run build` has
+# produced frontend/dist (in development Vite serves the app instead).
+
+if (FRONTEND_DIST / "index.html").exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def frontend(path: str):
+        if path == "api" or path.startswith("api/"):          # a mistyped API URL stays a JSON 404
+            raise HTTPException(404, "Not found.")
+        file = (FRONTEND_DIST / path).resolve()
+        if path and file.is_file() and FRONTEND_DIST.resolve() in file.parents:   # favicon.svg etc.
+            return FileResponse(file)
+        # Client-side routes (/calendar, /about/data, ...): the app's own router picks the page.
+        return FileResponse(FRONTEND_DIST / "index.html", headers={"Cache-Control": "no-cache"})
+

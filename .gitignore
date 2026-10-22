@@ -25,3 +25,7 @@ Thumbs.db
 *.db-journal
 *.db-wal
 *.db-shm
+
+# The working database (accounts, logs, calendars) is created at startup from the committed, clean
+# backend/app/db/homebase_original.db. Never commit it: it can hold real people's data.
+backend/app/db/homebase.db
