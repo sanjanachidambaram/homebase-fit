@@ -10,18 +10,22 @@ fills those in from the signed-in session and the user's profile before any MCP 
 backend/prompts/shared_rules.md, rules 2 and 4.
 """
 
+import json
 import os
 import re
 import time
+from contextvars import ContextVar
 from dataclasses import dataclass, field
+from email.utils import parsedate_to_datetime
 from functools import lru_cache
 from typing import Any
 
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
 
 from fastmcp import Client
+import httpx2 as httpx   # the HTTP library the OpenAI SDK is built on (DefaultAsyncHttpxClient)
 from fastmcp.exceptions import ToolError
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, DefaultAsyncHttpxClient
 from pydantic_ai import Agent, ModelRetry
 from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.models import Model
@@ -51,19 +55,98 @@ def _flagged_by_filter(exc: Exception) -> bool:
     return isinstance(exc, ModelHTTPError) and "invalid_prompt" in str(exc.body)
 
 
+# ---------------------------------------------------------------- gateway cache detection
+#
+# The Portkey gateway on the course key replays a stored answer when it sees an identical request
+# (checked 2026-10-22: the replay has the same response id and created_at as the original). It sends
+# no cache header, so replays are detected from the response itself: a fresh answer is created after
+# the gateway receives the request, so a created_at clearly OLDER than that moment means a replay.
+# Replays cost no provider tokens, so agent_runs records them separately (see run_logged).
+
+CACHE_TOLERANCE_S = 3.0      # clock differences plus the Date header's one-second resolution
+_requests: ContextVar[list[dict] | None] = ContextVar("gateway_requests", default=None)
+
+
+def is_gateway_replay(created_at: float | None, date_header: str | None, elapsed_s: float) -> bool | None:
+    """True if the response was made before the gateway received the request (a cache replay),
+    False if it's fresh, None if the response doesn't say."""
+    if created_at is None or not date_header:
+        return None
+    try:
+        received = parsedate_to_datetime(date_header).timestamp() - elapsed_s
+    except (TypeError, ValueError):
+        return None
+    return created_at < received - CACHE_TOLERANCE_S
+
+
+async def _mark_start(request: httpx.Request) -> None:
+    request.extensions["homebase_started"] = time.monotonic()
+
+
+async def _inspect_response(response: httpx.Response) -> None:
+    """For the current agent run, record whether this model response was a replay, and its token usage."""
+    calls = _requests.get()
+    path = response.request.url.path
+    if calls is None or not (path.endswith("/responses") or path.endswith("/chat/completions")):
+        return
+    entry: dict[str, Any] = {"status": response.status_code, "replay": None, "input_tokens": None,
+                             "output_tokens": None}
+    calls.append(entry)
+    if response.status_code != 200:
+        return
+    try:
+        body = json.loads(await response.aread())
+    except (ValueError, httpx.HTTPError):
+        return
+    created = body.get("created_at", body.get("created"))
+    elapsed = time.monotonic() - response.request.extensions.get("homebase_started", time.monotonic())
+    entry["replay"] = is_gateway_replay(created, response.headers.get("date"), elapsed)
+    usage = body.get("usage") or {}
+    entry["input_tokens"] = usage.get("input_tokens", usage.get("prompt_tokens"))
+    entry["output_tokens"] = usage.get("output_tokens", usage.get("completion_tokens"))
+
+
+def gateway_http_client(transport: httpx.AsyncBaseTransport | None = None) -> httpx.AsyncClient:
+    """The HTTP client the model uses, with the hooks above. Tests pass a fake transport."""
+    hooks = {"request": [_mark_start], "response": [_inspect_response]}
+    return DefaultAsyncHttpxClient(event_hooks=hooks, **({"transport": transport} if transport else {}))
+
+
+def summarize_gateway(calls: list[dict]) -> dict:
+    """Roll one agent run's model requests up into the agent_runs cache columns."""
+    known = [c for c in calls if c["replay"] is not None]
+    hits = sum(1 for c in known if c["replay"])
+    if not calls or len(known) < len(calls):
+        status = "unknown"        # no model HTTP traffic seen (e.g. tests), or a response that couldn't be read
+    elif hits == len(calls):
+        status = "hit"
+    elif hits == 0:
+        status = "miss"
+    else:
+        status = "partial"
+    fresh = [c for c in known if not c["replay"]]
+    complete = status != "unknown" and all(c["input_tokens"] is not None for c in fresh)
+    return {
+        "gateway_cache_status": status,
+        "gateway_cache_hits": hits,
+        "fresh_input_tokens": sum(c["input_tokens"] or 0 for c in fresh) if complete else None,
+        "fresh_output_tokens": sum(c["output_tokens"] or 0 for c in fresh) if complete else None,
+    }
+
+
 @lru_cache(maxsize=1)
 def get_model() -> Model:
     """gpt-6-luna via Portkey; falls back to a direct OpenAI key if that's all that is set.
     Tests replace this function with a fake model, so no test ever calls the real API."""
     if key := get_secret("PORTKEY_API_KEY"):
         client = AsyncOpenAI(api_key="portkey", base_url=PORTKEY_BASE_URL,   # Portkey auths via the header
-                             default_headers={"x-portkey-api-key": key, "x-portkey-provider": "openai"})
-        provider = OpenAIProvider(openai_client=client)
+                             default_headers={"x-portkey-api-key": key, "x-portkey-provider": "openai"},
+                             http_client=gateway_http_client())
     elif key := get_secret("OPENAI_API_KEY"):
-        provider = OpenAIProvider(api_key=key)
+        client = AsyncOpenAI(api_key=key, http_client=gateway_http_client())
     else:
         raise AgentUnavailable("No PORTKEY_API_KEY or OPENAI_API_KEY is set, so the AI features are off.")
-    luna = OpenAIResponsesModel(MODEL_NAME, provider=provider)
+    luna = OpenAIResponsesModel(MODEL_NAME, provider=OpenAIProvider(openai_client=client))
     return FallbackModel(luna, luna, fallback_on=_flagged_by_filter)
 
 
@@ -130,16 +213,18 @@ def makes_science_claim(text: str) -> bool:
 # ---------------------------------------------------------------- run + token log
 
 def _log_run(agent_name: str, user_id: int | None, route: str, usage: RunUsage, status: str,
-             error_type: str | None, started: float) -> int:
+             error_type: str | None, started: float, gateway: dict) -> int:
     conn = connect()
     try:
         with conn:
             cur = conn.execute(
                 "INSERT INTO agent_runs (agent_name, user_id, input_tokens, output_tokens, cached_tokens, requests, "
-                "tool_calls, model, route, status, error_type, duration_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "tool_calls, model, route, status, error_type, duration_ms, gateway_cache_status, gateway_cache_hits, "
+                "fresh_input_tokens, fresh_output_tokens) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (agent_name, user_id, usage.input_tokens, usage.output_tokens, usage.cache_read_tokens,
                  usage.requests, usage.tool_calls, MODEL_NAME, route, status, error_type,
-                 round((time.perf_counter() - started) * 1000)))
+                 round((time.perf_counter() - started) * 1000), gateway["gateway_cache_status"],
+                 gateway["gateway_cache_hits"], gateway["fresh_input_tokens"], gateway["fresh_output_tokens"]))
         return cur.lastrowid
     finally:
         conn.close()
@@ -151,17 +236,23 @@ async def run_logged(agent: Agent, *, agent_name: str, prompt: str, deps: AgentD
     usage = RunUsage()   # PydanticAI adds to this object as the run goes, so it's accurate even after an error
     started = time.perf_counter()
     model = get_model()
+    calls: list[dict] = []
+    token = _requests.set(calls)   # the HTTP hook adds one entry per model request made during this run
     try:
         result = await agent.run(prompt, deps=deps, model=model, usage=usage, usage_limits=USAGE_LIMITS,
                                  model_settings=MODEL_SETTINGS)
     except Exception as exc:
-        _log_run(agent_name, deps.user_id, route, usage, "error", type(exc).__name__, started)
+        _log_run(agent_name, deps.user_id, route, usage, "error", type(exc).__name__, started,
+                 summarize_gateway(calls))
         raise
-    run_id = _log_run(agent_name, deps.user_id, route, usage, "ok", None, started)
+    finally:
+        _requests.reset(token)
+    gateway = summarize_gateway(calls)
+    run_id = _log_run(agent_name, deps.user_id, route, usage, "ok", None, started, gateway)
     return result.output, {
         "agent_run_id": run_id,
         "usage": {"input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens,
                   "cached_tokens": usage.cache_read_tokens, "requests": usage.requests,
-                  "tool_calls": usage.tool_calls},
+                  "tool_calls": usage.tool_calls, **gateway},
         "tool_calls": deps.gateway.calls,
     }

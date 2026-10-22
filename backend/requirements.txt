@@ -5,7 +5,7 @@
 pydantic-ai-slim[openai,mcp]==2.55.0
 fastmcp==4.1.0
 mcp==2.3.0
-openai
+openai==3.36.1   # pinned: app/agents/harness.py hooks into its HTTP client (httpx2)
 python-dotenv
 pyyaml
 fastapi==0.143.0

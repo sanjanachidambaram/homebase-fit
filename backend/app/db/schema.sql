@@ -210,7 +210,19 @@ CREATE TABLE agent_runs (
     status        TEXT NOT NULL CHECK (status IN ('ok', 'error')),
     error_type    TEXT,               -- exception class name when status = 'error'
     duration_ms   INTEGER,
-    timestamp     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    timestamp     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    -- Gateway response cache. The Portkey gateway replays a stored answer for an identical request; a
+    -- replay costs no provider tokens. Detected per model request from the response's created_at
+    -- (older than when the gateway received the request = replay); see app/agents/harness.py.
+    --   hit: every model request in this call was a replay   miss: none were   partial: some were
+    --   unknown: couldn't tell (no model HTTP traffic seen, e.g. tests; or rows logged before this column)
+    gateway_cache_status TEXT NOT NULL DEFAULT 'unknown'
+        CHECK (gateway_cache_status IN ('hit', 'miss', 'partial', 'unknown')),
+    gateway_cache_hits   INTEGER NOT NULL DEFAULT 0,   -- how many of `requests` were replays
+    -- Tokens the provider actually processed for this call (replayed requests excluded).
+    -- input_tokens/output_tokens above include replays. NULL when gateway_cache_status is 'unknown'.
+    fresh_input_tokens   INTEGER,
+    fresh_output_tokens  INTEGER
 );
 CREATE INDEX idx_agent_runs_agent_time ON agent_runs(agent_name, timestamp);
 
