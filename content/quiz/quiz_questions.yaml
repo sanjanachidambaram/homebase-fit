@@ -1,0 +1,77 @@
+# =====================================================================
+# PLACEHOLDER QUIZ: Sanjana will replace this file with the real quiz.
+# =====================================================================
+# After editing, rebuild the database from backend/:
+#   .venv\Scripts\python.exe -m app.db.seed
+#
+# Each question:
+#   id             stable key; the Onboarding Agent maps answers by this id
+#   prompt         text shown to the user
+#   type           multi_select | single_select | number
+#   options        (select types) list of {value, label}; value is what's stored
+#   exclusive      (multi_select, optional) a value that clears all others, e.g. "none"
+#   allow_free_text (optional) also show a text box under the options
+#   unit, min, max (number types, optional)
+#   required       true/false
+#
+# The injury option values (lower_back, knee, shoulder) must match the
+# injury_contraindications tags in content/exercises/*/exercises.yaml,
+# because that's how unsafe exercises get filtered out.
+
+questions:
+  - id: goals
+    prompt: What are your goals? Pick all that apply.
+    type: multi_select
+    required: true
+    options:
+      - { value: weight_loss, label: Lose weight }
+      - { value: tone,        label: Tone up }
+      - { value: strength,    label: Get stronger }
+      - { value: rehab,       label: Rehab an injury }
+
+  - id: timeline
+    prompt: What timeline are you working toward?
+    type: single_select
+    required: true
+    options:
+      - { value: 4_weeks,     label: 4 weeks }
+      - { value: 8_weeks,     label: 8 weeks }
+      - { value: 12_weeks,    label: 12 weeks }
+      - { value: no_deadline, label: No deadline, just building a habit }
+
+  - id: injuries
+    prompt: Any injuries or areas that need extra care?
+    type: multi_select
+    required: true
+    exclusive: none
+    allow_free_text: true
+    free_text_prompt: Anything else we should know? (optional)
+    options:
+      - { value: lower_back, label: Lower back }
+      - { value: knee,       label: Knee }
+      - { value: shoulder,   label: Shoulder }
+      - { value: none,       label: None }
+
+  - id: age
+    prompt: How old are you?
+    type: number
+    unit: years
+    min: 13
+    max: 100
+    required: true
+
+  - id: weight
+    prompt: What is your current weight?
+    type: number
+    unit: lb
+    min: 60
+    max: 700
+    required: true
+
+  - id: height
+    prompt: How tall are you?
+    type: number
+    unit: in
+    min: 48
+    max: 90
+    required: true

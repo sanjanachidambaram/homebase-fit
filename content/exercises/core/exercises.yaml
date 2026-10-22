@@ -1,0 +1,44 @@
+# PLACEHOLDER exercises: PT TO REVIEW names, instructions, and contraindications.
+# id: lowercase_with_underscores; demo media in this folder is named <id>.gif/.mp4/.jpg/.png
+# equipment_needed: list from none | mat | dumbbells | resistance_band | chair | bench
+# difficulty: beginner | intermediate | advanced
+# injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder).
+#   The app filters these out in code, so be conservative.
+# est_time_seconds: rough time for one set including setup
+
+exercises:
+  - id: dead_bug
+    name: Dead Bug
+    equipment_needed: [mat]
+    difficulty: beginner
+    injury_contraindications: []
+    est_time_seconds: 60
+    instructions: Lie on your back with arms up and knees bent at 90 degrees. Press your low back into the floor and slowly extend the opposite arm and leg, then switch.
+  - id: forearm_plank
+    name: Forearm Plank
+    equipment_needed: [mat]
+    difficulty: beginner
+    injury_contraindications: [shoulder]
+    est_time_seconds: 45
+    instructions: Forearms on the floor under your shoulders, body in a straight line from head to heels. Brace your core and hold.
+  - id: cat_cow
+    name: Cat-Cow
+    equipment_needed: [mat]
+    difficulty: beginner
+    injury_contraindications: []
+    est_time_seconds: 45
+    instructions: On hands and knees, slowly round your back toward the ceiling, then let it sag gently while lifting your chest. Move with your breath.
+  - id: pelvic_tilt
+    name: Pelvic Tilt
+    equipment_needed: [mat]
+    difficulty: beginner
+    injury_contraindications: []
+    est_time_seconds: 45
+    instructions: Lie on your back with knees bent. Gently flatten your low back into the floor by tilting your pelvis, hold for a breath, and release.
+  - id: crunch
+    name: Crunch
+    equipment_needed: [mat]
+    difficulty: beginner
+    injury_contraindications: [lower_back]
+    est_time_seconds: 45
+    instructions: Lie on your back with knees bent and curl your shoulders off the floor, then lower with control.

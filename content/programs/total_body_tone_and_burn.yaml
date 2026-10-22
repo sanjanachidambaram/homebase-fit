@@ -1,0 +1,34 @@
+# PLACEHOLDER PROGRAM: PT TO REPLACE the rationale and review every exercise.
+# See back_friendly_fat_loss.yaml for what each field means.
+
+name: Total-Body Tone & Burn
+goal_tags: [weight_loss, tone]
+injury_focus: []
+created_by: placeholder
+description: >
+  Bodyweight circuits three days a week. Short rests keep your heart rate
+  up while every major muscle group gets worked each session.
+science_rationale: >
+  PT TO REPLACE. Placeholder text: full-body circuit training combines
+  strength work with elevated heart rate, which supports both muscle tone
+  and calorie burn.
+
+schedule:
+  mon:
+    - { exercise: jumping_jacks,    sets: 3, reps: "45s" }
+    - { exercise: bodyweight_squat, sets: 3, reps: "15" }
+    - { exercise: knee_pushup,      sets: 3, reps: "10" }
+    - { exercise: mountain_climber, sets: 3, reps: "30s" }
+    - { exercise: forearm_plank,    sets: 3, reps: "30s" }
+  wed:
+    - { exercise: step_jacks,       sets: 3, reps: "45s" }
+    - { exercise: reverse_lunge,    sets: 3, reps: "10 each side" }
+    - { exercise: superman_hold,    sets: 3, reps: "20s" }
+    - { exercise: crunch,           sets: 3, reps: "15" }
+    - { exercise: glute_bridge,     sets: 3, reps: "15" }
+  fri:
+    - { exercise: burpee,           sets: 3, reps: "8" }
+    - { exercise: squat_to_press,   sets: 3, reps: "10" }
+    - { exercise: incline_pushup,   sets: 3, reps: "12" }
+    - { exercise: dead_bug,         sets: 3, reps: "10 each side" }
+    - { exercise: march_in_place,   sets: 3, reps: "60s" }

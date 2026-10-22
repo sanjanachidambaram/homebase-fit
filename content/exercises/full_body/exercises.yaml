@@ -1,0 +1,51 @@
+# PLACEHOLDER exercises: PT TO REVIEW names, instructions, and contraindications.
+# id: lowercase_with_underscores; demo media in this folder is named <id>.gif/.mp4/.jpg/.png
+# equipment_needed: list from none | mat | dumbbells | resistance_band | chair | bench
+# difficulty: beginner | intermediate | advanced
+# injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder).
+#   The app filters these out in code, so be conservative.
+# est_time_seconds: rough time for one set including setup
+
+exercises:
+  - id: march_in_place
+    name: March in Place
+    equipment_needed: [none]
+    difficulty: beginner
+    injury_contraindications: []
+    est_time_seconds: 60
+    instructions: March in place, lifting your knees to a comfortable height and swinging your arms. Speed up for more intensity.
+  - id: jumping_jacks
+    name: Jumping Jacks
+    equipment_needed: [none]
+    difficulty: beginner
+    injury_contraindications: [knee]
+    est_time_seconds: 45
+    instructions: Jump your feet out while raising your arms overhead, then jump back to the start.
+  - id: step_jacks
+    name: Step Jacks (Low Impact)
+    equipment_needed: [none]
+    difficulty: beginner
+    injury_contraindications: []
+    est_time_seconds: 45
+    instructions: Step one foot out to the side while raising both arms overhead, return, and alternate sides.
+  - id: mountain_climber
+    name: Mountain Climber
+    equipment_needed: [mat]
+    difficulty: intermediate
+    injury_contraindications: [shoulder, lower_back]
+    est_time_seconds: 45
+    instructions: From a high plank, drive your knees toward your chest one at a time at a steady pace.
+  - id: burpee
+    name: Burpee
+    equipment_needed: [none]
+    difficulty: advanced
+    injury_contraindications: [knee, lower_back, shoulder]
+    est_time_seconds: 60
+    instructions: Squat down, jump or step your feet back to a plank, return your feet, and stand or jump up.
+  - id: squat_to_press
+    name: Dumbbell Squat to Press
+    equipment_needed: [dumbbells]
+    difficulty: intermediate
+    injury_contraindications: [knee, shoulder]
+    est_time_seconds: 60
+    instructions: Hold dumbbells at your shoulders, squat down, then stand and press them overhead in one motion.

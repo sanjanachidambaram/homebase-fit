@@ -1,0 +1,51 @@
+# PLACEHOLDER exercises: PT TO REVIEW names, instructions, and contraindications.
+# id: lowercase_with_underscores; demo media in this folder is named <id>.gif/.mp4/.jpg/.png
+# equipment_needed: list from none | mat | dumbbells | resistance_band | chair | bench
+# difficulty: beginner | intermediate | advanced
+# injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder).
+#   The app filters these out in code, so be conservative.
+# est_time_seconds: rough time for one set including setup
+
+exercises:
+  - id: bodyweight_squat
+    name: Bodyweight Squat
+    equipment_needed: [none]
+    difficulty: beginner
+    injury_contraindications: [knee]
+    est_time_seconds: 45
+    instructions: Feet shoulder-width apart, sit hips back and down until thighs are near parallel, then stand up through your heels.
+  - id: reverse_lunge
+    name: Reverse Lunge
+    equipment_needed: [none]
+    difficulty: beginner
+    injury_contraindications: [knee]
+    est_time_seconds: 60
+    instructions: Step one foot back and lower until both knees are bent about 90 degrees, then push through the front heel to return. Alternate sides.
+  - id: glute_bridge
+    name: Glute Bridge
+    equipment_needed: [mat]
+    difficulty: beginner
+    injury_contraindications: []
+    est_time_seconds: 45
+    instructions: Lie on your back with knees bent and feet flat. Squeeze your glutes to lift your hips until your body forms a straight line from shoulders to knees, then lower slowly.
+  - id: wall_sit
+    name: Wall Sit
+    equipment_needed: [none]
+    difficulty: beginner
+    injury_contraindications: [knee]
+    est_time_seconds: 45
+    instructions: Slide down a wall until your knees are bent about 90 degrees and hold, keeping your back flat against the wall.
+  - id: side_lying_leg_raise
+    name: Side-Lying Leg Raise
+    equipment_needed: [mat]
+    difficulty: beginner
+    injury_contraindications: []
+    est_time_seconds: 60
+    instructions: Lie on your side with legs straight. Lift the top leg about 45 degrees without rolling your hips back, then lower with control.
+  - id: goblet_squat
+    name: Dumbbell Goblet Squat
+    equipment_needed: [dumbbells]
+    difficulty: intermediate
+    injury_contraindications: [knee, lower_back]
+    est_time_seconds: 60
+    instructions: Hold one dumbbell at your chest, squat down keeping your chest tall and elbows inside your knees, then stand.

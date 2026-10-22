@@ -1,0 +1,36 @@
+# PLACEHOLDER PROGRAM: PT TO REPLACE the rationale and review every exercise.
+# See back_friendly_fat_loss.yaml for what each field means.
+
+name: Home Strength Foundations
+goal_tags: [strength, tone]
+injury_focus: []
+created_by: placeholder
+description: >
+  A beginner upper/lower split for a basic home setup (dumbbells and a band).
+  Four days a week with a rest day between hard sessions.
+science_rationale: >
+  PT TO REPLACE. Placeholder text: training each muscle group about twice a
+  week with progressive overload is a standard approach for building
+  strength as a beginner.
+
+schedule:
+  mon:
+    - { exercise: goblet_squat,           sets: 3, reps: "10" }
+    - { exercise: reverse_lunge,          sets: 3, reps: "8 each side" }
+    - { exercise: glute_bridge,           sets: 3, reps: "12" }
+    - { exercise: forearm_plank,          sets: 3, reps: "30s" }
+  tue:
+    - { exercise: knee_pushup,            sets: 3, reps: "10" }
+    - { exercise: dumbbell_bent_over_row, sets: 3, reps: "10" }
+    - { exercise: dumbbell_bicep_curl,    sets: 3, reps: "12" }
+    - { exercise: chair_triceps_dip,      sets: 3, reps: "10" }
+  thu:
+    - { exercise: bodyweight_squat,       sets: 3, reps: "15" }
+    - { exercise: wall_sit,               sets: 3, reps: "45s" }
+    - { exercise: side_lying_leg_raise,   sets: 3, reps: "12 each side" }
+    - { exercise: dead_bug,               sets: 3, reps: "10 each side" }
+  fri:
+    - { exercise: incline_pushup,         sets: 3, reps: "12" }
+    - { exercise: band_seated_row,        sets: 3, reps: "12" }
+    - { exercise: band_biceps_curl,       sets: 3, reps: "15" }
+    - { exercise: band_pull_apart,        sets: 3, reps: "15" }
