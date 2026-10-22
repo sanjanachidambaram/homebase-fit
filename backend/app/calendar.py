@@ -394,3 +394,20 @@ def revert_custom(entry_id: int, uid: int = Depends(signed_in)) -> dict:
     finally:
         conn.close()
     return {"entry": entry_dict(row)}
+
+
+def custom_day_items(uid: int, entry_id: int) -> list[dict]:
+    """The exercises of a day the user built (for the Workout Reviewer). 404 if it isn't theirs, 409 if it's a
+    generated day: reviews are for workouts people build themselves."""
+    conn = connect()
+    try:
+        entry = conn.execute("SELECT * FROM calendar_entries WHERE id = ? AND user_id = ?", (entry_id, uid)).fetchone()
+    finally:
+        conn.close()
+    if entry is None:
+        raise HTTPException(404, "Calendar day not found.")
+    if entry["source"] != "custom":
+        raise HTTPException(409, "Reviews are for workouts you build yourself. Build your own for this day first.")
+    return [{"exercise_id": x["exercise_id"], "est_minutes": x["est_minutes"]}
+            for x in json.loads(entry["workout_content"])["exercises"]]
+

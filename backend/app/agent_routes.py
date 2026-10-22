@@ -4,6 +4,8 @@
   POST /api/programs/recommend   the plan + the Program Architect's explanation
   POST /api/workouts/build       Workout Builder
   POST /api/calendar/{id}/custom Workout Builder, saved onto that calendar day (app/calendar.py has the rules)
+  POST /api/workouts/review      Workout Reviewer: a Build Your Own session (the review itself is computed by code)
+  POST /api/calendar/{id}/review Workout Reviewer: a custom calendar day
   GET  /api/coach/summary        Coach (dashboard load)
   POST /api/basics/ask           Fitness Basics (red-flag pre-filter runs first)
 
@@ -18,15 +20,16 @@ Every agent call is logged to agent_runs with measured token counts (app/agents/
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior, UsageLimitExceeded
 
 from app import calendar
-from app.agents import basics, coach, program_architect, workout_builder
+from app.agents import basics, coach, program_architect, workout_builder, workout_reviewer
 from app.agents.harness import AgentUnavailable
 from app.db import connect
 from app.safety_rules import CLINICAL_REVIEW_NO_AI, CLINICAL_REVIEW_PAGE, profile_needs_clinical_review
 from app.security import token_user_id
+from app.services import workout_review
 from app.services.program_generator import NoProfile, generate_for_user
 
 router = APIRouter(prefix="/api")
@@ -99,6 +102,50 @@ async def build_custom_day(entry_id: int, body: workout_builder.WorkoutRequest,
     out = await _run(workout_builder.build_workout(uid, body, route="POST /api/calendar/{id}/custom"))
     entry = calendar.apply_custom(uid, entry_id, out["result"], body.model_dump())
     return {**out, "entry": entry}
+
+
+class ReviewRequest(BaseModel):
+    """A Build Your Own session to review: just what was planned. Names, muscle groups, directions and times
+    come from the database; nothing else the client sends is trusted (and extra fields are rejected)."""
+    model_config = {"extra": "forbid"}
+    items: list[workout_builder.PlannedItem] = Field(min_length=1, max_length=workout_builder.MAX_TOTAL)
+
+
+def _review_items(items: list[workout_builder.PlannedItem]) -> list[dict]:
+    conn = connect()
+    try:
+        ids = [i.exercise_id for i in items]
+        secs = dict(conn.execute(f"SELECT id, est_time_seconds FROM exercises WHERE id IN "
+                                 f"({','.join('?' for _ in ids)})", ids).fetchall())
+    finally:
+        conn.close()
+    unknown = sorted(set(ids) - set(secs))
+    if unknown:
+        raise HTTPException(422, f"Unknown exercise id(s): {unknown}.")
+    return [{"exercise_id": i.exercise_id,
+             "est_minutes": workout_builder.item_seconds(i, secs[i.exercise_id]) / 60} for i in items]
+
+
+@router.post("/workouts/review")
+async def review_workout(body: ReviewRequest, uid: int = Depends(no_ai_for_clinical_review)) -> dict:
+    review = workout_review.review(uid, _review_items(body.items))     # code: coverage + estimate
+    return await _run_review(uid, review, "POST /api/workouts/review")
+
+
+@router.post("/calendar/{entry_id}/review")
+async def review_calendar_day(entry_id: int, uid: int = Depends(no_ai_for_clinical_review)) -> dict:
+    review = workout_review.review(uid, calendar.custom_day_items(uid, entry_id))
+    return await _run_review(uid, review, "POST /api/calendar/{id}/review")
+
+
+async def _run_review(uid: int, review: dict, route: str) -> dict:
+    try:
+        out, meta = await workout_reviewer.narrate(uid, review, route)
+    except AgentUnavailable as e:
+        raise HTTPException(503, str(e)) from e
+    except (UsageLimitExceeded, UnexpectedModelBehavior, ModelHTTPError) as e:
+        raise HTTPException(502, AI_FAILED) from e
+    return {"result": out, "meta": meta}
 
 
 @router.get("/coach/summary")

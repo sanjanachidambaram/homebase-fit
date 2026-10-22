@@ -2293,3 +2293,80 @@ fieldset.question {
   font-size: 0.78rem;
   line-height: 1.35;
 }
+
+/* Workout Reviewer */
+.workout-review {
+  margin-top: 1rem;
+}
+
+.review-panel {
+  padding: 1rem 1.1rem;
+  border-radius: 20px;
+  background: var(--lavender-tint);
+}
+
+.review-panel h4 {
+  margin: 1rem 0 0.4rem;
+}
+
+.review-summary {
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+
+.chip-hit {
+  background: var(--mint-tint);
+}
+
+.chip-missing {
+  background: #fff;
+  border: 2px dashed var(--lavender-deep);
+}
+
+.estimate-list {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+}
+
+.estimate-list dt {
+  font-weight: 700;
+  margin-top: 0.4rem;
+}
+
+.estimate-list dd {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.estimate-label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.caveat-list {
+  margin: 0.6rem 0;
+  padding-left: 1.2rem;
+  font-size: 0.9rem;
+}
+
+.caveat-list li {
+  margin: 0.2rem 0;
+}
+
+.method summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.method p,
+.review-sources {
+  font-size: 0.88rem;
+}
+
+.review-sources a {
+  color: var(--ink);
+  font-weight: 700;
+}

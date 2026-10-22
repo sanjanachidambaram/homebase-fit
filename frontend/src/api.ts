@@ -486,3 +486,46 @@ export const overrideCalendarDay = (token: string, id: number, body: WorkoutRequ
 /** Undo a custom day: the planned (generated) workout comes back. No AI involved. */
 export const revertCalendarDay = (token: string, id: number) =>
   request<{ entry: CalendarEntry }>(`/api/calendar/${id}/custom`, { method: 'DELETE' }, token)
+
+// ---------------------------------------------------------------- Workout Reviewer
+
+/** A review computed by code (coverage + a Compendium-based estimate range); `summary` is the AI's narration of
+ *  it, or a plain code-written one (`summary_by: 'code'`) if the AI's draft used a number the code didn't give. */
+export interface WorkoutReview {
+  exercises: { name: string; muscle_group: MuscleGroup; force: 'push' | 'pull' | 'static' | null }[]
+  coverage: {
+    groups_hit: { group: MuscleGroup; exercises: number }[]
+    groups_missing: MuscleGroup[]
+    upper_body_balance: { push: number; pull: number; static: number; unclassified: number; note: string }
+    notes: string[]
+  }
+  estimate:
+    | { available: false; reason: string }
+    | {
+        available: true
+        session_minutes: number
+        per_session_kcal: { low: number; high: number }
+        sessions_per_week: number | null
+        weekly_kcal: { low: number; high: number } | null
+        weight_change: {
+          weeks: number
+          pounds: { low: number; high: number }
+          label: string
+          cdc_context: string
+        } | null
+        method: { formula: string; low: { met: number; code: string; activity: string }; high: { met: number; code: string; activity: string } }
+        caveats: string[]
+      }
+  citations: { id: string; name: string; url: string | null }[]
+  summary: string
+  summary_by: 'model' | 'code'
+}
+
+export const reviewWorkout = (
+  token: string,
+  items: { exercise_id: string; sets: number; reps: string; rest_seconds: number }[],
+) =>
+  request<AgentResponse<WorkoutReview>>('/api/workouts/review', { method: 'POST', body: JSON.stringify({ items }) }, token)
+
+export const reviewCalendarDay = (token: string, id: number) =>
+  request<AgentResponse<WorkoutReview>>(`/api/calendar/${id}/review`, { method: 'POST' }, token)

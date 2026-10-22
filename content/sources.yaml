@@ -56,7 +56,7 @@ sources:
     name: "CDC: Losing Weight"
     url: https://www.cdc.gov/healthy-weight-growth/losing-weight/index.html
     license: U.S. government work (public domain)
-    used_for: The quiz note that losing about 1 to 2 pounds a week is more sustainable
+    used_for: The quiz note that losing about 1 to 2 pounds a week is more sustainable, and the same context next to the Workout Reviewer's weight-change estimate
     status: active
 
   - id: acog-co-804
@@ -64,4 +64,11 @@ sources:
     url: https://www.acog.org/clinical/clinical-guidance/committee-opinion/articles/2020/04/physical-activity-and-exercise-during-pregnancy-and-the-postpartum-period
     license: Cited by link only (American College of Obstetricians and Gynecologists; Obstet Gynecol 2020;135:e178-e188)
     used_for: Why pregnant and postpartum users are sent to their own clinician instead of a generated plan (the pregnancy support page)
+    status: active
+
+  - id: compendium-physical-activities
+    name: "2024 Adult Compendium of Physical Activities (Herrmann SD et al., J Sport Health Sci 2024;13(1):6-12)"
+    url: https://pacompendium.com/conditioning-exercise/
+    license: Cited by link (published MET values; DOI 10.1016/j.jshs.2023.10.010)
+    used_for: "The Workout Reviewer's calorie estimate range: MET 3.5 (code 02054, resistance training, 8-15 reps) to MET 7.5 (code 02020, vigorous calisthenics), with 1 MET = about 1 kcal per kg per hour"
     status: active

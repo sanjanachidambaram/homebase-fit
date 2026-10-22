@@ -5,6 +5,7 @@ import { useId, useState, type FormEvent } from 'react'
 import {
   buildWorkout,
   MUSCLE_GROUP_LABELS,
+  reviewWorkout,
   type MuscleGroup,
   type WorkoutRequest,
   type WorkoutSession,
@@ -12,6 +13,7 @@ import {
 import { agentError } from '../../agentCalls'
 import { useFavorites } from '../../favorites'
 import ExerciseDetail from '../ExerciseDetail'
+import ReviewWorkout from '../WorkoutReview'
 import Loading from './Loading'
 
 const MAX_PER_GROUP = 6
@@ -190,6 +192,16 @@ export default function WorkoutBuilder({
               {n}
             </p>
           ))}
+          {/* key: a new session gets a fresh review button */}
+          <ReviewWorkout
+            key={session.exercises.map((x) => x.exercise_id).join(',')}
+            load={() =>
+              reviewWorkout(
+                token,
+                session.exercises.map(({ exercise_id, sets, reps, rest_seconds }) => ({ exercise_id, sets, reps, rest_seconds })),
+              )
+            }
+          />
         </div>
       )}
 

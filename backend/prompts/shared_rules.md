@@ -148,3 +148,26 @@ one row per goal x experience level, PT-reviewable); the generator never invents
 
 **Enforced in code and tested:** `tests/test_program_generator.py` (blending, days, the injury filter during
 generation, equipment, pregnancy), `tests/test_plan_agent.py` (the agent's inputs, claims, and logging).
+
+## 7. Numbers come from code (the Workout Reviewer, and any agent that narrates a calculation)
+
+- The Workout Reviewer reviews a session someone built (Build Your Own, or a custom calendar day). Code computes
+  everything: muscle-group coverage, push/pull balance (exercises.force), and the outcome estimate
+  (`app/services/workout_review.py`). The agent only puts that result into words.
+- **The model never produces a number.** Every number in its reply must appear in the data code gave it,
+  written the same way. It may not compute, round, convert, add, or turn a range into a single figure.
+- Estimates are always ranges, rounded outward, never a single number. Calories come from MET values in the
+  2024 Adult Compendium of Physical Activities (1 MET = about 1 kcal per kg per hour; MET 3.5, code 02054, to
+  MET 7.5, code 02020). Pounds appear only for people with a weight-loss goal, use the 3,500-calories-per-pound
+  rule of thumb, and are always labelled "a rough, long-used approximation, not a precise prediction", with the
+  caveat that exercise alone is usually a small piece of weight change compared with eating. Sources: the
+  Compendium and the CDC pace guidance, both in `/api/sources`.
+- Same privacy as every agent (rule 2): the model gets the computed review only, never the user's id, email,
+  weight, or any free text. Pregnant / postpartum users get a 403 before anything is computed or sent.
+
+**Enforced in code:** `app/agents/workout_reviewer.py` extracts every number in the reply and compares it with the
+numbers in the model's input. Any number that isn't there sends the draft back; after two tries, and once more as
+a final check before returning, the reply is replaced by a plain summary written by code. A tone guard like the
+Coach's applies (no shaming, guilt or food talk; it allows "calories" and "pounds", which the estimate needs), plus
+no promises ("you will lose..."). Tests: `tests/test_workout_review.py`.
+

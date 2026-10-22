@@ -21,6 +21,7 @@ import {
   isSignInGone,
   MUSCLE_GROUP_LABELS,
   overrideCalendarDay,
+  reviewCalendarDay,
   revertCalendarDay,
   updateCalendarDay,
   type CalendarEntry,
@@ -29,6 +30,7 @@ import {
 import AccountForm from '../components/AccountForm'
 import ClinicalSupportCard from '../components/ClinicalSupport'
 import WorkoutBuilder from '../components/dashboard/WorkoutBuilder'
+import ReviewWorkout from '../components/WorkoutReview'
 import Link from '../components/Link'
 import { setSession, useSession, type Session } from '../session'
 
@@ -58,6 +60,7 @@ function DayCard({
   onChange,
   onBuild,
   onRevert,
+  onReview,
 }: {
   entry: CalendarEntry
   busy: boolean
@@ -65,6 +68,7 @@ function DayCard({
   onChange: (id: number, change: { notes?: string | null; completed?: boolean }) => Promise<boolean>
   onBuild: (entry: CalendarEntry) => void
   onRevert: (id: number) => void
+  onReview: (entry: CalendarEntry) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: entry.id,
@@ -140,6 +144,13 @@ function DayCard({
         <p className="rest-text">Rest and recover. Your muscles get stronger on days like this.</p>
       )}
 
+      {entry.source === 'custom' && (
+        <div className="day-custom-actions">
+          <button type="button" className="btn-ghost btn-small" disabled={busy} onClick={() => onReview(entry)}>
+            Review this workout
+          </button>
+        </div>
+      )}
       {entry.can_override && (
         <div className="day-custom-actions">
           <button type="button" className="btn-ghost btn-small" disabled={busy} onClick={() => onBuild(entry)}>
@@ -195,6 +206,39 @@ function DayCell({ date, isToday, children }: { date: string; isToday: boolean; 
       </h3>
       {children}
     </section>
+  )
+}
+
+/** A modal with the Workout Reviewer for one custom day. */
+function ReviewDayModal({ entry, token, onClose }: { entry: CalendarEntry; token: string; onClose: () => void }) {
+  const closeRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null
+    closeRef.current?.focus()
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = previousOverflow
+      opener?.focus()
+    }
+  }, [onClose])
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="review-day-title" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2 id="review-day-title">
+            Review: {dayName(entry.date)} {shortDate(entry.date)}
+          </h2>
+          <button ref={closeRef} type="button" className="btn-secondary" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <ReviewWorkout load={() => reviewCalendarDay(token, entry.id)} />
+      </div>
+    </div>
   )
 }
 
@@ -270,6 +314,8 @@ function Calendar({ session }: { session: Session }) {
   const [busyId, setBusyId] = useState<number | null>(null)
   const [support, setSupport] = useState<Record<number, string>>({})
   const [buildingFor, setBuildingFor] = useState<CalendarEntry | null>(null)
+  const [reviewingFor, setReviewingFor] = useState<CalendarEntry | null>(null)
+  const closeReview = useCallback(() => setReviewingFor(null), [])
   const [notice, setNotice] = useState<string | null>(null)
   const weekEnd = addDays(weekStart, 6)
   const closeBuilder = useCallback(() => setBuildingFor(null), [])
@@ -420,6 +466,7 @@ function Calendar({ session }: { session: Session }) {
                           setBuildingFor(x)
                         }}
                         onRevert={revert}
+                        onReview={setReviewingFor}
                       />
                     ) : (
                       <p className="hint day-empty">Nothing planned</p>
@@ -429,6 +476,9 @@ function Calendar({ session }: { session: Session }) {
               })}
             </div>
           </DndContext>
+          {reviewingFor && (
+            <ReviewDayModal key={reviewingFor.id} entry={reviewingFor} token={session.token} onClose={closeReview} />
+          )}
           {buildingFor && (
             <BuildDayModal
               key={buildingFor.id}
