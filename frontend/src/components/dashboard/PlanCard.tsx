@@ -63,6 +63,9 @@ export default function PlanCard({ token, userId }: { token: string; userId: num
             <Link to="/content" className="btn">
               Open my full plan
             </Link>
+            <Link to="/how-we-build" className="btn-ghost">
+              See how we built this
+            </Link>
           </div>
         </>
       )}

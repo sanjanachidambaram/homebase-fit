@@ -256,3 +256,42 @@ def test_seed_rejects_a_missing_protocol(tmp_path, monkeypatch):
     errors: list[str] = []
     seed.seed_goal_protocols(conn, {"placeholder-authored"}, errors)
     assert errors and "missing protocols" in errors[0] and "strength/advanced" in errors[0]
+
+
+# ---------------------------------------------------------------- the public worked example
+
+def test_worked_example_is_a_live_run_of_the_generator(client, search_spy):
+    r = client.get("/api/plan/example")                       # public: no sign-in needed
+    assert r.status_code == 200
+    ex = r.json()
+    assert ex["profile"] == gen.EXAMPLE_PROFILE
+    assert ex["profile"]["age"] == 45 and ex["profile"]["injury_flags"] == ["lower_back"]
+    assert ex["profile"]["equipment"] == ["resistance_band"] and ex["profile"]["experience_level"] == "beginner"
+    assert ex["plan"] == generate(gen.EXAMPLE_PROFILE).model_dump()      # not hand-written: same as the generator
+    assert ex["plan"]["safety"]["checked_only"] is True
+    assert any(d["kind"] == "rest" for d in ex["plan"]["days"])
+    picks = [c for c in search_spy if c.get("muscle_group")]   # the generator's picks (not the funnel's counts)
+    assert picks and all(c["checked_only"] is True for c in picks)    # the strict filter ran for the example too
+
+
+def test_worked_example_funnel_matches_the_filter(client):
+    from app.mcp_server.search import search_exercises
+    funnel = client.get("/api/plan/example").json()["funnel"]
+    counts = [s["exercises_left"] for s in funnel]
+    assert counts == sorted(counts, reverse=True) and counts[0] == 903
+    flags, eq = ["lower_back"], gen.available_equipment(["resistance_band"])
+    assert counts[1] == search_exercises(limit=1, injury_flags=flags)["total_matching"]
+    assert counts[2] == search_exercises(limit=1, injury_flags=flags, checked_only=True)["total_matching"]
+    assert counts[3] == search_exercises(limit=1, injury_flags=flags, checked_only=True, equipment=eq)["total_matching"]
+    assert all(s["removed"] == a["exercises_left"] - s["exercises_left"] for a, s in zip(funnel, funnel[1:]))
+
+
+def test_worked_example_follows_changes_in_the_data(client):
+    before = client.get("/api/plan/example").json()["funnel"][1]["removed"]
+    conn = sqlite3.connect(config.WORKING_DB)
+    with conn:   # a PT tags one more exercise as unsafe for lower backs
+        conn.execute("UPDATE exercises SET injury_contraindications = '[\"lower_back\"]' WHERE id = 'band_pull_apart'")
+    conn.close()
+    after = client.get("/api/plan/example").json()
+    assert after["funnel"][1]["removed"] == before + 1
+    assert "band_pull_apart" not in {e["exercise_id"] for d in after["plan"]["days"] for e in d["exercises"]}

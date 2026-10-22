@@ -31,6 +31,9 @@ function YourPlan({ session }: { session: Session }) {
   return (
     <div className="dash-card">
       <WeeklyPlanView plan={plan} />
+      <p>
+        <Link to="/how-we-build">See how we built this</Link>
+      </p>
     </div>
   )
 }

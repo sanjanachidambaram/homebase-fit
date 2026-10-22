@@ -1667,3 +1667,123 @@ fieldset.question {
 .weekly-plan .chip {
   text-transform: none;
 }
+
+/* ================================================================ How We Build Your Plan */
+
+.build-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem;
+  display: grid;
+  gap: 0.9rem;
+  max-width: 860px;
+}
+
+.build-step {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  background: #fff;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow);
+  padding: 1rem 1.25rem;
+}
+
+.build-step h3 {
+  margin: 0.15rem 0 0.35rem;
+  font-size: 1.2rem;
+}
+
+.build-step p {
+  margin: 0;
+}
+
+.step-num {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.4rem;
+  height: 2.4rem;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--pink);
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.example {
+  background: #fff;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow);
+  padding: 1.25rem 1.4rem;
+  border-top: 8px solid var(--mint);
+}
+
+.example-live {
+  margin-top: 0;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-input);
+  background: var(--mint-tint);
+  font-weight: 700;
+}
+
+.example .chip {
+  text-transform: none;
+}
+
+.example-step {
+  margin-top: 1.4rem;
+}
+
+.example-step h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+}
+
+.example-step h4 .step-num {
+  font-size: 0.95rem;
+  height: 2rem;
+  min-width: 2rem;
+}
+
+.funnel {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.funnel-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.funnel-removed {
+  color: var(--error);
+  font-weight: 700;
+}
+
+.funnel-bar {
+  height: 14px;
+  margin-top: 0.25rem;
+  border-radius: var(--radius-pill);
+  background: var(--lavender-tint);
+  overflow: hidden;
+}
+
+.funnel-bar span {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--pink), var(--lavender));
+}
+
+.example-notes li {
+  margin-bottom: 0.3rem;
+}

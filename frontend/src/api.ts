@@ -310,3 +310,22 @@ export const fetchCoach = (token: string) => request<AgentResponse<CoachMessage>
 
 export const askBasics = (token: string, question: string) =>
   request<AgentResponse<BasicsAnswer>>('/api/basics/ask', { method: 'POST', body: JSON.stringify({ question }) }, token)
+
+// ---------------------------------------------------------------- the public "How We Build Your Plan" example
+
+export interface PlanExample {
+  profile: {
+    age: number
+    goals: string[]
+    experience_level: string
+    injury_flags: string[]
+    equipment: string[]
+    days_available: number
+    session_length_minutes: number
+  }
+  funnel: { step: string; exercises_left: number; removed: number }[]
+  plan: WeeklyProgram
+}
+
+/** A live run of the real generator for a fixed profile (public, no sign-in, no AI). */
+export const fetchPlanExample = () => getJson<PlanExample>('/api/plan/example')

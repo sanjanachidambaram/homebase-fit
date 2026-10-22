@@ -418,3 +418,60 @@ def generate_for_user(user_id: int) -> WeeklyProgram:
     for col in ("goals", "injury_flags", "equipment"):
         profile[col] = json.loads(profile[col] or "[]")
     return generate(profile)
+
+
+# ---------------------------------------------------------------- the public worked example
+#
+# The "How We Build Your Plan" page shows a real run of generate() for this fixed profile, so the example
+# can never drift from the algorithm. Nothing here is hand-written output.
+
+EXAMPLE_PROFILE = {
+    "age": 45,                               # shown on the page; the generator doesn't use age
+    "goals": ["general_health"],
+    "experience_level": "beginner",
+    "injury_flags": ["lower_back"],
+    "equipment": ["resistance_band"],        # resistance bands only
+    "days_available": 3,
+    "session_length_minutes": 30,
+    "other_activity_days": 0,
+    "pregnancy_status": "none",
+}
+
+
+class FilterStep(BaseModel):
+    step: str
+    exercises_left: int
+    removed: int
+
+
+class PlanExample(BaseModel):
+    profile: dict
+    funnel: list[FilterStep]
+    plan: WeeklyProgram
+
+
+def filter_funnel(profile: dict) -> list[FilterStep]:
+    """How many exercises in the whole library survive each safety/equipment filter, in the order the page
+    explains them. Counted live with the same search_exercises() the generator uses."""
+    flags = sorted(set(profile.get("injury_flags") or []))
+    equipment = available_equipment(profile.get("equipment") or ["bodyweight"])
+    stages = [("The whole exercise library", {})]
+    if flags:
+        stages += [
+            ("Remove exercises tagged unsafe for " + ", ".join(f.replace("_", " ") for f in flags),
+             {"injury_flags": flags}),
+            ("Remove exercises nobody has checked for injuries yet",
+             {"injury_flags": flags, "checked_only": checked_only_for(flags)}),
+        ]
+    stages.append(("Keep only what your equipment allows",
+                   {"injury_flags": flags, "checked_only": checked_only_for(flags), "equipment": equipment}))
+    steps, previous = [], None
+    for label, kwargs in stages:
+        left = search_exercises(limit=1, **kwargs)["total_matching"]
+        steps.append(FilterStep(step=label, exercises_left=left, removed=0 if previous is None else previous - left))
+        previous = left
+    return steps
+
+
+def worked_example() -> PlanExample:
+    return PlanExample(profile=EXAMPLE_PROFILE, funnel=filter_funnel(EXAMPLE_PROFILE), plan=generate(EXAMPLE_PROFILE))

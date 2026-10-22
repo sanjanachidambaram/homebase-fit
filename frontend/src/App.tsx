@@ -6,6 +6,7 @@ import BuildPage from './pages/BuildPage'
 import ContentPage from './pages/ContentPage'
 import DashboardPage from './pages/DashboardPage'
 import ExercisesPage from './pages/ExercisesPage'
+import HowWeBuildPage from './pages/HowWeBuildPage'
 import LegalPage from './pages/LegalPage'
 import QuizPage from './pages/QuizPage'
 import SettingsPage from './pages/SettingsPage'
@@ -21,6 +22,7 @@ const PAGES: Record<string, () => JSX.Element> = {
   '/settings': SettingsPage,
   '/quiz': QuizPage, // reached from the dashboard and sign-up, not the nav
   '/legal': LegalPage, // linked from the footer on every page
+  '/how-we-build': HowWeBuildPage, // public; linked from the plan on the Dashboard and Your Plan page
 }
 
 // Only pages that exist get a nav link (no Calendar yet).

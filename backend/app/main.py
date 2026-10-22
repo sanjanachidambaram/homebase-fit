@@ -17,6 +17,7 @@ from app.content import media_url, review_info
 from app.db import connect, ensure_working_db, table_counts
 from app.agent_routes import router as agent_router
 from app.exercises import router as exercises_router
+from app.services.program_generator import worked_example
 from app.users import router as users_router
 
 
@@ -61,6 +62,13 @@ def list_sources() -> list[dict]:
     finally:
         conn.close()
     return [dict(r) for r in rows]
+
+
+@app.get("/api/plan/example")
+def plan_example() -> dict:
+    """Public: the worked example on the "How We Build Your Plan" page. A live run of the real generator
+    for a fixed profile (no user data, no AI), so the example always matches the current algorithm."""
+    return worked_example().model_dump()
 
 
 @app.get("/api/basics")
