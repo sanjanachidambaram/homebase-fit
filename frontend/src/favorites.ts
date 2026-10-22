@@ -1,6 +1,6 @@
 // The signed-in user's favorited ("faved") exercises, shared by the cards, the My Faves tab, and the detail view.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { addFavorite, fetchFavorites, removeFavorite, type Exercise } from './api'
+import { addFavorite, fetchFavorites, isSignInGone, removeFavorite, type Exercise } from './api'
 import { setSession, useSession } from './session'
 
 export interface Favorites {
@@ -59,7 +59,7 @@ export function useFavorites(): Favorites {
         )
       } catch (e) {
         const message = (e as Error).message
-        if (/sign in/i.test(message)) setSession(null) // stale token or deleted account
+        if (isSignInGone(e)) setSession(null) // stale token or deleted account
         setError(message)
       } finally {
         setPending((p) => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { deleteAccount, fetchAccount, type Account } from '../api'
+import { deleteAccount, fetchAccount, isSignInGone, type Account } from '../api'
 import AccountForm from '../components/AccountForm'
 import { PrivacyNote } from '../components/Legal'
 import Link from '../components/Link'
@@ -21,7 +21,7 @@ export default function SettingsPage() {
       .catch((e: Error) => {
         if (cancelled) return
         setError(e.message)
-        setSession(null) // stale or deleted account
+        if (isSignInGone(e)) setSession(null) // stale or deleted account; a server error keeps you signed in
       })
     return () => {
       cancelled = true

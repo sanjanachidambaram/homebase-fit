@@ -16,6 +16,7 @@ import {
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import {
   fetchCalendar,
+  isSignInGone,
   MUSCLE_GROUP_LABELS,
   updateCalendarDay,
   type CalendarEntry,
@@ -183,7 +184,7 @@ function Calendar({ session }: { session: Session }) {
           setError(null)
         })
         .catch((e: Error) => {
-          if (/sign in/i.test(e.message)) setSession(null)
+          if (isSignInGone(e)) setSession(null)
           setError(e.message)
         }),
     [session.token, weekStart, weekEnd],

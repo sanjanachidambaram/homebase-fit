@@ -217,6 +217,9 @@ def _log_run(agent_name: str, user_id: int | None, route: str, usage: RunUsage, 
              error_type: str | None, started: float, gateway: dict) -> int:
     conn = connect()
     try:
+        # If the account was deleted while the model was running, still log the tokens, without the link.
+        if user_id is not None and not conn.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone():
+            user_id = None
         with conn:
             cur = conn.execute(
                 "INSERT INTO agent_runs (agent_name, user_id, input_tokens, output_tokens, cached_tokens, requests, "

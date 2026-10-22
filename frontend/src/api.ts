@@ -178,6 +178,14 @@ export class ApiError extends Error {
   }
 }
 
+/** Should this error sign the user out? Only when the server says the sign-in itself is no longer usable:
+ *  401 (missing, bad or expired token) or 404 "Account not found." for your own account (it was deleted).
+ *  Never for a server error (5xx), a backend that's restarting (502), a network failure, or any other
+ *  message that happens to mention signing in. */
+export function isSignInGone(e: unknown): boolean {
+  return e instanceof ApiError && (e.status === 401 || (e.status === 404 && /account not found/i.test(e.message)))
+}
+
 /** fetch + JSON with the API's error message ("detail") surfaced as the Error text. */
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   const headers = new Headers(init.headers)

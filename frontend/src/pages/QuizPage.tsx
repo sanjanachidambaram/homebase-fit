@@ -3,7 +3,7 @@
 // Health questions (health: true in quiz_questions.yaml) stay hidden until the
 // disclaimer is accepted, and the API rejects any submission without consent.
 import { useEffect, useState } from 'react'
-import { fetchQuizQuestions, submitQuiz, type QuizProfile, type QuizQuestion } from '../api'
+import { fetchQuizQuestions, isSignInGone, submitQuiz, type QuizProfile, type QuizQuestion } from '../api'
 import AccountForm from '../components/AccountForm'
 import { ConsentStep } from '../components/Legal'
 import { CONSENT_VERSION } from '../legal'
@@ -198,9 +198,10 @@ export default function QuizPage() {
       setSaved(profile)
       setStep('done')
     } catch (e) {
-      const message = (e as Error).message
-      if (/sign in/i.test(message)) setSession(null)
-      setError(message)
+      // Only a sign-in the server rejects ends the session. Anything else (a 500, a restart, no network)
+      // keeps you signed in with your answers still on screen, so you can just press Submit again.
+      if (isSignInGone(e)) setSession(null)
+      setError((e as Error).message)
     } finally {
       setSaving(false)
     }

@@ -10,6 +10,7 @@ Routes:
 """
 
 import json
+import logging
 import re
 import sqlite3
 from datetime import date, datetime, timezone
@@ -22,6 +23,7 @@ from app.db import connect
 from app.security import hash_password, make_token, require_same_user, token_user_id, verify_password
 
 router = APIRouter(prefix="/api")
+log = logging.getLogger(__name__)
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -233,7 +235,12 @@ def save_quiz(user_id: int, body: QuizSubmission, uid: int = Depends(token_user_
     conn.commit()
     # Lay the (re)generated plan out on the calendar. Days the user completed or wrote notes on are kept;
     # pregnant / postpartum users get no plan, so only their untouched future days are cleared.
+    # The answers are already saved. If laying out the calendar fails, log it and still return 200: GET
+    # /api/calendar fills it in on the next visit, and the quiz never looks like it failed.
     from app.calendar import materialize_plan   # local import: calendar imports this module's db helpers
-    materialize_plan(user_id)
+    try:
+        materialize_plan(user_id)
+    except Exception:
+        log.exception("Calendar materialization failed after saving the quiz for user %s", user_id)
     row = conn.execute("SELECT * FROM quiz_profiles WHERE user_id = ?", (user_id,)).fetchone()
     return profile_dict(row)

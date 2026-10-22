@@ -1,6 +1,6 @@
 // Home page. Signed in: the dashboard that ties the four agents together. Signed out: a welcome + sign-up.
 import { useEffect, useState } from 'react'
-import { fetchAccount, type Account } from '../api'
+import { fetchAccount, isSignInGone, type Account } from '../api'
 import AccountForm from '../components/AccountForm'
 import ClinicalSupportCard from '../components/ClinicalSupport'
 import AskBasics from '../components/dashboard/AskBasics'
@@ -42,7 +42,7 @@ function Dashboard({ session }: { session: Session }) {
       .then((a) => !cancelled && setAccount(a))
       .catch((e: Error) => {
         // Only a bad sign-in (expired, or the account was deleted) signs you out; a server hiccup doesn't.
-        if (!cancelled && /sign in|not found/i.test(e.message)) setSession(null)
+        if (!cancelled && isSignInGone(e)) setSession(null)
         else if (!cancelled) setLoadFailed(true)
       })
     return () => {

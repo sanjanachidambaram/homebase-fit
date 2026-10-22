@@ -1,10 +1,12 @@
 """Build homebase_original.db from schema.sql + the files in content/,
-then reset the working copy (homebase.db) from it.
+then refresh the working copy (homebase.db) from it.
 
 Run from backend/ whenever you change anything in content/:
-    .venv\\Scripts\\python.exe -m app.db.seed
+    .venv\\Scripts\\python.exe -m app.db.seed                 rebuild; KEEP every account and its data
+    .venv\\Scripts\\python.exe -m app.db.seed --wipe-users    rebuild and wipe all user data (clean demo DB)
 
-This rebuilds from scratch, so it also wipes user data in the working copy.
+The working copy gets the new content and schema; accounts, quiz answers, logs, calendar and favorites are
+carried over (app/db/reset.py refresh_content), so people who are signed in stay signed in.
 Content problems (missing fields, a bad goal protocol, an unknown source or injury tag, an injury tag
 with no rationale)
 stop the build with
@@ -14,13 +16,15 @@ a list of errors.
 import json
 import os
 import sqlite3
+import sys
 from pathlib import Path
 
 import yaml
 
-from app.config import CONTENT_DIR, DB_DIR, ORIGINAL_DB, PROJECT_ROOT
+from app import config
+from app.config import CONTENT_DIR, DB_DIR, PROJECT_ROOT
 from app.db import connect, table_counts
-from app.db.reset import reset
+from app.db.reset import refresh_content, reset
 from app.safety_rules import RATIONALE_PENDING_SOURCE, RATIONALE_TIERS
 
 MUSCLE_GROUPS = ("legs", "arms", "chest", "shoulders", "back", "core", "full_body")
@@ -358,8 +362,9 @@ def seed_basics(conn: sqlite3.Connection, sources: set[str], errors: list[str]) 
 
 # ---------------------------------------------------------------- build
 
-def build_original() -> None:
-    tmp = DB_DIR / "homebase_original.building.db"
+def build_original(target: Path | None = None) -> None:
+    target = target or config.ORIGINAL_DB
+    tmp = target.with_name(target.stem + ".building.db")
     tmp.unlink(missing_ok=True)
     conn = connect(tmp)
     errors: list[str] = []
@@ -380,18 +385,33 @@ def build_original() -> None:
         conn.close()
         if not ok:
             tmp.unlink(missing_ok=True)
-    os.replace(tmp, ORIGINAL_DB)
+    os.replace(tmp, target)
 
 
-if __name__ == "__main__":
+def main(argv: list[str]) -> dict | None:
+    """Build the original, then refresh the working copy KEEPING accounts (default) or wipe them (--wipe-users).
+    Returns refresh_content()'s summary, or None after a wipe."""
+    original = config.ORIGINAL_DB
     try:
-        build_original()
+        build_original(original)
     except ContentError as e:
-        raise SystemExit(f"Seed failed; {ORIGINAL_DB.name} was not changed:\n{e}")
-    reset()
+        raise SystemExit(f"Seed failed; {original.name} was not changed:\n{e}")
+    if "--wipe-users" in argv:
+        reset()
+        print(f"Built {original.name} and reset the working copy (all user data wiped).")
+        result = None
+    else:
+        result = refresh_content()
+        print(f"Built {original.name} and refreshed the working copy, keeping every account.")
+        if any(result["dropped"].values()):
+            print(f"  rows no longer valid under the new content, dropped: {result['dropped']}")
     conn = connect()
     counts = table_counts(conn)
     conn.close()
-    print(f"Built {ORIGINAL_DB.name} and reset the working copy.")
     for table, n in counts.items():
         print(f"  {table:28} {n}")
+    return result
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
