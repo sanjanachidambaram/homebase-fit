@@ -4,6 +4,9 @@
 # difficulty: beginner | intermediate | advanced
 # injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder | wrist | ankle).
 #   The app filters these out in code, so be conservative.
+# injury_rationale: one entry per tag above, {reasoning, tier, source}. reasoning = why the exercise is commonly
+#   avoided with that injury (general exercise-science reasoning, never an invented citation). tier: ai_drafted
+#   until a PT confirms it, then pt_reviewed with source set to the PT's name and credentials.
 # est_time_seconds: rough time for one set including setup
 
 exercises:
@@ -12,6 +15,11 @@ exercises:
     equipment_needed: [none]
     difficulty: beginner
     injury_contraindications: [knee]
+    injury_rationale:
+      knee:
+        reasoning: "Squatting bends the knees while they carry your body weight, and deep or repeated bending can aggravate a sore or recovering knee."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 45
     instructions: Feet shoulder-width apart, sit hips back and down until thighs are near parallel, then stand up through your heels.
   - id: reverse_lunge
@@ -19,6 +27,15 @@ exercises:
     equipment_needed: [none]
     difficulty: beginner
     injury_contraindications: [knee, ankle]
+    injury_rationale:
+      knee:
+        reasoning: "Lunges load one knee at a time through a deep bend, which can aggravate a sore knee."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      ankle:
+        reasoning: "Stepping back and balancing on one leg challenges the ankle's stability, which can be risky for an ankle that's sprained or still recovering."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 60
     instructions: Step one foot back and lower until both knees are bent about 90 degrees, then push through the front heel to return. Alternate sides.
   - id: glute_bridge
@@ -33,6 +50,11 @@ exercises:
     equipment_needed: [none]
     difficulty: beginner
     injury_contraindications: [knee]
+    injury_rationale:
+      knee:
+        reasoning: "Holding your knees bent at about 90 degrees keeps steady pressure on the knee joint, including behind the kneecap, which can aggravate a sore knee."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 45
     instructions: Slide down a wall until your knees are bent about 90 degrees and hold, keeping your back flat against the wall.
   - id: side_lying_leg_raise
@@ -47,5 +69,14 @@ exercises:
     equipment_needed: [dumbbells]
     difficulty: intermediate
     injury_contraindications: [knee, lower_back]
+    injury_rationale:
+      knee:
+        reasoning: "A weighted squat loads the knees through a deep bend."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      lower_back:
+        reasoning: "Holding a weight at your chest adds load that your back muscles must resist to keep you upright, which can strain a sensitive lower back if your posture slips."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 60
     instructions: Hold one dumbbell at your chest, squat down keeping your chest tall and elbows inside your knees, then stand.

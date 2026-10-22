@@ -7,8 +7,11 @@ Run from backend/ after seeding:
 This OVERWRITES the template. The PT should fill in a copy saved as
 contraindication_tags.csv so a re-export never clobbers their work.
 
-Columns lower_back / knee / shoulder: Y = unsafe for that injury, N = OK,
+Columns lower_back / knee / shoulder / wrist / ankle: Y = unsafe for that injury, N = OK,
 blank = not reviewed. Drafted tags are pre-filled; imported exercises are blank.
+
+Column rationale: WHY each Y is there, one "injury: reasoning" per line, pre-filled with the AI-drafted
+reasoning (rationale_tier says ai_drafted) so the PT can confirm or correct it instead of starting from nothing.
 """
 
 import csv
@@ -20,7 +23,8 @@ from app.db import connect
 TEMPLATE = CONTENT_DIR / "exercises" / "contraindication_tags_TEMPLATE.csv"
 INJURIES = ("lower_back", "knee", "shoulder", "wrist", "ankle")
 COLUMNS = ("exercise_id", "name", "source_dataset", "muscle_group", "category", "equipment",
-           "primary_muscles", "contraindication_status", *INJURIES, "pt_notes", "reviewed_by")
+           "primary_muscles", "contraindication_status", *INJURIES, "rationale", "rationale_tier",
+           "pt_notes", "reviewed_by")
 
 
 def export() -> int:
@@ -35,12 +39,15 @@ def export() -> int:
         w.writerow(COLUMNS)
         for r in rows:
             tags = set(json.loads(r["injury_contraindications"]))
+            rationale = json.loads(r["injury_rationale"])
             tagged = r["contraindication_status"] != "untagged"
             w.writerow([
                 r["id"], r["name"], r["source_dataset"], r["muscle_group"], r["category"] or "",
                 ", ".join(json.loads(r["equipment_needed"])), ", ".join(json.loads(r["primary_muscles"])),
                 r["contraindication_status"],
                 *(("Y" if i in tags else "N") if tagged else "" for i in INJURIES),
+                "\n".join(f"{i}: {rationale[i]['reasoning']}" for i in INJURIES if i in rationale),
+                ", ".join(sorted({v["tier"] for v in rationale.values()})),
                 "", "",
             ])
     return len(rows)

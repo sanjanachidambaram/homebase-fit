@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { MUSCLE_GROUP_LABELS, type WeeklyProgram } from '../api'
 import { useFavorites } from '../favorites'
+import { rationaleCredit } from '../injurySafety'
 import ExerciseDetail from './ExerciseDetail'
 import Link from './Link'
 import ReviewInfo from './ReviewInfo'
@@ -94,6 +95,34 @@ export default function WeeklyPlanView({ plan, startOpen = true }: { plan: Weekl
             Rest days: {plan.days.filter((d) => d.kind === 'rest').map((d) => DAY_NAMES[d.day]).join(', ')}.
           </p>
         </div>
+      )}
+
+      {!!plan.safety?.left_out_for_injury?.length && (
+        <details className="left-out">
+          <summary>
+            Left out for your injury ({plan.safety.left_out_for_injury.length}{' '}
+            {plan.safety.left_out_for_injury.length === 1 ? 'exercise' : 'exercises'})
+          </summary>
+          <ul>
+            {plan.safety.left_out_for_injury.map((x) => (
+              <li key={x.exercise_id}>
+                <button type="button" className="session-name" onClick={() => setOpenId(x.exercise_id)}>
+                  {x.name}
+                </button>
+                {x.cautions.map((c) => (
+                  <p key={c.injury}>
+                    <strong>{words(c.injury)}:</strong> {c.reasoning ?? 'No reason written yet.'}{' '}
+                    {c.tier && c.source && (
+                      <span className={c.tier === 'pt_reviewed' ? 'review-tag review-tag-ok' : 'review-tag'}>
+                        {rationaleCredit({ tier: c.tier, source: c.source })}
+                      </span>
+                    )}
+                  </p>
+                ))}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       <div className="plan-footnotes">

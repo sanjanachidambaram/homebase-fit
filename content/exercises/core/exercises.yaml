@@ -4,6 +4,9 @@
 # difficulty: beginner | intermediate | advanced
 # injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder | wrist | ankle).
 #   The app filters these out in code, so be conservative.
+# injury_rationale: one entry per tag above, {reasoning, tier, source}. reasoning = why the exercise is commonly
+#   avoided with that injury (general exercise-science reasoning, never an invented citation). tier: ai_drafted
+#   until a PT confirms it, then pt_reviewed with source set to the PT's name and credentials.
 # est_time_seconds: rough time for one set including setup
 
 exercises:
@@ -19,6 +22,11 @@ exercises:
     equipment_needed: [mat]
     difficulty: beginner
     injury_contraindications: [shoulder]
+    injury_rationale:
+      shoulder:
+        reasoning: "Holding your body up on your forearms makes the muscles around the shoulder work continuously to keep the joint steady, which can be too much for an irritated or recovering shoulder."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 45
     instructions: Forearms on the floor under your shoulders, body in a straight line from head to heels. Brace your core and hold.
   - id: cat_cow
@@ -26,6 +34,11 @@ exercises:
     equipment_needed: [mat]
     difficulty: beginner
     injury_contraindications: [wrist]
+    injury_rationale:
+      wrist:
+        reasoning: "You stay on your hands and knees for the whole movement, with the wrists bent back and bearing weight, which can irritate a sore wrist."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 45
     instructions: On hands and knees, slowly round your back toward the ceiling, then let it sag gently while lifting your chest. Move with your breath.
   - id: pelvic_tilt
@@ -40,5 +53,10 @@ exercises:
     equipment_needed: [mat]
     difficulty: beginner
     injury_contraindications: [lower_back]
+    injury_rationale:
+      lower_back:
+        reasoning: "Crunches repeatedly curl the spine forward. Many people with a sensitive lower back find repeated forward bending makes it worse."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 45
     instructions: Lie on your back with knees bent and curl your shoulders off the floor, then lower with control.

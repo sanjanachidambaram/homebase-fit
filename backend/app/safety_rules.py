@@ -5,6 +5,12 @@ See backend/prompts/shared_rules.md, rule 4.
 INJURY_FLAGS = ("lower_back", "knee", "shoulder", "wrist", "ankle")
 CLINICAL_REVIEW_STATUSES = ("pregnant", "postpartum")
 
+# Why an exercise carries an injury tag (exercises.injury_rationale). Every rationale is ai_drafted until a
+# licensed PT confirms it; then tier becomes pt_reviewed and source becomes her name and credentials.
+# The reasoning is general exercise science, never an invented citation.
+RATIONALE_TIERS = ("ai_drafted", "pt_reviewed")
+RATIONALE_PENDING_SOURCE = "Pending review by a licensed physical therapist"
+
 
 def checked_only_for(injury_flags: list[str] | None) -> bool:
     """DECIDED 2026-10-22: anyone with an injury flag only ever gets exercises that have injury tags.

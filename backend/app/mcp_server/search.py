@@ -179,6 +179,37 @@ def search_exercises(
     return result
 
 
+def contraindicated_exercises(injury_flags: list[str], muscle_groups: list[str],
+                              equipment: list[str] | None = None, checked_only: bool = True) -> list[dict]:
+    """The exercises the injury filter removes for these flags (same equipment / checked_only scope as
+    search_exercises), each with the drafted reasoning for every matching tag. For the plan's "left out
+    for your injury" list; code only, never sent to the model."""
+    flags = _clean_flags(injury_flags)
+    have = _clean_equipment(equipment)
+    if not flags or not muscle_groups:
+        return []
+    params = {"flags": json.dumps(flags), "equipment": json.dumps(have or []), "groups": json.dumps(muscle_groups)}
+    where = ["e.muscle_group IN (SELECT value FROM json_each(:groups))", f"NOT ({NOT_CONTRAINDICATED})"]
+    if have is not None:
+        where.append(EQUIPMENT_AVAILABLE)
+    if checked_only:
+        where.append("e.contraindication_status <> 'untagged'")
+    conn = connect_readonly()
+    try:
+        rows = conn.execute(f"SELECT * FROM exercises e WHERE {' AND '.join(where)} ORDER BY e.name", params).fetchall()
+    finally:
+        conn.close()
+    out = []
+    for r in rows:
+        rationale = json.loads(r["injury_rationale"])
+        out.append({
+            "exercise_id": r["id"], "name": r["name"], "muscle_group": r["muscle_group"],
+            "cautions": [{"injury": i, **rationale.get(i, {"reasoning": None, "tier": None, "source": None})}
+                         for i in json.loads(r["injury_contraindications"]) if i in flags],
+        })
+    return out
+
+
 # ---------------------------------------------------------------- Fitness Basics knowledge base
 
 STOPWORDS = {

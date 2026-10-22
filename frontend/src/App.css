@@ -1858,3 +1858,67 @@ fieldset.question {
 .support-more p {
   margin: 0;
 }
+
+/* Library filters: muscle group select plus chip groups for equipment, level and injury-safety status. */
+.filters {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.filter-group {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.filter-group legend {
+  font-weight: 800;
+  margin-bottom: 0.35rem;
+}
+
+.filter-group .chip-check {
+  min-height: 40px;
+  padding: 0 0.8rem;
+  font-size: 0.92rem;
+}
+
+.injury-status {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
+/* Why each injury caution is there (exercise detail + plan). */
+.injury-reasons ul,
+.left-out ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.injury-reasons .review-tag,
+.left-out .review-tag {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 0.8rem;
+}
+
+.left-out {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-input);
+  border: 2px dashed var(--lavender-deep);
+  background: #fff;
+}
+
+.left-out summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.left-out p {
+  margin: 0.25rem 0 0;
+}

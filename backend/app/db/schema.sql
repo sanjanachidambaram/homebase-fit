@@ -96,6 +96,11 @@ CREATE TABLE exercises (
     --   draft        tags drafted but not yet reviewed by a PT
     --   pt_reviewed  tags confirmed by a PT
     contraindication_status  TEXT NOT NULL CHECK (contraindication_status IN ('untagged', 'draft', 'pt_reviewed')),
+    -- Why each tag in injury_contraindications is there, one entry per tag (the seed checks they match):
+    --   {"knee": {"reasoning": "...", "tier": "ai_drafted" | "pt_reviewed", "source": "..."}}
+    -- reasoning is plain-language exercise science, never a citation. tier ai_drafted = written by AI, not yet
+    -- reviewed, with source "Pending review by a licensed physical therapist"; pt_reviewed = source names the PT.
+    injury_rationale         TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(injury_rationale) AND json_type(injury_rationale) = 'object'),
     demo_media_path          TEXT,                   -- relative to project root; the file may not exist yet
     -- How the frontend should render demo_media_path: <img> for 'image' and 'gif',
     -- <video> for 'video'. Set by the seed from the file extension; NULL when

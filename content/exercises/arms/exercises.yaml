@@ -4,6 +4,9 @@
 # difficulty: beginner | intermediate | advanced
 # injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder | wrist | ankle).
 #   The app filters these out in code, so be conservative.
+# injury_rationale: one entry per tag above, {reasoning, tier, source}. reasoning = why the exercise is commonly
+#   avoided with that injury (general exercise-science reasoning, never an invented citation). tier: ai_drafted
+#   until a PT confirms it, then pt_reviewed with source set to the PT's name and credentials.
 # est_time_seconds: rough time for one set including setup
 
 exercises:
@@ -12,6 +15,15 @@ exercises:
     equipment_needed: [chair]
     difficulty: beginner
     injury_contraindications: [shoulder, wrist]
+    injury_rationale:
+      shoulder:
+        reasoning: "Push-ups lower and press your body weight through the shoulder joint. Even at an incline, that can aggravate an irritated or recovering shoulder."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      wrist:
+        reasoning: "Your hands are flat with the wrists bent back under load, a position that commonly bothers sore or injured wrists."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 45
     instructions: Hands on a sturdy chair or counter, body in a straight line. Lower your chest to the edge and press back up.
   - id: knee_pushup
@@ -19,6 +31,15 @@ exercises:
     equipment_needed: [mat]
     difficulty: beginner
     injury_contraindications: [shoulder, wrist]
+    injury_rationale:
+      shoulder:
+        reasoning: "Even from your knees, the shoulders lower and press a good part of your body weight, which can aggravate an irritated or recovering shoulder."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      wrist:
+        reasoning: "Your hands are flat on the floor with the wrists bent back under part of your body weight, a position that commonly bothers sore or injured wrists."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 45
     instructions: From your knees with a straight line from head to knees, lower your chest toward the floor and press back up.
   - id: dumbbell_bicep_curl
@@ -33,6 +54,15 @@ exercises:
     equipment_needed: [chair]
     difficulty: intermediate
     injury_contraindications: [shoulder, wrist]
+    injury_rationale:
+      shoulder:
+        reasoning: "Lowering yourself between your hands on a chair pulls the upper arms back into deep shoulder extension while they hold most of your body weight, which can stress the front of the shoulder joint."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      wrist:
+        reasoning: "Your hands grip the chair edge with the wrists bent sharply back while they support much of your body weight, which can irritate a sore or injured wrist."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 45
     instructions: Hands on the edge of a sturdy chair behind you, bend your elbows to lower your hips, then press back up.
   - id: band_biceps_curl

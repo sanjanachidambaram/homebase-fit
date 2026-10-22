@@ -4,6 +4,9 @@
 # difficulty: beginner | intermediate | advanced
 # injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder | wrist | ankle).
 #   The app filters these out in code, so be conservative.
+# injury_rationale: one entry per tag above, {reasoning, tier, source}. reasoning = why the exercise is commonly
+#   avoided with that injury (general exercise-science reasoning, never an invented citation). tier: ai_drafted
+#   until a PT confirms it, then pt_reviewed with source set to the PT's name and credentials.
 # est_time_seconds: rough time for one set including setup
 
 exercises:
@@ -12,6 +15,11 @@ exercises:
     equipment_needed: [mat]
     difficulty: beginner
     injury_contraindications: [wrist]
+    injury_rationale:
+      wrist:
+        reasoning: "Being on all fours puts weight through your hands with the wrists bent back, and lifting one arm shifts more of that weight onto the other wrist."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 60
     instructions: On hands and knees, extend one arm and the opposite leg straight out while keeping your back flat. Hold briefly, return, and switch sides.
   - id: band_pull_apart
@@ -26,6 +34,11 @@ exercises:
     equipment_needed: [mat]
     difficulty: beginner
     injury_contraindications: [lower_back]
+    injury_rationale:
+      lower_back:
+        reasoning: "Lifting your chest and legs off the floor arches the lower spine and squeezes the low-back muscles hard, which can aggravate a sensitive lower back."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 45
     instructions: Lie face down and lift your arms, chest, and legs slightly off the floor. Hold, then lower.
   - id: dumbbell_bent_over_row
@@ -33,6 +46,11 @@ exercises:
     equipment_needed: [dumbbells]
     difficulty: intermediate
     injury_contraindications: [lower_back]
+    injury_rationale:
+      lower_back:
+        reasoning: "Holding a hip hinge while the weights hang in front of you makes the low-back muscles work hard to keep your spine still. If that flat-back position slips under load, it can strain a sensitive lower back."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 60
     instructions: Hinge at the hips with a flat back, let the dumbbells hang, then row them toward your hips and lower slowly.
   - id: band_seated_row

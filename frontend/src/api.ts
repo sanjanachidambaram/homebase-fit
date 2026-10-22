@@ -25,6 +25,13 @@ export interface ReviewFields {
 
 export type MediaType = 'image' | 'gif' | 'video'
 
+/** Why an exercise carries an injury tag. tier is ai_drafted until a licensed PT reviews it. Never a citation. */
+export interface InjuryRationale {
+  reasoning: string
+  tier: 'ai_drafted' | 'pt_reviewed'
+  source: string // "Pending review by a licensed physical therapist", or the reviewing PT
+}
+
 export interface Exercise extends ReviewFields {
   id: string
   name: string
@@ -36,6 +43,7 @@ export interface Exercise extends ReviewFields {
   secondary_muscles: string[]
   injury_contraindications: string[]
   contraindication_status: 'untagged' | 'draft' | 'pt_reviewed'
+  injury_rationale: Partial<Record<string, InjuryRationale>> // one per injury_contraindications entry
   est_time_seconds: number
   instructions: string // steps separated by newlines
   demo_media_url: string | null // null until the file exists
@@ -59,9 +67,26 @@ async function getJson<T>(path: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export function fetchExercises(muscleGroup: MuscleGroup | ''): Promise<Exercise[]> {
-  const query = muscleGroup ? `?muscle_group=${muscleGroup}` : ''
-  return getJson<Exercise[]>(`/api/exercises${query}`)
+/** Library filters. Each list is "any of these"; different filters must all match. Done by the API, in SQL. */
+export interface ExerciseFilters {
+  muscleGroup: MuscleGroup | ''
+  equipment: string[] // exercises that USE any of these; 'none' = bodyweight
+  difficulty: Exercise['difficulty'][]
+  injuryStatus: Exercise['contraindication_status'][]
+}
+
+export function exerciseQuery(f: ExerciseFilters): string {
+  const q = new URLSearchParams()
+  if (f.muscleGroup) q.set('muscle_group', f.muscleGroup)
+  f.equipment.forEach((v) => q.append('equipment', v))
+  f.difficulty.forEach((v) => q.append('difficulty', v))
+  f.injuryStatus.forEach((v) => q.append('injury_status', v))
+  const s = q.toString()
+  return s ? `?${s}` : ''
+}
+
+export function fetchExercises(filters: ExerciseFilters): Promise<Exercise[]> {
+  return getJson<Exercise[]>(`/api/exercises${exerciseQuery(filters)}`)
 }
 
 export const fetchExercise = (id: string) => getJson<Exercise>(`/api/exercises/${encodeURIComponent(id)}`)
@@ -256,7 +281,19 @@ export interface WeeklyProgram {
     review_notice: string | null
     citations: Citation[]
   } | null
-  safety: { injury_flags: string[]; checked_only: boolean; excluded_as_contraindicated: number; equipment: string[] | null } | null
+  safety: {
+    injury_flags: string[]
+    checked_only: boolean
+    excluded_as_contraindicated: number
+    equipment: string[] | null
+    // Which exercises the injury filter left out, and the (AI-drafted until PT-reviewed) reason for each.
+    left_out_for_injury: {
+      exercise_id: string
+      name: string
+      muscle_group: MuscleGroup
+      cautions: ({ injury: string } & Partial<InjuryRationale>)[]
+    }[]
+  } | null
   notes: string[]
 }
 

@@ -3,17 +3,30 @@ import { fetchExercise, MUSCLE_GROUP_LABELS, type Exercise } from '../api'
 import type { Favorites } from '../favorites'
 import DemoMedia from './DemoMedia'
 import FavoriteButton from './FavoriteButton'
+import { injuryStatusLabel, rationaleCredit, words } from '../injurySafety'
 import ReviewInfo from './ReviewInfo'
 
-const words = (values: string[]) => values.map((v) => v.replace(/_/g, ' ')).join(', ')
-
-function injuryNote(ex: Exercise): string {
-  const avoid = ex.injury_contraindications.length ? words(ex.injury_contraindications) : null
-  if (ex.contraindication_status === 'untagged') return 'Not yet checked for injury safety. Ask a doctor or physical therapist if you have an injury.'
-  if (ex.contraindication_status === 'draft') {
-    return (avoid ? `Drafted advice: avoid with ${avoid}.` : 'No injury cautions drafted.') + ' Not yet reviewed by a physical therapist.'
-  }
-  return avoid ? `Avoid with ${avoid}.` : 'No injury cautions.'
+/** Why each injury caution is there, with who (if anyone) has reviewed the reasoning. */
+function InjuryReasons({ ex }: { ex: Exercise }) {
+  const reasons = ex.injury_contraindications.map((injury) => ({ injury, r: ex.injury_rationale[injury] }))
+  if (!reasons.length) return null
+  return (
+    <section className="injury-reasons" aria-labelledby="injury-reasons-title">
+      <h3 id="injury-reasons-title">Why the injury cautions</h3>
+      <ul>
+        {reasons.map(({ injury, r }) => (
+          <li key={injury}>
+            <strong>{words([injury])}:</strong> {r?.reasoning ?? 'No reason written yet.'}
+            {r && <span className={r.tier === 'pt_reviewed' ? 'review-tag review-tag-ok' : 'review-tag'}>{rationaleCredit(r)}</span>}
+          </li>
+        ))}
+      </ul>
+      <p className="hint">
+        General exercise-science reasoning, not a medical judgment about you. If something hurts, stop, and ask a
+        doctor or physical therapist.
+      </p>
+    </section>
+  )
 }
 
 /** Full exercise info in a modal. Closes on Escape, the Close button, or a click outside. */
@@ -109,8 +122,14 @@ export default function ExerciseDetail({
               <dt>Level</dt>
               <dd>{exercise.difficulty}</dd>
               <dt>Injury safety</dt>
-              <dd>{injuryNote(exercise)}</dd>
+              <dd>
+                {injuryStatusLabel(exercise)}
+                {exercise.contraindication_status === 'untagged' &&
+                  '. Ask a doctor or physical therapist if you have an injury.'}
+              </dd>
             </dl>
+
+            <InjuryReasons ex={exercise} />
 
             <h3>How to do it</h3>
             <ol className="steps-list">

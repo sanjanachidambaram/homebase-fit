@@ -24,7 +24,7 @@ from pydantic import BaseModel
 
 from app.content import REVIEW_NOTICE
 from app.db import connect_readonly
-from app.mcp_server.search import search_exercises
+from app.mcp_server.search import contraindicated_exercises, search_exercises
 from app.safety_rules import checked_only_for, needs_clinical_review
 
 GOALS = ("weight_loss", "strength", "tone", "rehab", "general_health")
@@ -113,10 +113,27 @@ class ProtocolSummary(BaseModel):
     citations: list[dict]
 
 
+class InjuryCaution(BaseModel):
+    injury: str
+    reasoning: str | None                # plain-language, AI-drafted until a PT reviews it; never a citation
+    tier: str | None                     # ai_drafted | pt_reviewed
+    source: str | None                   # "Pending review by a licensed physical therapist", or the PT
+
+
+class LeftOutExercise(BaseModel):
+    exercise_id: str
+    name: str
+    muscle_group: str
+    cautions: list[InjuryCaution]        # only the user's own flags
+
+
 class SafetySummary(BaseModel):
     injury_flags: list[str]
     checked_only: bool
     excluded_as_contraindicated: int     # tagged-unsafe exercises the filter removed while picking
+    # Which ones, and why. Built by code for the person's own plan view; Program Architect never sees it
+    # (shared_rules rule 2: injury details stay out of the model's prompt).
+    left_out_for_injury: list[LeftOutExercise] = []
     equipment: list[str] | None          # None = any equipment (full gym)
 
 
@@ -397,7 +414,9 @@ def generate(profile: dict) -> WeeklyProgram:
             progression_notes=b.progression_notes, blending_rules_applied=b.rules, status=b.status,
             review_notice=REVIEW_NOTICE if b.status == "placeholder" else None, citations=b.citations),
         safety=SafetySummary(injury_flags=flags, checked_only=checked_only, excluded_as_contraindicated=picker.excluded,
-                             equipment=picker.equipment),
+                             equipment=picker.equipment,
+                             left_out_for_injury=contraindicated_exercises(flags, sorted(picker.candidates),
+                                                                           picker.equipment, checked_only)),
     )
 
 

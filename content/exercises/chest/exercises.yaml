@@ -4,6 +4,9 @@
 # difficulty: beginner | intermediate | advanced
 # injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder | wrist | ankle).
 #   The app filters these out in code, so be conservative.
+# injury_rationale: one entry per tag above, {reasoning, tier, source}. reasoning = why the exercise is commonly
+#   avoided with that injury (general exercise-science reasoning, never an invented citation). tier: ai_drafted
+#   until a PT confirms it, then pt_reviewed with source set to the PT's name and credentials.
 # est_time_seconds: rough time for one set including setup
 
 # No hand-authored chest exercises yet; imported ones come from source_free_exercise_db/.

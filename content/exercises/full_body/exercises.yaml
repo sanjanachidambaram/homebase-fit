@@ -4,6 +4,9 @@
 # difficulty: beginner | intermediate | advanced
 # injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder | wrist | ankle).
 #   The app filters these out in code, so be conservative.
+# injury_rationale: one entry per tag above, {reasoning, tier, source}. reasoning = why the exercise is commonly
+#   avoided with that injury (general exercise-science reasoning, never an invented citation). tier: ai_drafted
+#   until a PT confirms it, then pt_reviewed with source set to the PT's name and credentials.
 # est_time_seconds: rough time for one set including setup
 
 exercises:
@@ -19,6 +22,15 @@ exercises:
     equipment_needed: [none]
     difficulty: beginner
     injury_contraindications: [knee, ankle]
+    injury_rationale:
+      knee:
+        reasoning: "Every rep is a jump and a landing, and that repeated impact goes through the knees."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      ankle:
+        reasoning: "Repeated jumping and landing, with the feet moving out to the side, loads the ankles and can stress one that's recovering from a sprain."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 45
     instructions: Jump your feet out while raising your arms overhead, then jump back to the start.
   - id: step_jacks
@@ -33,6 +45,19 @@ exercises:
     equipment_needed: [mat]
     difficulty: intermediate
     injury_contraindications: [shoulder, lower_back, wrist]
+    injury_rationale:
+      shoulder:
+        reasoning: "You hold a high plank on straight arms while your legs move quickly, so the shoulders support and steady your body weight the whole time."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      lower_back:
+        reasoning: "Driving the knees in fast from a plank makes it hard to keep your spine still, and the low back can sag or round, which can aggravate a sensitive lower back."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      wrist:
+        reasoning: "The whole exercise is spent in a high plank, with the wrists bent back under your body weight."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 45
     instructions: From a high plank, drive your knees toward your chest one at a time at a steady pace.
   - id: burpee
@@ -40,6 +65,27 @@ exercises:
     equipment_needed: [none]
     difficulty: advanced
     injury_contraindications: [knee, lower_back, shoulder, wrist, ankle]
+    injury_rationale:
+      knee:
+        reasoning: "Burpees combine a squat with jumping and landing. The repeated impact and quick, deep knee bends load the knees much more than a slow, controlled squat."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      lower_back:
+        reasoning: "The quick drop to the floor, the kick back to a plank, and the explosive jump up involve fast bending of the spine under impact, which can load or aggravate a sensitive lower back."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      shoulder:
+        reasoning: "Dropping into a plank catches your body weight on your arms quickly, which can jar an irritated shoulder."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      wrist:
+        reasoning: "Your hands suddenly take your body weight as you drop into the plank, with the wrists bent back."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      ankle:
+        reasoning: "Jumping and landing over and over puts quick, high forces through the ankles, which can aggravate an ankle that's sprained or still recovering."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 60
     instructions: Squat down, jump or step your feet back to a plank, return your feet, and stand or jump up.
   - id: squat_to_press
@@ -47,5 +93,14 @@ exercises:
     equipment_needed: [dumbbells]
     difficulty: intermediate
     injury_contraindications: [knee, shoulder]
+    injury_rationale:
+      knee:
+        reasoning: "It includes a squat while holding dumbbells, which adds weight to every knee bend."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      shoulder:
+        reasoning: "Pressing weights overhead lifts the arms to the top of their range under load, a position that commonly aggravates an irritated shoulder."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 60
     instructions: Hold dumbbells at your shoulders, squat down, then stand and press them overhead in one motion.

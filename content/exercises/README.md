@@ -18,8 +18,30 @@ Every exercise starts as `status: placeholder` with no citations, so the app sho
 `contraindication_tags_TEMPLATE.csv` lists **every** exercise from both sources, one row each.
 
 1. Save a copy as `contraindication_tags.csv` and fill that in. The template gets regenerated, so edits made to it directly would be lost.
-2. In `lower_back`, `knee`, `shoulder`: `Y` = unsafe for someone with that injury, `N` = OK, blank = not reviewed.
-3. Add your name in `reviewed_by` for each row you've checked; use `pt_notes` for anything else.
+2. In `lower_back`, `knee`, `shoulder`, `wrist`, `ankle`: `Y` = unsafe for someone with that injury, `N` = OK, blank = not reviewed.
+3. `rationale` says **why** each `Y` is there, one `injury: reasoning` per line. Every one is pre-filled with
+   AI-drafted reasoning (`rationale_tier` = `ai_drafted`): general exercise-science reasoning, with no citation
+   behind it. Confirm it, correct it in place, or replace it; add a reason for any new `Y` you add.
+4. Add your name and credentials in `reviewed_by` for each row you've checked; use `pt_notes` for anything else.
+   Once you've reviewed a row, its rationale becomes `tier: pt_reviewed` with your name and credentials as the
+   `source` (in that exercise's `injury_rationale` in `exercises.yaml`).
+
+### Injury rationale in `exercises.yaml`
+
+Each injury tag on a hand-authored exercise has a matching `injury_rationale` entry:
+
+```yaml
+injury_contraindications: [knee]
+injury_rationale:
+  knee:
+    reasoning: "Squatting bends the knees while they carry your body weight, ..."
+    tier: ai_drafted          # ai_drafted until a PT confirms it, then pt_reviewed
+    source: Pending review by a licensed physical therapist   # then: the PT's name and credentials
+```
+
+The seed refuses to build if a tag has no rationale (or a rationale has no tag), if `tier` is anything else, or if
+a `pt_reviewed` entry still says "Pending review". The app shows this reasoning in the exercise detail view and,
+for people with an injury flag, in the "left out for your injury" list on their plan, always with its review tier.
 
 Regenerate the template after changing exercises (from `backend/`):
 

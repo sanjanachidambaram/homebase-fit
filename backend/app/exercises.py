@@ -1,7 +1,12 @@
 """Exercise library and favorites.
 
 Routes:
-  GET    /api/exercises?muscle_group=&source=   the library (full detail for each exercise)
+  GET    /api/exercises?muscle_group=&source=&equipment=&difficulty=&injury_status=
+                                                the library (full detail for each exercise). equipment,
+                                                difficulty and injury_status can repeat (?difficulty=beginner
+                                                &difficulty=intermediate); values within one filter are ORed,
+                                                different filters are ANDed. equipment matches exercises that
+                                                USE any of the chosen items (none = bodyweight).
   GET    /api/exercises/{id}                    one exercise in full detail
   GET    /api/favorites                         the signed-in user's faved exercises, in full detail
   POST   /api/favorites {exercise_id}           fave an exercise (idempotent)
@@ -23,6 +28,11 @@ from app.users import db
 router = APIRouter(prefix="/api")
 
 MuscleGroup = Literal["legs", "arms", "chest", "shoulders", "back", "core", "full_body"]
+Equipment = Literal["none", "mat", "chair", "bench", "dumbbells", "resistance_band", "kettlebells", "barbell",
+                    "ez_curl_bar", "medicine_ball", "exercise_ball", "foam_roller", "cable", "machine", "other"]
+Difficulty = Literal["beginner", "intermediate", "advanced"]
+# untagged = nobody has checked it; draft = cautions drafted, not PT-reviewed; pt_reviewed = confirmed by a PT
+InjuryStatus = Literal["untagged", "draft", "pt_reviewed"]
 
 # One query shape for every exercise response; the source registry entry comes along for the credit line.
 SELECT_EXERCISE = """
@@ -45,6 +55,8 @@ def exercise_dict(r: sqlite3.Row) -> dict:
         "secondary_muscles": json.loads(r["secondary_muscles"]),
         "injury_contraindications": json.loads(r["injury_contraindications"]),
         "contraindication_status": r["contraindication_status"],
+        # {injury: {reasoning, tier, source}}, one per tag; tier "ai_drafted" until a PT reviews it
+        "injury_rationale": json.loads(r["injury_rationale"]),
         "est_time_seconds": r["est_time_seconds"],
         "instructions": r["instructions"],
         # media_type says how to render demo_media_url; both are None until the file exists.
@@ -61,6 +73,9 @@ def exercise_dict(r: sqlite3.Row) -> dict:
 def list_exercises(
     muscle_group: MuscleGroup | None = None,
     source: str | None = Query(None, description="source_dataset id, e.g. free-exercise-db"),
+    equipment: list[Equipment] = Query([], description="exercises that use any of these (none = bodyweight)"),
+    difficulty: list[Difficulty] = Query([]),
+    injury_status: list[InjuryStatus] = Query([], description="untagged | draft | pt_reviewed"),
     conn: sqlite3.Connection = Depends(db),
 ) -> list[dict]:
     sql, args = SELECT_EXERCISE + " WHERE 1 = 1", []
@@ -70,6 +85,16 @@ def list_exercises(
     if source:
         sql += " AND e.source_dataset = ?"
         args.append(source)
+    if equipment:
+        sql += (" AND EXISTS (SELECT 1 FROM json_each(e.equipment_needed) n"
+                " WHERE n.value IN (SELECT value FROM json_each(?)))")
+        args.append(json.dumps(sorted(set(equipment))))
+    if difficulty:
+        sql += " AND e.difficulty IN (SELECT value FROM json_each(?))"
+        args.append(json.dumps(sorted(set(difficulty))))
+    if injury_status:
+        sql += " AND e.contraindication_status IN (SELECT value FROM json_each(?))"
+        args.append(json.dumps(sorted(set(injury_status))))
     sql += " ORDER BY e.source_dataset = 'free-exercise-db', e.name"
     return [exercise_dict(r) for r in conn.execute(sql, args).fetchall()]
 

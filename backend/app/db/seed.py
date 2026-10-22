@@ -5,7 +5,8 @@ Run from backend/ whenever you change anything in content/:
     .venv\\Scripts\\python.exe -m app.db.seed
 
 This rebuilds from scratch, so it also wipes user data in the working copy.
-Content problems (missing fields, a bad goal protocol, an unknown source or injury tag)
+Content problems (missing fields, a bad goal protocol, an unknown source or injury tag, an injury tag
+with no rationale)
 stop the build with
 a list of errors.
 """
@@ -20,6 +21,7 @@ import yaml
 from app.config import CONTENT_DIR, DB_DIR, ORIGINAL_DB, PROJECT_ROOT
 from app.db import connect, table_counts
 from app.db.reset import reset
+from app.safety_rules import RATIONALE_PENDING_SOURCE, RATIONALE_TIERS
 
 MUSCLE_GROUPS = ("legs", "arms", "chest", "shoulders", "back", "core", "full_body")
 INJURY_TAGS = {"lower_back", "knee", "shoulder", "wrist", "ankle"}
@@ -160,15 +162,42 @@ def insert_exercise(conn: sqlite3.Connection, **ex) -> None:
     ex["media_type"] = media_type_for(ex["demo_media_path"])
     ex.setdefault("status", "placeholder")
     ex.setdefault("citations", "[]")
+    ex.setdefault("injury_rationale", "{}")
     conn.execute(
         "INSERT INTO exercises (id, name, muscle_group, equipment_needed, difficulty,"
-        " injury_contraindications, contraindication_status, demo_media_path, media_type, instructions,"
+        " injury_contraindications, contraindication_status, injury_rationale, demo_media_path, media_type, instructions,"
         " est_time_seconds, category, primary_muscles, secondary_muscles, source_dataset, status, citations)"
         " VALUES (:id, :name, :muscle_group, :equipment_needed, :difficulty,"
-        " :injury_contraindications, :contraindication_status, :demo_media_path, :media_type, :instructions,"
+        " :injury_contraindications, :contraindication_status, :injury_rationale, :demo_media_path, :media_type, :instructions,"
         " :est_time_seconds, :category, :primary_muscles, :secondary_muscles, :source_dataset, :status, :citations)",
         ex,
     )
+
+
+def injury_rationale(ex: dict, contra: list[str], where: str, errors: list[str]) -> dict:
+    """Every injury tag needs a {reasoning, tier, source} entry, and nothing else may have one.
+    pt_reviewed must name a real reviewer in source, not the pending placeholder."""
+    rationale = ex.get("injury_rationale") or {}
+    if not isinstance(rationale, dict):
+        errors.append(f"{where}: injury_rationale must be a mapping of injury -> {{reasoning, tier, source}}")
+        return {}
+    if set(rationale) != set(contra):
+        errors.append(f"{where}: injury_rationale must have exactly one entry per injury tag "
+                      f"(tags {sorted(contra)}, rationale {sorted(rationale)})")
+    for injury, r in rationale.items():
+        if not isinstance(r, dict) or set(r) != {"reasoning", "tier", "source"}:
+            errors.append(f"{where} {injury}: rationale needs exactly reasoning, tier, source")
+            continue
+        if not str(r["reasoning"]).strip() or not str(r["source"]).strip():
+            errors.append(f"{where} {injury}: reasoning and source can't be empty")
+        if r["tier"] not in RATIONALE_TIERS:
+            errors.append(f"{where} {injury}: tier must be one of {list(RATIONALE_TIERS)}")
+        if r["tier"] == "pt_reviewed" and r["source"] == RATIONALE_PENDING_SOURCE:
+            errors.append(f"{where} {injury}: pt_reviewed needs the reviewing PT's name and credentials as source")
+        if r["tier"] == "ai_drafted" and r["source"] != RATIONALE_PENDING_SOURCE:
+            errors.append(f"{where} {injury}: ai_drafted rationale must have source '{RATIONALE_PENDING_SOURCE}'")
+    return {i: {k: str(rationale[i][k]).strip() for k in ("reasoning", "tier", "source")}
+            for i in contra if isinstance(rationale.get(i), dict) and set(rationale[i]) == {"reasoning", "tier", "source"}}
 
 
 def seed_authored_exercises(conn: sqlite3.Connection, errors: list[str]) -> dict[str, set[str]]:
@@ -192,6 +221,7 @@ def seed_authored_exercises(conn: sqlite3.Connection, errors: list[str]) -> dict
             unknown = set(contra) - INJURY_TAGS
             if unknown:
                 errors.append(f"{where}: unknown injury tag(s) {sorted(unknown)}")
+            rationale = injury_rationale(ex, contra, where, errors)
             review = review_fields(ex, where, errors)   # optional status + citations in the yaml
             if review is None:
                 continue
@@ -200,6 +230,7 @@ def seed_authored_exercises(conn: sqlite3.Connection, errors: list[str]) -> dict
                 conn, id=ex["id"], name=ex["name"], muscle_group=group,
                 equipment_needed=json.dumps(ex.get("equipment_needed") or ["none"]),
                 difficulty=ex["difficulty"], injury_contraindications=json.dumps(contra),
+                injury_rationale=json.dumps(rationale),
                 contraindication_status="draft", demo_media_path=rel(find_media(folder, ex["id"])),
                 instructions=ex["instructions"].strip(), est_time_seconds=int(ex["est_time_seconds"]),
                 category=None, primary_muscles="[]", secondary_muscles="[]", source_dataset=DEFAULT_SOURCE,
