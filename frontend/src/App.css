@@ -2972,3 +2972,141 @@ fieldset.question {
   background: #fff;
   font-size: 0.8rem;
 }
+
+/* ================================================================ calendar redesign: day choice, cardio, calories */
+
+/* The day-type selector: three plain choices on every day that isn't done or past. */
+.day-choice {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+  margin: 0.45rem 0;
+  padding: 0.2rem;
+  border-radius: var(--radius-input);
+  background: var(--bg);
+}
+
+.day-choice-btn {
+  min-height: 36px;
+  padding: 0.25rem 0.3rem;
+  border: 2px solid transparent;
+  border-radius: var(--radius-input);
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.day-choice-btn:hover:not(:disabled) {
+  background: #fff;
+  color: var(--ink);
+}
+
+.day-choice-btn[aria-pressed='true'] {
+  border-color: var(--pink-deep);
+  background: #fff;
+  color: var(--ink);
+  cursor: default;
+}
+
+.day-choice-btn:disabled:not([aria-pressed='true']) {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.chip-cardio {
+  background: var(--yellow-tint);
+  border: 2px solid var(--yellow);
+}
+
+.day-kcal {
+  margin: 0.2rem 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.day-kcal a,
+.kcal-note {
+  color: var(--ink-soft);
+  text-decoration: underline dotted;
+}
+
+.cardio-measure {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.cardio-measure legend {
+  margin-bottom: 0.15rem;
+  font-weight: 700;
+}
+
+.cardio-logged {
+  font-size: 0.85rem;
+}
+
+/* The progress marker at the top of the calendar (code-computed). */
+.progress-marker {
+  margin-bottom: 1rem;
+  border-top: 8px solid var(--mint);
+}
+
+.progress-marker h3 {
+  margin-bottom: 0.4rem;
+}
+
+.progress-marker ul {
+  margin: 0 0 0.4rem;
+  padding-left: 1.2rem;
+}
+
+.progress-marker li {
+  margin: 0.2rem 0;
+}
+
+.calorie-caveats {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-card);
+  background: var(--bg);
+  font-size: 0.9rem;
+  scroll-margin-top: 6rem;
+}
+
+.calorie-caveats h3 {
+  margin-top: 0;
+}
+
+.build-cardio {
+  margin-top: 1.25rem;
+  border-top: 8px solid var(--yellow);
+}
+
+.build-cardio-date {
+  display: inline-grid;
+  gap: 0.15rem;
+  margin-bottom: 0.4rem;
+  font-weight: 700;
+}
+
+/* The cardio form's label/input rules would stack these chips and blow up the radios: keep them as small chips. */
+.cardio-form .cardio-measure label.chip-check {
+  display: inline-flex;
+  min-height: 36px;
+  padding: 0 0.75rem;
+  font-size: 0.85rem;
+}
+
+.cardio-form .cardio-measure input[type='radio'] {
+  min-height: 0;
+  width: auto;
+  margin: 0;
+  padding: 0;
+}

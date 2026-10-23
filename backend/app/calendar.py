@@ -24,6 +24,15 @@ Rules, all enforced here in code:
     'calendar_note') and returns a supportive message pointing to a doctor or PT. No AI call, ever: notes are
     never sent to any model (shared_rules.md rule 2) and no MCP tool reads them.
   * Pregnant / postpartum users have no plan: GET returns an empty calendar that points to /pregnancy-support.
+  * Every day that isn't done and isn't past offers one explicit choice of what goes there (the day-type selector):
+    "Use my plan" (POST /api/calendar/{id}/use-plan: the generated day, where the plan has one), "Build your own"
+    (POST /api/calendar/{id}/custom, the Workout Builder), or "Add cardio" (POST /api/calendar/{id}/cardio-day: a
+    cardio day, done once cardio is logged on its date, see app/cardio.py). Cardio and built days are custom days:
+    kept on a retake, and "Use my plan" brings the planned day back.
+  * Done days show a calorie range computed in code (day_calories below): the Workout Reviewer's Compendium MET
+    method for the strength session's minutes, plus each cardio log's own estimate. None for pregnant / postpartum
+    users. GET /api/calendar/progress (app/services/progress_marker.py) builds the progress marker from the same
+    numbers.
 """
 
 import json
@@ -95,6 +104,15 @@ def open_day(on: date) -> dict:
     """A day with nothing planned yet ("I'll build it myself" mode, or a date opened for "Save to calendar")."""
     return {"plan_day": WEEKDAYS[on.weekday()], "focus": None, "est_minutes": 0, "exercises": [], "open": True,
             "protocol_status": None, "review_notice": None, "snapshot_at": now_utc()}
+
+
+def cardio_content(cardio_type: str | None, on: date) -> dict:
+    """A cardio day ("Add cardio", or cardio logged on a rest / open day): nothing prescribed, just what kind."""
+    from app.services.cardio_estimate import CARDIO_TYPES
+    label = CARDIO_TYPES.get(cardio_type or "", {}).get("label")
+    return {"plan_day": WEEKDAYS[on.weekday()], "focus": f"Cardio: {label}" if label else "Cardio", "est_minutes": 0,
+            "exercises": [], "cardio": {"type": cardio_type}, "protocol_status": None, "review_notice": None,
+            "snapshot_at": now_utc()}
 
 
 def calendar_settings(conn: sqlite3.Connection, user_id: int) -> dict | None:
@@ -201,7 +219,17 @@ def can_override(day: str, completed: bool) -> bool:
     return not completed and date.fromisoformat(day) >= today()
 
 
-def entry_dict(r: sqlite3.Row) -> dict:
+def day_choice(r: sqlite3.Row) -> str:
+    """Which of the three the day is now: 'plan', 'build' (Workout Builder), 'cardio', or 'open' (nothing yet)."""
+    content = json.loads(r["workout_content"])
+    if r["day_type"] == "cardio":
+        return "cardio"
+    if r["source"] == "custom":
+        return "build"
+    return "open" if content.get("open") else "plan"
+
+
+def entry_dict(r: sqlite3.Row, calories: dict | None = None) -> dict:
     planned = json.loads(r["planned_content"]) if r["planned_content"] else None
     return {
         "id": r["id"],
@@ -216,6 +244,8 @@ def entry_dict(r: sqlite3.Row) -> dict:
         "can_override": can_override(r["date"], bool(r["completed"])),
         # What "Revert to planned workout" would bring back (only on custom days).
         "planned": {"day_type": planned["day_type"], "focus": planned["workout_content"].get("focus")} if planned else None,
+        "choice": day_choice(r),   # the day-type selector's current pick
+        "calories": calories,      # done days only: {"low", "high", "parts"} computed in code, or None
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
     }
@@ -256,9 +286,61 @@ def get_calendar(
     try:
         rows = conn.execute("SELECT * FROM calendar_entries WHERE user_id = ? AND date BETWEEN ? AND ? ORDER BY date",
                             (uid, start.isoformat(), end.isoformat())).fetchall()
+        weight = _weight(conn, uid)
     finally:
         conn.close()
-    return {**base, "needs_quiz": not has_quiz, "needs_clinical_review": False, "entries": [entry_dict(r) for r in rows]}
+    cals = day_calories(rows, base["cardio"], weight)
+    return {**base, "needs_quiz": not has_quiz, "needs_clinical_review": False,
+            "entries": [entry_dict(r, cals.get(r["date"])) for r in rows]}
+
+
+@router.get("/calendar/progress")
+def calendar_progress(week_start: date | None = Query(None, description="Monday of the week; default this week"),
+                      uid: int = Depends(signed_in)) -> dict:
+    """The progress marker at the top of the calendar (app/services/progress_marker.py). Code only, no AI."""
+    from app.services.progress_marker import build
+    start = week_start or today() - timedelta(days=today().weekday())
+    return build(uid, start, today())
+
+
+# ---------------------------------------------------------------- calories on done days (code only)
+
+def _weight(conn: sqlite3.Connection, uid: int) -> float | None:
+    row = conn.execute("SELECT weight FROM quiz_profiles WHERE user_id = ?", (uid,)).fetchone()
+    return row["weight"] if row else None
+
+
+def strength_kcal(content: dict, weight_lb: float | None) -> dict | None:
+    """The Workout Reviewer's per-session range (app/services/workout_review.estimate) for a day's minutes."""
+    from app.services.workout_review import estimate
+    minutes = float(content.get("est_minutes") or 0)
+    if not minutes:
+        return None
+    est = estimate(minutes, weight_lb, None, [], None)
+    return est["per_session_kcal"] if est["available"] else None
+
+
+def day_calories(rows: list[sqlite3.Row], cardio_logs: list[dict], weight_lb: float | None) -> dict[str, dict]:
+    """{date: {"low", "high", "parts"}} for every DONE day: the strength session (if it was a done workout day) plus
+    each cardio log on that date that has an estimate. Every number comes from the two existing estimators; this only
+    adds them up. Cardio logs already carry no estimate for pregnant / postpartum users (who have no entries anyway)."""
+    out: dict[str, dict] = {}
+    for r in rows:
+        if not r["completed"]:
+            continue
+        parts = []
+        if r["day_type"] == "workout":
+            k = strength_kcal(json.loads(r["workout_content"]), weight_lb)
+            if k:
+                parts.append({"what": "strength", **k})
+        for log in cardio_logs:
+            if log["date"] == r["date"] and log["estimate"].get("available"):
+                parts.append({"what": "cardio", "log_id": log["id"], **log["estimate"]["kcal"]})
+        if parts:
+            out[r["date"]] = {"low": sum(x["low"] for x in parts), "high": sum(x["high"] for x in parts),
+                              "parts": parts, "rough": any(log["estimate"].get("rough") for log in cardio_logs
+                                                           if log["date"] == r["date"] and log["estimate"].get("available"))}
+    return out
 
 
 # ---------------------------------------------------------------- updating
@@ -353,6 +435,9 @@ def update_entry(entry_id: int, body: CalendarUpdate, uid: int = Depends(signed_
             # 3. completed -> workout_logs (the same table the Coach reads)
             if "completed" in sent and body.completed is not None and body.completed != bool(entry["completed"]):
                 current = conn.execute("SELECT * FROM calendar_entries WHERE id = ?", (entry_id,)).fetchone()
+                if current["day_type"] == "cardio":
+                    raise HTTPException(422, "A cardio day is done once you log your cardio on it"
+                                             + ("." if body.completed else "; remove the log to un-mark it."))
                 if body.completed:
                     if current["day_type"] != "workout":
                         raise HTTPException(422, "Rest days don't get marked done. Resting is the point!")
@@ -469,6 +554,88 @@ def revert_custom(entry_id: int, uid: int = Depends(signed_in)) -> dict:
     finally:
         conn.close()
     return {"entry": entry_dict(row)}
+
+
+class CardioDayIn(BaseModel):
+    model_config = {"extra": "forbid"}
+    cardio_type: str | None = Field(None, max_length=30)
+
+
+@router.post("/calendar/{entry_id}/cardio-day")
+def make_cardio_day(entry_id: int, body: CardioDayIn, uid: int = Depends(signed_in)) -> dict:
+    """"Add cardio": the day becomes a cardio day (a custom day, so the planned day is kept for "Use my plan"). It
+    counts as done once cardio is logged on its date. No AI, nothing prescribed: the user logs what they did."""
+    from app.services.cardio_estimate import CARDIO_TYPES
+    if profile_needs_clinical_review(uid):
+        raise HTTPException(403, {"code": "needs_clinical_review", "message": CLINICAL_REVIEW_NO_AI,
+                                  "page": CLINICAL_REVIEW_PAGE})
+    if body.cardio_type is not None and body.cardio_type not in CARDIO_TYPES:
+        raise HTTPException(422, f"cardio_type must be one of {sorted(CARDIO_TYPES)}.")
+    conn = connect()
+    try:
+        with conn:
+            entry = _overridable(conn, uid, entry_id)
+            planned = entry["planned_content"]
+            if entry["source"] == "generated":
+                planned = json.dumps({"day_type": entry["day_type"],
+                                      "workout_content": json.loads(entry["workout_content"])})
+            day = date.fromisoformat(entry["date"])
+            logged = conn.execute("SELECT COUNT(*) FROM cardio_logs WHERE user_id = ? AND date = ?",
+                                  (uid, entry["date"])).fetchone()[0]
+            conn.execute(
+                "UPDATE calendar_entries SET day_type = 'cardio', workout_content = ?, source = 'custom', "
+                "planned_content = ?, completed = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(cardio_content(body.cardio_type, day)), planned, int(bool(logged)), now_utc(), entry_id))
+        row = conn.execute("SELECT * FROM calendar_entries WHERE id = ?", (entry_id,)).fetchone()
+    finally:
+        conn.close()
+    return {"entry": entry_dict(row), "agent_called": False}
+
+
+@router.post("/calendar/{entry_id}/use-plan")
+def use_plan(entry_id: int, uid: int = Depends(signed_in)) -> dict:
+    """"Use my plan": the generated day for this date. A day you built or made cardio gets back the planned day it
+    replaced; an open day (or one whose planned day was open) gets this weekday of your current plan. No AI."""
+    if profile_needs_clinical_review(uid):
+        raise HTTPException(403, {"code": "needs_clinical_review", "message": CLINICAL_REVIEW_NO_AI,
+                                  "page": CLINICAL_REVIEW_PAGE})
+    conn = connect()
+    try:
+        entry = _overridable(conn, uid, entry_id)
+        cfg = calendar_settings(conn, uid)
+    finally:
+        conn.close()
+    planned = json.loads(entry["planned_content"]) if entry["planned_content"] else None
+    if planned and not planned["workout_content"].get("open"):
+        day_type, content = planned["day_type"], planned["workout_content"]   # exactly what the plan had
+    else:
+        if entry["source"] == "generated" and not json.loads(entry["workout_content"]).get("open"):
+            raise HTTPException(409, "This day is already your plan.")
+        try:
+            plan = generate_for_user(uid)
+        except NoProfile:
+            raise HTTPException(409, "Take the quiz first, so there's a plan to use.")
+        if not plan.generated:
+            raise HTTPException(409, plan.blocked_reason or "There's no generated plan to use.")
+        day = date.fromisoformat(entry["date"])
+        pd = {d.day: d for d in plan.days}[WEEKDAYS[day.weekday()]]
+        day_type = "workout" if pd.kind == "training" else "rest"
+        content = snapshot(plan, pd, day, cfg["started"] if cfg else None)
+    conn = connect()
+    try:
+        with conn:
+            current = _overridable(conn, uid, entry_id)   # checked again inside the write
+            if current["day_type"] == "cardio" and conn.execute(
+                    "SELECT 1 FROM cardio_logs WHERE user_id = ? AND date = ?", (uid, current["date"])).fetchone():
+                raise HTTPException(409, "You've logged cardio on this day. Remove the log first to switch it back.")
+            conn.execute(
+                "UPDATE calendar_entries SET day_type = ?, workout_content = ?, source = 'generated', "
+                "planned_content = NULL, completed = 0, updated_at = ? WHERE id = ?",
+                (day_type, json.dumps(content), now_utc(), entry_id))
+        row = conn.execute("SELECT * FROM calendar_entries WHERE id = ?", (entry_id,)).fetchone()
+    finally:
+        conn.close()
+    return {"entry": entry_dict(row), "agent_called": False}
 
 
 def custom_day_items(uid: int, entry_id: int) -> list[dict]:

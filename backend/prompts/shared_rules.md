@@ -192,6 +192,17 @@ generation, equipment, pregnancy), `tests/test_plan_agent.py` (the agent's input
 - Same privacy as every agent (rule 2): the model gets the computed review only, never the user's id, username,
   first name, email, weight, or any free text. Pregnant / postpartum users get a 403 before anything is computed or sent.
 
+- **The same method, and the same rule, everywhere calories appear (2026-10-23).** Cardio logs
+  (`app/services/cardio_estimate.py`: each activity type has an easier and a harder Compendium code; distance uses the
+  codes that state a speed, as calories per mile; steps become distance by a rough 2,000-2,500 steps-a-mile rule of
+  thumb and are labelled extra rough; "Something else" gets no number), the calorie range on each done calendar day
+  (the Reviewer's per-session range for the strength minutes plus each cardio log's own range), and the progress
+  marker at the top of the calendar (`app/services/progress_marker.py`) all use these calculations and only add them
+  up. The progress marker has no model at all: its numbers come from `check_goal_achievement`, the calorie estimates,
+  pounds = calories / 3,500 (weight-loss goals only, labelled as a rough approximation, never a promise), and
+  `compute_strength_equivalents`; its words are code templates. The full caveats are shown once, at the bottom of the
+  calendar, and every figure links to them. Tests: `tests/test_calendar_redesign.py` (hand-checked numbers).
+
 **Enforced in code:** `app/agents/workout_reviewer.py` extracts every number in the reply and compares it with the
 numbers in the model's input. Any number that isn't there sends the draft back; after two tries, and once more as
 a final check before returning, the reply is replaced by a plain summary written by code. A tone guard like the
@@ -235,12 +246,30 @@ Tests: `test_injured_and_rehab_profiles_do_not_progress_but_the_same_goal_withou
   list of exercises shown to someone with no plan reads like a suggestion, which is exactly what we've held back until
   an OB-GYN has reviewed pregnancy guidance (rule 6). The API refuses `exercise_id` for them (403).
 
-**Enforced in code:** `app/cardio.py`. Tests: `tests/test_cardio.py`
+- **DECISION (revisited 2026-10-23, with steps, distance and calorie estimates added): pregnant / postpartum users
+  can log cardio however they measure it (minutes, steps or distance), in their own words, and it counts toward their
+  streak, but they get no calorie estimate and no progress marker.** Reason: logging is still just a personal record
+  with no AI and no prescription, so yes to that. The numbers are different: the Compendium's MET values come from
+  adults who weren't pregnant and say nothing about pregnancy or the months after birth, so the range would be less
+  accurate, and calories and pound figures during pregnancy and postpartum (when weight gain or recovery is expected)
+  read like weight-loss guidance, which is exactly the kind of advice we hold back until an OB-GYN has reviewed it.
+  The library picker stays off for them, as above. Test: `test_pregnant_users_log_cardio_any_way_they_like_but_get_no_numbers`.
+- Logging cardio on a calendar rest, open or cardio day marks that day done (it becomes a cardio day, a custom day
+  that "Use my plan" can undo). Strength days are only marked done with their own toggle.
+
+**Enforced in code:** `app/cardio.py`, `app/services/cardio_estimate.py`. Tests: `tests/test_cardio.py`,
+`tests/test_calendar_redesign.py`,
 (`test_pregnant_users_can_log_in_their_own_words_only`, `test_cardio_text_never_reaches_any_model`,
 `test_red_flag_in_a_cardio_log_is_saved_logged_and_answered_without_ai`).
 
 ## 10. Calendar population modes, and saving Build Your Own to the calendar
 
+- **Every day that isn't done or past offers one explicit choice (2026-10-23):** "Use my plan" (the generated day,
+  where the plan has one; for a built or cardio day it brings back the planned day it replaced), "Build your own"
+  (the Workout Builder, same injury filter), or "Add cardio" (a cardio day, done once cardio is logged on its date).
+  Built and cardio days are custom days, so a retake keeps them. Strength days, generated or built, share the same
+  done toggle; cardio days are done by logging. No AI in any of it except the Workout Builder itself. Blocked for
+  pregnant / postpartum users (403), who have no plan; their activity log still works (rule 9).
 - After the quiz (and any time in Settings) the user picks how the calendar is filled: **generated** (the default),
   **review** (the generated plan, laid out only after they review it and optionally swap exercises), or **self** (open
   days they fill with Build Your Own). Every mode keeps per-day overrides, and the retake rules (rule 2 of the calendar:

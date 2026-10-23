@@ -62,8 +62,9 @@ def by_date(body: dict) -> dict[str, dict]:
 
 
 def stored(e: dict) -> dict:
-    """An entry without the flags computed from "today" (tests move today forward)."""
-    return {k: v for k, v in e.items() if k not in ("can_override", "can_complete")}
+    """An entry without the fields computed on the fly: the flags from "today" (tests move today forward) and the
+    calorie range (computed for done days from the stored snapshot)."""
+    return {k: v for k, v in e.items() if k not in ("can_override", "can_complete", "calories")}
 
 
 def patch(client, h, entry_id, **body):

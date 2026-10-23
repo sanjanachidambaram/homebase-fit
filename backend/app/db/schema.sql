@@ -197,19 +197,28 @@ CREATE TABLE built_workouts (
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
--- Cardio the user did (a log, not a recommendation; no AI). Either free text ("ran 20 min") or one of the library's
--- cardio exercises, plus minutes. activity is the user's own words, like calendar notes: never sent to any model,
--- red-flag checked when saved (safety_events source 'cardio_log'). Each log also writes one workout_logs row, so the
--- Coach's streak and rest-day checks see the activity.
+-- Cardio the user did (a log, not a recommendation; no AI). Free text ("ran 20 min") or one of the library's cardio
+-- exercises, measured however they like: minutes, steps, or distance (measure says which; distance is stored in
+-- miles). cardio_type (walking, running, ...) picks the Compendium MET codes for the calorie estimate
+-- (app/services/cardio_estimate.py); NULL = no estimate. activity is the user's own words, like calendar notes:
+-- never sent to any model, red-flag checked when saved (safety_events source 'cardio_log'). Each log also writes one
+-- workout_logs row, so the Coach's streak and rest-day checks see the activity.
 CREATE TABLE cardio_logs (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     date             TEXT NOT NULL CHECK (date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
     activity         TEXT CHECK (activity IS NULL OR length(activity) <= 80),
     exercise_id      TEXT REFERENCES exercises(id),
-    duration_minutes INTEGER NOT NULL CHECK (duration_minutes BETWEEN 1 AND 600),
+    cardio_type      TEXT,
+    measure          TEXT NOT NULL DEFAULT 'duration' CHECK (measure IN ('duration', 'steps', 'distance')),
+    duration_minutes INTEGER CHECK (duration_minutes BETWEEN 1 AND 600),
+    steps            INTEGER CHECK (steps BETWEEN 1 AND 100000),
+    distance_miles   REAL CHECK (distance_miles > 0 AND distance_miles <= 200),
     created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    CHECK (activity IS NOT NULL OR exercise_id IS NOT NULL)
+    CHECK (activity IS NOT NULL OR exercise_id IS NOT NULL),
+    CHECK ((measure = 'duration') = (duration_minutes IS NOT NULL)),
+    CHECK ((measure = 'steps') = (steps IS NOT NULL)),
+    CHECK ((measure = 'distance') = (distance_miles IS NOT NULL))
 );
 CREATE INDEX idx_cardio_logs_user_date ON cardio_logs(user_id, date);
 
@@ -221,12 +230,13 @@ CREATE INDEX idx_cardio_logs_user_date ON cardio_logs(user_id, date);
 -- red flags in code when saved (safety_events source 'calendar_note').
 -- A day can be overridden with a custom workout from the Workout Builder: source = 'custom', and the generated
 -- day it replaced is kept in planned_content ({"day_type", "workout_content"}) so it can be restored. A retake
--- never replaces a custom day either.
+-- never replaces a custom day either. A cardio day (day_type 'cardio', chosen with "Add cardio") is a custom day
+-- too; it counts as done once cardio is logged on its date (cardio_logs), not with the strength-day toggle.
 CREATE TABLE calendar_entries (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     date            TEXT NOT NULL CHECK (date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),   -- YYYY-MM-DD
-    day_type        TEXT NOT NULL CHECK (day_type IN ('workout', 'rest')),
+    day_type        TEXT NOT NULL CHECK (day_type IN ('workout', 'rest', 'cardio')),
     workout_content TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(workout_content) AND json_type(workout_content) = 'object'),
     completed       INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
     notes           TEXT,

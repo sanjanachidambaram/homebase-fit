@@ -1,7 +1,10 @@
 // Calendar: your generated plan on real dates, one week at a time. Drag a day onto another day to swap them
 // (PATCH /api/calendar/{id} {date}), tick a workout off (writes the workout logs the Coach reads), and keep notes.
-// "Build your own for this day" swaps a day's workout for one from the Workout Builder (same form, same injury
-// filter); the planned workout is kept so it can be restored, and a quiz retake never replaces a day you built.
+// Every day that isn't done or past shows one clear choice of what goes there: "Use my plan" (the generated day),
+// "Build your own" (the Workout Builder, same injury filter), or "Add cardio" (done once you log cardio on it).
+// The planned day is kept so "Use my plan" can bring it back, and a quiz retake never replaces a day you chose.
+// Done days show a calorie range computed in code (never AI), and the progress marker at the top is code too: it
+// only adds up numbers the app already computes. The full caveats live once, at the bottom (#calorie-estimates).
 // Notes stay private: they're never sent to the AI. A note that mentions pain or other warning signs is still
 // saved, and the API (plain code, no AI) sends back a message pointing you to a doctor or physical therapist.
 import {
@@ -18,13 +21,16 @@ import {
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   fetchCalendar,
+  fetchCalendarProgress,
   isSignInGone,
+  makeCardioDay,
   MUSCLE_GROUP_LABELS,
   overrideCalendarDay,
   reviewCalendarDay,
-  revertCalendarDay,
   updateCalendarDay,
+  applyDayPlan,
   type CalendarEntry,
+  type CalendarProgress,
   type CalendarRange,
 } from '../api'
 import AccountForm from '../components/AccountForm'
@@ -60,17 +66,19 @@ function DayCard({
   supportMessage,
   onChange,
   onBuild,
-  onRevert,
+  onUsePlan,
+  onCardio,
   onReview,
   cardio,
 }: {
   entry: CalendarEntry
-  cardio?: ReactNode // rest and open days: the cardio log for that date
+  cardio?: ReactNode // the cardio log for that date (on a strength day it doesn't tick the workout off)
   busy: boolean
   supportMessage: string | null
   onChange: (id: number, change: { notes?: string | null; completed?: boolean }) => Promise<boolean>
   onBuild: (entry: CalendarEntry) => void
-  onRevert: (id: number) => void
+  onUsePlan: (entry: CalendarEntry) => void
+  onCardio: (entry: CalendarEntry) => void
   onReview: (entry: CalendarEntry) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -92,16 +100,24 @@ function DayCard({
       ref={setNodeRef}
       className={`day-card day-${entry.day_type}${entry.completed ? ' day-done' : ''}${isDragging ? ' day-dragging' : ''}`}
       style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined}
-      aria-label={`${dayName(entry.date)} ${shortDate(entry.date)}: ${entry.day_type === 'workout' ? 'workout' : 'rest day'}`}
+      aria-label={`${dayName(entry.date)} ${shortDate(entry.date)}: ${
+        entry.day_type === 'workout' ? 'workout' : entry.day_type === 'cardio' ? 'cardio day' : 'rest day'
+      }`}
     >
       <div className="day-card-head">
         {/* A custom day's focus reads "Your own: ..." and gets the pink chip, so it's clear it was overridden. */}
         <span
           className={`chip chip-small ${
-            entry.source === 'custom' ? 'chip-custom' : entry.day_type === 'workout' ? 'chip-workout' : 'chip-rest'
+            entry.day_type === 'cardio'
+              ? 'chip-cardio'
+              : entry.source === 'custom'
+                ? 'chip-custom'
+                : entry.day_type === 'workout'
+                  ? 'chip-workout'
+                  : 'chip-rest'
           }`}
         >
-          {entry.day_type === 'workout' ? (w.focus ?? 'Workout') : 'Rest day'}
+          {entry.day_type === 'rest' ? (w.open ? 'Open day' : 'Rest day') : (w.focus ?? 'Workout')}
         </span>
         {entry.completed ? (
           <span className="day-locked" title="Done days stay on their date">
@@ -113,6 +129,39 @@ function DayCard({
           </button>
         )}
       </div>
+
+      {entry.can_override && (
+        <div className="day-choice" role="group" aria-label="What goes on this day">
+          <button
+            type="button"
+            className="day-choice-btn"
+            aria-pressed={entry.choice === 'plan'}
+            disabled={busy || entry.choice === 'plan'}
+            onClick={() => onUsePlan(entry)}
+          >
+            Use my plan
+          </button>
+          <button type="button" className="day-choice-btn" aria-pressed={entry.choice === 'build'} disabled={busy} onClick={() => onBuild(entry)}>
+            {entry.choice === 'build' ? 'Rebuild it' : 'Build your own'}
+          </button>
+          <button
+            type="button"
+            className="day-choice-btn"
+            aria-pressed={entry.choice === 'cardio'}
+            disabled={busy || entry.choice === 'cardio'}
+            onClick={() => onCardio(entry)}
+          >
+            Add cardio
+          </button>
+        </div>
+      )}
+      {entry.calories && (
+        <p className="day-kcal">
+          <a href="#calorie-estimates" title="How we estimate calories">
+            ~{entry.calories.low}–{entry.calories.high} kcal burned{entry.calories.rough ? ' (rough)' : ''}
+          </a>
+        </p>
+      )}
 
       {entry.day_type === 'workout' ? (
         <>
@@ -144,35 +193,34 @@ function DayCard({
             {entry.completed ? 'Done!' : 'Mark done'}
           </label>
           {!entry.completed && !entry.can_complete && <p className="hint">Tick it off on the day.</p>}
+          {cardio}
+        </>
+      ) : entry.day_type === 'cardio' ? (
+        <>
+          <p className="rest-text">
+            {entry.completed ? 'Cardio done. Nice work showing up!' : 'Cardio day: log what you did and it counts as done.'}
+          </p>
+          <span className={`chip-check day-done-toggle${entry.completed ? ' chip-on' : ''}`} aria-live="polite">
+            {entry.completed ? 'Done!' : 'Not logged yet'}
+          </span>
+          {cardio}
         </>
       ) : (
         <>
           <p className="rest-text">
             {w.open
-              ? 'Open day: build your own workout for it, or log some cardio.'
+              ? 'Open day: pick what goes here above, or just log some cardio.'
               : 'Rest and recover. Your muscles get stronger on days like this.'}
           </p>
           {cardio}
         </>
       )}
 
-      {entry.source === 'custom' && (
+      {entry.choice === 'build' && (
         <div className="day-custom-actions">
           <button type="button" className="btn-ghost btn-small" disabled={busy} onClick={() => onReview(entry)}>
             Review this workout
           </button>
-        </div>
-      )}
-      {entry.can_override && (
-        <div className="day-custom-actions">
-          <button type="button" className="btn-ghost btn-small" disabled={busy} onClick={() => onBuild(entry)}>
-            {entry.source === 'custom' ? 'Rebuild this day' : 'Build your own for this day'}
-          </button>
-          {entry.source === 'custom' && entry.planned && (
-            <button type="button" className="btn-ghost btn-small" disabled={busy} onClick={() => onRevert(entry.id)}>
-              Revert to planned {entry.planned.day_type === 'rest' ? 'rest day' : 'workout'}
-            </button>
-          )}
         </div>
       )}
 
@@ -217,6 +265,38 @@ function DayCell({ date, isToday, children }: { date: string; isToday: boolean; 
         {isToday && <span className="today-pill">Today</span>}
       </h3>
       {children}
+    </section>
+  )
+}
+
+/** The one place on the calendar with the full caveats behind every calorie and pound figure (linked from each). */
+function CalorieCaveats() {
+  return (
+    <section id="calorie-estimates" className="calorie-caveats" aria-labelledby="calorie-estimates-title">
+      <h3 id="calorie-estimates-title">How we estimate calories</h3>
+      <ul>
+        <li>
+          Calories are worked out by the app's own math, never by AI: MET values from the 2024 Adult Compendium of
+          Physical Activities times your weight from the quiz times the time spent (about 1 calorie per kilogram per hour
+          for each MET). The Compendium itself says its values don't reflect precise individual energy use.
+        </li>
+        <li>
+          Every number is a range: an easier and a harder way of doing the same thing. Where you land depends on how hard
+          you worked.
+        </li>
+        <li>
+          Distance uses the Compendium's speed-specific values for walking, running and cycling. Steps are turned into
+          distance with a rough rule of thumb (about 2,000 to 2,500 steps a mile), so those are extra rough.
+        </li>
+        <li>
+          Pound figures (weight-loss goals only) use the 3,500-calories-per-pound rule of thumb: a rough, long-used
+          approximation, not a precise prediction. Exercise on its own is usually a small piece of weight change compared
+          with eating habits; sleep and stress play a part too.
+        </li>
+      </ul>
+      <p className="hint">
+        Sources: see <Link to="/about/data">where our data comes from</Link>.
+      </p>
     </section>
   )
 }
@@ -329,14 +409,19 @@ function Calendar({ session }: { session: Session }) {
   const [reviewingFor, setReviewingFor] = useState<CalendarEntry | null>(null)
   const closeReview = useCallback(() => setReviewingFor(null), [])
   const [notice, setNotice] = useState<string | null>(null)
+  const [progress, setProgress] = useState<CalendarProgress | null>(null)
   const weekEnd = addDays(weekStart, 6)
   const closeBuilder = useCallback(() => setBuildingFor(null), [])
 
   const load = useCallback(
     () =>
-      fetchCalendar(session.token, weekStart, weekEnd)
-        .then((d) => {
+      Promise.all([
+        fetchCalendar(session.token, weekStart, weekEnd),
+        fetchCalendarProgress(session.token, weekStart).catch(() => null), // the marker is extra: never blocks
+      ])
+        .then(([d, p]) => {
           setData(d)
+          setProgress(p)
           setError(null)
         })
         .catch((e: Error) => {
@@ -379,15 +464,19 @@ function Calendar({ session }: { session: Session }) {
     }
   }
 
-  async function revert(id: number) {
-    setBusyId(id)
+  /** The day-type selector's "Use my plan" and "Add cardio" (Build your own opens the builder). No AI. */
+  async function choose(entry: CalendarEntry, pick: 'plan' | 'cardio') {
+    setBusyId(entry.id)
     setError(null)
     setNotice(null)
     try {
-      const r = await revertCalendarDay(session.token, id)
-      setNotice(`${dayName(r.entry.date)} ${shortDate(r.entry.date)} is back to the planned ${
-        r.entry.day_type === 'rest' ? 'rest day' : 'workout'
-      }.`)
+      const r = pick === 'plan' ? await applyDayPlan(session.token, entry.id) : await makeCardioDay(session.token, entry.id, null)
+      const when = `${dayName(r.entry.date)} ${shortDate(r.entry.date)}`
+      setNotice(
+        pick === 'cardio'
+          ? `${when} is a cardio day. Log what you did on the day and it counts as done.`
+          : `${when} is back to your plan${r.entry.day_type === 'rest' ? ' (a rest day)' : ''}.`,
+      )
       await load()
     } catch (e) {
       if (isSignInGone(e)) setSession(null)
@@ -440,6 +529,25 @@ function Calendar({ session }: { session: Session }) {
           This week
         </button>
       </div>
+
+      {progress?.available && progress.items && (
+        <section className="dash-card progress-marker" aria-labelledby="progress-title">
+          <h3 id="progress-title">{progress.headline}</h3>
+          <ul>
+            {progress.items.map((i) => (
+              <li key={i.kind} className={`progress-${i.kind}`}>
+                {i.text}{' '}
+                {i.anchor && (
+                  <a href={`#${i.anchor}`} className="hint">
+                    how we estimate
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="hint">Worked out by the app's own math from what you've logged, not by AI.</p>
+        </section>
+      )}
 
       {error && <p className="error">{error}</p>}
       {notice && (
@@ -515,9 +623,10 @@ function Calendar({ session }: { session: Session }) {
                           setNotice(null)
                           setBuildingFor(x)
                         }}
-                        onRevert={revert}
+                        onUsePlan={(x) => choose(x, 'plan')}
+                        onCardio={(x) => choose(x, 'cardio')}
                         onReview={setReviewingFor}
-                        cardio={entry.day_type === 'rest' ? cardioFor(date, true) : undefined}
+                        cardio={cardioFor(date, true)}
                       />
                     ) : (
                       <>
@@ -552,6 +661,7 @@ function Calendar({ session }: { session: Session }) {
               days you've marked done or written notes on are kept.
             </p>
           )}
+          <CalorieCaveats />
         </>
       )}
     </div>

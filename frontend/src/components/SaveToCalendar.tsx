@@ -10,7 +10,16 @@ const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.ge
 const nice = (s: string) => new Date(`${s}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 
 function label(e: CalendarEntry) {
-  const what = e.source === 'custom' ? 'your own workout' : e.workout.open ? 'open' : e.day_type === 'rest' ? 'rest day' : e.workout.focus
+  const what =
+    e.day_type === 'cardio'
+      ? 'cardio day'
+      : e.source === 'custom'
+        ? 'your own workout'
+        : e.workout.open
+          ? 'open'
+          : e.day_type === 'rest'
+            ? 'rest day'
+            : e.workout.focus
   return `${nice(e.date)} (${what})`
 }
 

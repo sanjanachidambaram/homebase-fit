@@ -468,7 +468,7 @@ export interface CalendarEntry {
   id: number
   date: string // YYYY-MM-DD
   weekday: PlanDay['day']
-  day_type: 'workout' | 'rest'
+  day_type: 'workout' | 'rest' | 'cardio' // cardio: "Add cardio" (done once cardio is logged on its date)
   // A snapshot of that day of the plan, taken when the entry was made (it never changes by itself).
   workout: {
     plan_day: PlanDay['day']
@@ -481,13 +481,18 @@ export interface CalendarEntry {
     open?: boolean // nothing planned: "I'll build it myself" mode, or a day opened by "Save to calendar"
     week?: number // week of the plan (progressive overload)
     progression_step?: number
+    cardio?: { type: string | null } // cardio days: which kind
   }
   completed: boolean
   notes: string | null // the user's own words; never sent to any AI model
   can_complete: boolean
   source: 'generated' | 'custom' // custom = the user built this day with the Workout Builder
   can_override: boolean // today or later and not done
-  planned: { day_type: 'workout' | 'rest'; focus: string | null } | null // what "revert" brings back
+  planned: { day_type: 'workout' | 'rest' | 'cardio'; focus: string | null } | null // what "Use my plan" brings back
+  /** The day-type selector's current pick. 'open' = nothing chosen yet ("I'll build it myself" mode). */
+  choice: 'plan' | 'build' | 'cardio' | 'open'
+  /** Done days only: a calorie range computed in code (Compendium MET method), or null. */
+  calories: { low: number; high: number; rough: boolean; parts: { what: 'strength' | 'cardio' }[] } | null
   created_at: string
   updated_at: string
 }
@@ -534,6 +539,32 @@ export const overrideCalendarDay = (token: string, id: number, body: WorkoutRequ
 /** Undo a custom day: the planned (generated) workout comes back. No AI involved. */
 export const revertCalendarDay = (token: string, id: number) =>
   request<{ entry: CalendarEntry }>(`/api/calendar/${id}/custom`, { method: 'DELETE' }, token)
+
+/** The day-type selector, "Use my plan": the generated day (a built or cardio day gets its planned day back). */
+export const applyDayPlan = (token: string, id: number) =>
+  request<{ entry: CalendarEntry }>(`/api/calendar/${id}/use-plan`, { method: 'POST' }, token)
+
+/** The day-type selector, "Add cardio": a cardio day, done once you log cardio on it. No AI. */
+export const makeCardioDay = (token: string, id: number, cardioType: string | null) =>
+  request<{ entry: CalendarEntry }>(
+    `/api/calendar/${id}/cardio-day`,
+    { method: 'POST', body: JSON.stringify({ cardio_type: cardioType }) },
+    token,
+  )
+
+/** The progress marker at the top of the calendar: numbers and words both from code, no AI. */
+export interface CalendarProgress {
+  available: boolean
+  reason?: string
+  goal_status?: string
+  headline?: string
+  items?: { kind: 'sessions' | 'minutes' | 'energy' | 'weight_change' | 'fun_fact'; text: string; anchor?: string; rough?: boolean }[]
+  heuristic_note?: string
+  caveats_anchor?: string
+}
+
+export const fetchCalendarProgress = (token: string, weekStart: string) =>
+  request<CalendarProgress>(`/api/calendar/progress?week_start=${weekStart}`, {}, token)
 
 // ---------------------------------------------------------------- Workout Reviewer
 
@@ -613,13 +644,26 @@ export const saveBuiltToCalendar = (token: string, builtId: number, date: string
 
 // ---------------------------------------------------------------- cardio log (no AI; your own record)
 
+/** A calorie range computed in code (Compendium MET values x your weight), or why there isn't one. */
+export type CardioEstimate =
+  | { available: false; reason: string }
+  | { available: true; kcal: { low: number; high: number }; basis: string; rough: boolean; caveats: string[] }
+
+export type CardioMeasure = 'duration' | 'steps' | 'distance'
+
 export interface CardioLog {
   id: number
   date: string
   activity: string | null
   exercise_id: string | null
   exercise_name: string | null
-  duration_minutes: number
+  cardio_type: string | null
+  cardio_type_label: string | null
+  measure: CardioMeasure
+  duration_minutes: number | null
+  steps: number | null
+  distance_miles: number | null
+  estimate: CardioEstimate
   created_at: string
 }
 
@@ -628,15 +672,35 @@ export interface CardioExercise {
   name: string
   equipment_needed: string[]
   difficulty: string
+  cardio_type: string
+}
+
+export interface CardioType {
+  value: string
+  label: string
+  distance: boolean // can be measured by distance
+  steps: boolean // can be measured by steps
+  estimate: boolean // has a calorie estimate ("Something else" doesn't)
 }
 
 export const fetchCardioExercises = () => getJson<CardioExercise[]>('/api/cardio/exercises')
+export const fetchCardioTypes = () => getJson<CardioType[]>('/api/cardio/types')
 
 export const logCardio = (
   token: string,
-  body: { date: string; activity?: string; exercise_id?: string; duration_minutes: number },
+  body: {
+    date: string
+    activity?: string
+    exercise_id?: string
+    cardio_type?: string
+    measure: CardioMeasure
+    duration_minutes?: number
+    steps?: number
+    distance?: number
+    distance_unit?: 'mi' | 'km'
+  },
 ) =>
-  request<{ log: CardioLog; safety: { flagged: boolean; message?: string } }>(
+  request<{ log: CardioLog; safety: { flagged: boolean; message?: string }; calendar_entry_updated: number | null }>(
     '/api/cardio',
     { method: 'POST', body: JSON.stringify(body) },
     token,
