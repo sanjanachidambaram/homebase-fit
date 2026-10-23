@@ -138,7 +138,7 @@ def test_model_cannot_invent_its_own_number(client, narrator):
     n = narrator("Nice work! You'll burn about 200 calories a session.",          # a number not in the data
                  "Roughly 131 to 281 calories a session.",                         # 'rounded' differently
                  "That's around 0.04 pounds a day.")                               # converted
-    uid, h = account(client, "numbers@example.com")
+    uid, h = account(client, "numbers")
     r = review_api(client, h)
     assert r.status_code == 200, r.text
     res = r.json()["result"]
@@ -150,7 +150,7 @@ def test_model_cannot_invent_its_own_number(client, narrator):
 
 
 def test_model_narration_is_kept_when_it_only_uses_the_codes_numbers(client, narrator):
-    uid, h = account(client, "goodnumbers@example.com")
+    uid, h = account(client, "goodnumbers")
     res = review_api(client, h).json()["result"]                                   # learn the computed numbers
     k = res["estimate"]["per_session_kcal"]
     good = (f"A solid mix of legs, arms and core. Next time a back or shoulder move would round it out. "
@@ -166,7 +166,7 @@ def test_model_narration_is_kept_when_it_only_uses_the_codes_numbers(client, nar
 ])
 def test_promises_and_shaming_are_rejected_even_with_allowed_numbers(client, narrator, attempt):
     narrator(attempt)
-    uid, h = account(client, "tone@example.com")
+    uid, h = account(client, "tone")
     res = review_api(client, h).json()["result"]
     assert res["summary_by"] == "code" and res["summary"] != attempt
 
@@ -175,7 +175,7 @@ def test_promises_and_shaming_are_rejected_even_with_allowed_numbers(client, nar
 
 def test_review_route_returns_coverage_estimate_and_citations(client, narrator):
     narrator("A friendly summary without numbers.")
-    uid, h = account(client, "route@example.com")
+    uid, h = account(client, "route")
     r = review_api(client, h).json()
     res = r["result"]
     assert [e["name"] for e in res["exercises"]] == ["Dead Bug", "Incline Push-Up", "Bodyweight Squat"]
@@ -190,7 +190,7 @@ def test_review_route_returns_coverage_estimate_and_citations(client, narrator):
 
 def test_review_route_rejects_bad_input(client, narrator):
     n = narrator("x")
-    uid, h = account(client, "badinput@example.com")
+    uid, h = account(client, "badinput")
     assert review_api(client, h, [{"exercise_id": "made_up", "sets": 2, "reps": "8", "rest_seconds": 30}]).status_code == 422
     assert review_api(client, h, []).status_code == 422
     assert client.post("/api/workouts/review", headers=h, json={"items": ITEMS, "user_id": 1}).status_code == 422
@@ -199,8 +199,8 @@ def test_review_route_rejects_bad_input(client, narrator):
 
 
 def test_calendar_review_is_for_custom_days_only(client, on_day, use_script, narrator):
-    uid, h = account(client, "calreview@example.com")
-    other, oh = account(client, "calother@example.com")
+    uid, h = account(client, "calreview")
+    other, oh = account(client, "calother")
     days = by_date(get_days(client, h))
     use_script(*CORE_SCRIPT)                                                       # the Workout Builder
     assert client.post(f"/api/calendar/{days[d(2)]['id']}/custom", headers=h,
@@ -218,7 +218,7 @@ def test_calendar_review_is_for_custom_days_only(client, on_day, use_script, nar
 
 @pytest.mark.parametrize("status", ["pregnant", "postpartum"])
 def test_pregnant_and_postpartum_users_are_blocked_at_the_api(client, on_day, use_script, narrator, status):
-    uid, h = account(client, f"review-{status}@example.com")
+    uid, h = account(client, f"review-{status}")
     days = by_date(get_days(client, h))
     use_script(*CORE_SCRIPT)
     client.post(f"/api/calendar/{days[d(2)]['id']}/custom", headers=h, json={"picks": {"core": 2}, "time_budget_minutes": 15})
@@ -234,8 +234,8 @@ def test_pregnant_and_postpartum_users_are_blocked_at_the_api(client, on_day, us
 
 def test_the_model_never_sees_who_the_user_is(client, narrator):
     n = narrator("A kind summary.")
-    email = "very.private.person@example.com"
-    r = client.post("/api/users", json={"email": email, "password": "correct horse 1"}).json()
+    username, first_name = "very.private.person", "Zenobia"
+    r = client.post("/api/users", json={"username": username, "first_name": first_name, "password": "correct horse 1"}).json()
     h = {"Authorization": f"Bearer {r['token']}"}
     from tests.helpers import quiz_answers
     client.put(f"/api/users/{r['user_id']}/quiz-profile", headers=h, json={
@@ -243,7 +243,7 @@ def test_the_model_never_sees_who_the_user_is(client, narrator):
         "answers": quiz_answers(weight=173, other_activity_notes="PRIVATE-ACTIVITY-NOTE")})
     review_api(client, h)
     sent = " ".join(n.seen)
-    for secret in (email, "very.private", "PRIVATE-INJURY-NOTE", "Dr. Smith", "PRIVATE-ACTIVITY-NOTE",
+    for secret in (username, "very.private", first_name, "PRIVATE-INJURY-NOTE", "Dr. Smith", "PRIVATE-ACTIVITY-NOTE",
                    '"user_id"', '"weight_lb"', '"weight":', "173"):
         assert secret not in sent, secret
     assert "per_session_kcal" in sent                                              # it did get the computed review

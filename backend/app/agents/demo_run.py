@@ -40,8 +40,9 @@ def main() -> None:
     keep = "--keep" in sys.argv
     transcript = {"ran_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "calls": []}
     with TestClient(app) as client:
-        email = f"demo.{int(time.time())}@homebase.test"
-        r = client.post("/api/users", json={"email": email, "password": "demo-password-123"})
+        username = f"demo.{int(time.time())}"
+        r = client.post("/api/users", json={"username": username, "first_name": "Demo",
+                                            "password": "demo-password-123"})
         uid, token = r.json()["user_id"], r.json()["token"]
         h = {"Authorization": f"Bearer {token}"}
         client.put(f"/api/users/{uid}/quiz-profile", headers=h, json={
@@ -63,7 +64,7 @@ def main() -> None:
                 conn.execute("INSERT INTO measurements (user_id, date, body_weight) VALUES (?, ?, ?)",
                              (uid, (today - timedelta(days=d)).isoformat(), w))
         conn.close()
-        print(f"Demo user {uid} ({email}): goals weight_loss + rehab, injury lower_back, 11-day streak.\n")
+        print(f"Demo user {uid} ({username}): goals weight_loss + rehab, injury lower_back, 11-day streak.\n")
 
         for label, method, route, body in CALLS:
             started = time.perf_counter()

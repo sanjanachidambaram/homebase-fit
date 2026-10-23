@@ -38,8 +38,8 @@ def on_day(monkeypatch):
     return set_today
 
 
-def account(client, email, **answers) -> tuple[int, dict]:
-    r = client.post("/api/users", json={"email": email, "password": "correct horse 1"}).json()
+def account(client, username, **answers) -> tuple[int, dict]:
+    r = client.post("/api/users", json={"username": username, "first_name": "Tester", "password": "correct horse 1"}).json()
     h = {"Authorization": f"Bearer {r['token']}"}
     retake(client, r["user_id"], h, **answers)
     return r["user_id"], h
@@ -77,7 +77,7 @@ def d(offset: int) -> str:
 # ================================================================ materializing the plan
 
 def test_quiz_lays_out_four_weeks_of_the_plan(client, on_day):
-    uid, h = account(client, "cal@example.com")
+    uid, h = account(client, "cal")
     plan = {p.day: p for p in generate_for_user(uid).days}
     entries = get_days(client, h)["entries"]
     assert len(entries) == 28 and [e["date"] for e in entries] == [d(i) for i in range(28)]
@@ -92,7 +92,7 @@ def test_quiz_lays_out_four_weeks_of_the_plan(client, on_day):
 
 
 def test_snapshot_does_not_change_when_the_content_changes_later(client, on_day):
-    uid, h = account(client, "snap@example.com")
+    uid, h = account(client, "snap")
     first = by_date(get_days(client, h))[d(0)]["workout"]["exercises"][0]
     conn = connect()
     with conn:
@@ -104,7 +104,7 @@ def test_snapshot_does_not_change_when_the_content_changes_later(client, on_day)
 # ================================================================ the retake preservation rule
 
 def test_retake_keeps_logged_and_noted_days_and_refreshes_only_untouched_future_days(client, on_day):
-    uid, h = account(client, "retake@example.com")
+    uid, h = account(client, "retake")
     before = by_date(get_days(client, h))
     logged, noted, past_untouched = before[d(0)], before[d(4)], before[d(1)]   # Mon (workout), Fri, Tue
     assert logged["day_type"] == "workout"
@@ -144,7 +144,7 @@ def test_retake_keeps_logged_and_noted_days_and_refreshes_only_untouched_future_
 # ================================================================ drag and drop (PATCH date)
 
 def test_moving_a_day_onto_another_swaps_them(client, on_day):
-    uid, h = account(client, "drag@example.com")
+    uid, h = account(client, "drag")
     days = by_date(get_days(client, h))
     mon, tue = days[d(0)], days[d(1)]
     assert (mon["day_type"], tue["day_type"]) == ("workout", "rest")
@@ -162,7 +162,7 @@ def test_moving_a_day_onto_another_swaps_them(client, on_day):
 
 
 def test_done_days_stay_put(client, on_day):
-    uid, h = account(client, "stay@example.com")
+    uid, h = account(client, "stay")
     days = by_date(get_days(client, h))
     assert patch(client, h, days[d(0)]["id"], completed=True).status_code == 200
     assert patch(client, h, days[d(0)]["id"], date=d(3)).status_code == 409        # can't move a done day
@@ -173,7 +173,7 @@ def test_done_days_stay_put(client, on_day):
 # ================================================================ completed -> workout_logs
 
 def test_completing_a_day_writes_the_workout_logs_the_coach_reads(client, on_day):
-    uid, h = account(client, "done@example.com")
+    uid, h = account(client, "done")
     days = by_date(get_days(client, h))
     mon = days[d(0)]
     patch(client, h, mon["id"], notes="felt strong today")
@@ -200,7 +200,7 @@ def test_logged_rows_use_the_low_end_and_turn_holds_into_seconds(sets, reps, exp
 
 
 def test_rest_days_and_future_days_cant_be_marked_done(client, on_day):
-    uid, h = account(client, "rules@example.com")
+    uid, h = account(client, "rules")
     days = by_date(get_days(client, h))
     assert patch(client, h, days[d(1)]["id"], completed=True).status_code == 422   # rest day
     assert patch(client, h, days[d(2)]["id"], completed=True).status_code == 422   # Wednesday, two days ahead
@@ -212,7 +212,7 @@ def test_rest_days_and_future_days_cant_be_marked_done(client, on_day):
 
 def test_red_flag_note_is_saved_logged_and_answered_without_ai(client, on_day, use_script):
     script = use_script(("final", {"encouragement": "x", "fun_fact_comparison": None}))
-    uid, h = account(client, "note@example.com")
+    uid, h = account(client, "note")
     entry = by_date(get_days(client, h))[d(0)]
 
     r = patch(client, h, entry["id"], notes=RED_FLAG_NOTE)
@@ -253,7 +253,7 @@ def test_calendar_notes_never_reach_any_model(client, on_day, monkeypatch):
     """Same boundary as injury_notes: the user's own words stay in the database. We write a unique note on
     several days (one of them completed), then run every agent with a fake model that records everything it
     is sent, and call the MCP tools that read user activity directly."""
-    uid, h = account(client, "private.notes@example.com")
+    uid, h = account(client, "private.notes")
     days = by_date(get_days(client, h))
     for i in (0, 2, 4):
         assert patch(client, h, days[d(i)]["id"], notes=f"{SENTINEL} day {i}").status_code == 200
@@ -285,7 +285,7 @@ def test_calendar_notes_never_reach_any_model(client, on_day, monkeypatch):
 # ================================================================ pregnant / postpartum
 
 def test_pregnant_users_get_an_empty_calendar_pointing_to_support(client, on_day):
-    uid, h = account(client, "was-not@example.com")
+    uid, h = account(client, "was-not")
     days = by_date(get_days(client, h))
     patch(client, h, days[d(3)]["id"], notes="my own note")
     retake(client, uid, h, pregnancy_status="pregnant")
@@ -296,7 +296,7 @@ def test_pregnant_users_get_an_empty_calendar_pointing_to_support(client, on_day
     assert rows("SELECT notes FROM calendar_entries WHERE user_id = ?", uid) == [{"notes": "my own note"}]
     assert patch(client, h, days[d(3)]["id"], notes="x").status_code == 403
 
-    new_uid, nh = account(client, "pp@example.com", pregnancy_status="postpartum")
+    new_uid, nh = account(client, "user_pp", pregnancy_status="postpartum")
     assert get_days(client, nh)["entries"] == []
     assert rows("SELECT COUNT(*) AS n FROM calendar_entries WHERE user_id = ?", new_uid) == [{"n": 0}]
 
@@ -304,8 +304,8 @@ def test_pregnant_users_get_an_empty_calendar_pointing_to_support(client, on_day
 # ================================================================ access, input, and the goal check
 
 def test_users_only_ever_see_and_change_their_own_days(client, on_day):
-    a, ha = account(client, "a@example.com")
-    b, hb = account(client, "b@example.com")
+    a, ha = account(client, "user_a")
+    b, hb = account(client, "user_b")
     a_day = by_date(get_days(client, ha))[d(0)]
     assert patch(client, hb, a_day["id"], notes="hi").status_code == 404
     assert patch(client, hb, a_day["id"], date=d(1)).status_code == 404
@@ -317,13 +317,13 @@ def test_users_only_ever_see_and_change_their_own_days(client, on_day):
 
 
 def test_quizless_account_gets_a_take_the_quiz_state(client, on_day):
-    r = client.post("/api/users", json={"email": "noquiz@example.com", "password": "correct horse 1"}).json()
+    r = client.post("/api/users", json={"username": "noquiz", "first_name": "Tester", "password": "correct horse 1"}).json()
     body = get_days(client, {"Authorization": f"Bearer {r['token']}"})
     assert body["needs_quiz"] is True and body["entries"] == []
 
 
 def test_goal_check_compares_completed_days_with_the_plan(client, on_day):
-    uid, h = account(client, "goal@example.com")
+    uid, h = account(client, "goal")
     today = MONDAY + timedelta(days=13)                      # two weeks in; the quiz "was taken" on MONDAY
     conn = connect()
     with conn:

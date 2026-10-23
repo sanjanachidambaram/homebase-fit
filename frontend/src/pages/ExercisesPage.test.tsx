@@ -16,7 +16,7 @@ const GLUTE_BRIDGE = {
 
 beforeEach(() => {
   resetEquipmentCache()
-  window.localStorage.setItem('homebase.session', JSON.stringify({ userId: 1, token: 't', email: 'a@b.c' }))
+  window.localStorage.setItem('homebase.session', JSON.stringify({ userId: 1, token: 't', username: 'tester' }))
   mockFetch({ '/api/exercises/equipment': EQUIPMENT, '/api/favorites': [GLUTE_BRIDGE], '/api/exercises': [] })
 })
 afterEach(() => {

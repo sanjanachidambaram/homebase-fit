@@ -139,7 +139,7 @@ def test_no_injury_means_nothing_left_out(test_db):
 
 def test_the_model_never_sees_the_injury_reasoning(client, explainer):
     e = explainer("Here's why it fits.")
-    uid, h = account(client, email="reasons@example.com")
+    uid, h = account(client, username="reasons")
     res = client.post("/api/programs/recommend", headers=h).json()
     left_out = res["result"]["plan"]["safety"]["left_out_for_injury"]
     assert left_out, "the person sees what was left out and why"

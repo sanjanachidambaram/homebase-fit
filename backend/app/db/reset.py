@@ -26,6 +26,11 @@ import sys
 from app import config
 from app.db import connect, copy_db, stamp_working_db, table_counts
 
+# Columns renamed between schema versions, {table: {new name: old name}}: when the saved rows predate the rename,
+# the new column is filled from the old one. 2026-10-23: sign-in moved from email to username, and existing
+# accounts keep their old email as their username, so nobody is locked out.
+RENAMED_COLUMNS = {"users": {"username": "email"}}
+
 # Parents first, so ids line up. (app/users.py USER_DATA_TABLES lists the same tables for account deletion.)
 USER_TABLES = ("users", "quiz_profiles", "exercise_favorites", "measurements", "calendar_entries", "cardio_logs",
                "built_workouts", "workout_logs", "safety_events")
@@ -63,12 +68,14 @@ def _restore(keep_users: bool) -> dict:
             for table, rows in saved.items():
                 if not rows:
                     continue
-                cols = [c for c in _insertable(conn, table) if c in rows[0]]
+                renamed = {new: old for new, old in RENAMED_COLUMNS.get(table, {}).items()
+                           if new not in rows[0] and old in rows[0]}
+                cols = [c for c in _insertable(conn, table) if c in rows[0] or c in renamed]
                 sql = f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join('?' for _ in cols)})"
                 kept = dropped = 0
                 for r in rows:
-                    values = [None if (c == "user_id" and table == "agent_runs" and not keep_users) else r[c]
-                              for c in cols]
+                    values = [None if (c == "user_id" and table == "agent_runs" and not keep_users)
+                              else r[renamed.get(c, c)] for c in cols]
                     try:
                         conn.execute(sql, values)
                         kept += 1

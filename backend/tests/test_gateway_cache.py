@@ -45,7 +45,7 @@ def fake_gateway(created_at_offset_s: float):
 
 
 def account(client) -> dict:
-    r = client.post("/api/users", json={"email": "cache@example.com", "password": "correct horse 1"}).json()
+    r = client.post("/api/users", json={"username": "cache", "first_name": "Tester", "password": "correct horse 1"}).json()
     return {"Authorization": f"Bearer {r['token']}"}
 
 

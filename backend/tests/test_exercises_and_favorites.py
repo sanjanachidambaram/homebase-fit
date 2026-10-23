@@ -12,8 +12,8 @@ FEDB_ID = "3_4_Sit-Up"   # imported exercise with a real image file
 PLACEHOLDER_ID = "glute_bridge"   # hand-authored; its demo file doesn't exist yet
 
 
-def sign_up(client, email):
-    r = client.post("/api/users", json={"email": email, "password": "correct horse 1"})
+def sign_up(client, username):
+    r = client.post("/api/users", json={"username": username, "first_name": "Tester", "password": "correct horse 1"})
     assert r.status_code == 201, r.text
     body = r.json()
     return body["user_id"], {"Authorization": f"Bearer {body['token']}"}
@@ -71,7 +71,7 @@ def test_favorites_require_sign_in(client):
 
 
 def test_add_list_remove_favorite(client):
-    _, h = sign_up(client, "a@example.com")
+    _, h = sign_up(client, "user_a")
     assert client.get("/api/favorites", headers=h).json() == []
 
     r = client.post("/api/favorites", json={"exercise_id": FEDB_ID}, headers=h)
@@ -87,7 +87,7 @@ def test_add_list_remove_favorite(client):
 
 
 def test_favorite_is_idempotent_and_unique(client):
-    uid, h = sign_up(client, "a@example.com")
+    uid, h = sign_up(client, "user_a")
     for _ in range(3):
         assert client.post("/api/favorites", json={"exercise_id": FEDB_ID}, headers=h).status_code == 200
     assert len(client.get("/api/favorites", headers=h).json()) == 1
@@ -106,13 +106,13 @@ def test_favorite_is_idempotent_and_unique(client):
 
 
 def test_unknown_exercise_cant_be_favorited(client):
-    _, h = sign_up(client, "a@example.com")
+    _, h = sign_up(client, "user_a")
     assert client.post("/api/favorites", json={"exercise_id": "nope"}, headers=h).status_code == 404
 
 
 def test_favorites_are_private_per_user(client):
-    _, ha = sign_up(client, "a@example.com")
-    _, hb = sign_up(client, "b@example.com")
+    _, ha = sign_up(client, "user_a")
+    _, hb = sign_up(client, "user_b")
     client.post("/api/favorites", json={"exercise_id": FEDB_ID}, headers=ha)
     assert client.get("/api/favorites", headers=hb).json() == []
     client.delete(f"/api/favorites/{FEDB_ID}", headers=hb)      # B can't un-fave A's favorite
@@ -120,6 +120,6 @@ def test_favorites_are_private_per_user(client):
 
 
 def test_deleted_account_cant_favorite_with_its_old_token(client):
-    uid, h = sign_up(client, "a@example.com")
+    uid, h = sign_up(client, "user_a")
     assert client.delete(f"/api/users/{uid}", headers=h).status_code == 200
     assert client.post("/api/favorites", json={"exercise_id": FEDB_ID}, headers=h).status_code == 401

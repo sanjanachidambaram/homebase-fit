@@ -69,7 +69,7 @@ def test_progression_never_goes_past_the_protocols_own_ranges(test_db):
 
 def test_calendar_weeks_count_from_the_plans_start_and_only_sets_and_reps_change(client, on_day):
     """Week numbers come from plan_started_on, including on a top-up weeks later. Exercises and rest never change."""
-    uid, h = account(client, "progress@example.com", goals=["tone"], injuries=["none"], experience_level="intermediate")
+    uid, h = account(client, "progress", goals=["tone"], injuries=["none"], experience_level="intermediate")
     week1 = workout_days(get_days(client, h)["entries"])
     assert {e["workout"]["week"] for e in week1} == {1, 2, 3, 4}
     later = {e["date"]: e for e in week1}
@@ -88,7 +88,7 @@ def test_calendar_weeks_count_from_the_plans_start_and_only_sets_and_reps_change
 
 
 def test_an_injured_calendar_stays_flat_week_after_week(client, on_day):
-    uid, h = account(client, "flat@example.com")                                  # lower-back injury + rehab goal
+    uid, h = account(client, "flat")                                  # lower-back injury + rehab goal
     entries = workout_days(get_days(client, h)["entries"])
     on_day(MONDAY + timedelta(days=56))
     entries += workout_days(get_days(client, h, MONDAY + timedelta(days=56), MONDAY + timedelta(days=62))["entries"])
@@ -104,7 +104,7 @@ def test_an_injured_calendar_stays_flat_week_after_week(client, on_day):
 # ================================================================ calendar population modes
 
 def test_self_mode_lays_out_open_days_that_build_your_own_can_fill(client, on_day, use_script):
-    uid, h = account(client, "selfmode@example.com")
+    uid, h = account(client, "selfmode")
     r = client.put("/api/calendar/mode", headers=h, json={"mode": "self"})
     assert r.status_code == 200 and r.json()["calendar_mode"] == "self"
     entries = get_days(client, h)["entries"]
@@ -120,7 +120,7 @@ def test_self_mode_lays_out_open_days_that_build_your_own_can_fill(client, on_da
 
 
 def test_review_mode_waits_then_lays_out_the_reviewed_plan_with_safe_swaps_only(client, on_day):
-    uid, h = account(client, "reviewer@example.com")                              # lower-back injury
+    uid, h = account(client, "reviewer")                              # lower-back injury
     client.put("/api/calendar/mode", headers=h, json={"mode": "review"})
     cal = get_days(client, h)
     assert cal["needs_review"] is True and cal["entries"] == []                   # nothing until it's reviewed
@@ -151,7 +151,7 @@ def test_review_mode_waits_then_lays_out_the_reviewed_plan_with_safe_swaps_only(
 
 
 def test_mode_is_validated_and_needs_a_quiz(client):
-    r = client.post("/api/users", json={"email": "nomode@example.com", "password": "correct horse 1"}).json()
+    r = client.post("/api/users", json={"username": "nomode", "first_name": "Tester", "password": "correct horse 1"}).json()
     h = {"Authorization": f"Bearer {r['token']}"}
     assert client.put("/api/calendar/mode", headers=h, json={"mode": "self"}).status_code == 409
     assert client.put("/api/calendar/mode", headers=h, json={"mode": "chaos"}).status_code == 422
@@ -167,7 +167,7 @@ def build(client, h):
 
 def test_save_a_built_workout_to_a_calendar_day(client, on_day, use_script):
     use_script(*CORE_SCRIPT)
-    uid, h = account(client, "bridge@example.com")
+    uid, h = account(client, "bridge")
     built = build(client, h)
     wed = by_date(get_days(client, h))[d(2)]
     r = client.post("/api/calendar/save-built", headers=h, json={"built_id": built["built_id"], "date": d(2)})
@@ -186,7 +186,7 @@ def test_save_a_built_workout_to_a_calendar_day(client, on_day, use_script):
 
 def test_saving_to_a_date_beyond_the_calendar_extends_it(client, on_day, use_script):
     use_script(*CORE_SCRIPT)
-    uid, h = account(client, "extend@example.com")
+    uid, h = account(client, "extend")
     built = build(client, h)
     far = MONDAY + timedelta(days=40)                                              # past the 4 weeks laid out
     r = client.post("/api/calendar/save-built", headers=h, json={"built_id": built["built_id"], "date": far.isoformat()})
@@ -200,8 +200,8 @@ def test_saving_to_a_date_beyond_the_calendar_extends_it(client, on_day, use_scr
 
 def test_save_to_calendar_refuses_what_it_should(client, on_day, use_script):
     use_script(*CORE_SCRIPT)
-    uid, h = account(client, "refuse@example.com")
-    other, oh = account(client, "refuse2@example.com")
+    uid, h = account(client, "refuse")
+    other, oh = account(client, "refuse2")
     built = build(client, h)["built_id"]
     days = by_date(get_days(client, h))
     patch(client, h, days[d(0)]["id"], completed=True)

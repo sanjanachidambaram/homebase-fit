@@ -53,7 +53,7 @@ def build_throwaway_db(path: Path) -> int:
     with conn:
         conn.execute("UPDATE exercises SET injury_contraindications = '[\"knee\"]', contraindication_status = 'draft' "
                      "WHERE id = ?", (TEST_EXERCISE,))
-        uid = conn.execute("INSERT INTO users (email, password_hash) VALUES ('smoke.test@example.com', 'x')").lastrowid
+        uid = conn.execute("INSERT INTO users (username, first_name, password_hash) VALUES ('smoke.test', 'Smokey', 'x')").lastrowid
         conn.execute(
             "INSERT INTO quiz_profiles (user_id, goals, timeline, injury_flags, injury_notes, age, weight, height, "
             "consent_accepted, consent_accepted_at, consent_version, created_at, updated_at) "

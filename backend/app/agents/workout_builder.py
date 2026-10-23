@@ -16,7 +16,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 from pydantic_ai import Agent, ModelRetry, RunContext
 
-from app.agents.harness import AgentDeps, McpGateway, harness_flags, load_prompt, run_logged
+from app.agents.harness import AgentDeps, McpGateway, harness_flags, load_prompt, no_emoji, run_logged
 
 MuscleGroup = Literal["legs", "arms", "chest", "shoulders", "back", "core", "full_body"]
 MAX_PER_GROUP, MAX_TOTAL = 6, 12
@@ -167,7 +167,7 @@ def finalize(draft: WorkoutDraft, deps: AgentDeps) -> WorkoutSession:
                      "were left out automatically.")
     return WorkoutSession(exercises=exercises, time_budget_minutes=req.time_budget_minutes,
                           total_estimated_minutes=round(sum(x.est_minutes for x in exercises), 1),
-                          balance_note=draft.balance_note.strip(), notes=notes)
+                          balance_note=no_emoji(draft.balance_note), notes=notes)
 
 
 async def build_workout(user_id: int, request: WorkoutRequest, route: str) -> tuple[WorkoutSession, dict]:

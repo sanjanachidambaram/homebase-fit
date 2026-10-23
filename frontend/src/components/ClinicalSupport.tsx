@@ -6,7 +6,7 @@ export default function ClinicalSupportCard() {
   return (
     <section className="dash-card clinical-card" aria-labelledby="clinical-card-title">
       <h3 id="clinical-card-title">
-        <span className="card-icon" aria-hidden="true">💜</span> Your plan and workouts are paused for now
+        Your plan and workouts are paused for now
       </h3>
       <p>
         Because you told us you're pregnant or recently gave birth, we don't build plans or workouts for you. Exercise

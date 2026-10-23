@@ -12,7 +12,8 @@ export default function AccountForm({
   onDone?: (s: Session) => void
 }) {
   const [mode, setMode] = useState(initialMode)
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
+  const [firstName, setFirstName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -22,8 +23,9 @@ export default function AccountForm({
     setError(null)
     setBusy(true)
     try {
-      const result = mode === 'signup' ? await signUp(email, password) : await logIn(email, password)
-      const session = { userId: result.user_id, token: result.token, email: email.trim().toLowerCase() }
+      const result =
+        mode === 'signup' ? await signUp(username, firstName, password) : await logIn(username, password)
+      const session = { userId: result.user_id, token: result.token, username: username.trim() }
       setSession(session)
       onDone?.(session)
     } catch (err) {
@@ -38,9 +40,29 @@ export default function AccountForm({
       {mode === 'signup' && <PrivacyNote title="Before you sign up: your data and privacy" />}
       <form onSubmit={submit}>
         <h3>{mode === 'signup' ? 'Create your account' : 'Sign in'}</h3>
+        {mode === 'signup' && (
+          <label>
+            First name <span className="hint">(just for your greeting; never sent to the AI)</span>
+            <input
+              required
+              maxLength={50}
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+            />
+          </label>
+        )}
         <label>
-          Email
-          <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          Username {mode === 'signup' && <span className="hint">(3 to 30 letters, numbers, dots, dashes or underscores)</span>}
+          <input
+            required
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            {...(mode === 'signup' ? { minLength: 3, maxLength: 30, pattern: '[A-Za-z0-9._\\-]+' } : {})}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
         </label>
         <label>
           Password {mode === 'signup' && <span className="hint">(at least 8 characters)</span>}

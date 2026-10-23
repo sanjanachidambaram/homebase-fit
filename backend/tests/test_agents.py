@@ -34,12 +34,13 @@ class Script:
     """A fake model that plays back fixed steps: ("tool_name", args) or ("final", output)."""
 
     def __init__(self, *steps):
-        self.steps, self.calls, self.tool_defs = list(steps), 0, []
+        self.steps, self.calls, self.tool_defs, self.seen = list(steps), 0, [], []
 
     def model(self) -> FunctionModel:
         def fn(messages, info: AgentInfo) -> ModelResponse:
             self.calls += 1
             self.tool_defs = info.function_tools
+            self.seen.append(repr(messages))     # everything sent: instructions, prompt, tool results
             step = sum(isinstance(m, ModelResponse) for m in messages)
             name, args = self.steps[min(step, len(self.steps) - 1)]
             if name == "final":
@@ -70,8 +71,8 @@ def mcp_calls(monkeypatch):
     return calls
 
 
-def account(client, email, injuries=("lower_back",), goals=None) -> tuple[int, dict]:
-    r = client.post("/api/users", json={"email": email, "password": "correct horse 1"})
+def account(client, username, injuries=("lower_back",), goals=None) -> tuple[int, dict]:
+    r = client.post("/api/users", json={"username": username, "first_name": "Tester", "password": "correct horse 1"})
     uid, token = r.json()["user_id"], r.json()["token"]
     h = {"Authorization": f"Bearer {token}"}
     answers = quiz_answers(injuries=list(injuries) or ["none"], **({"goals": goals} if goals else {}))
@@ -103,7 +104,7 @@ def test_red_flag_question_never_reaches_the_agent(client, use_script, monkeypat
     script = use_script(("final", {"answered": True, "answer": "x", "source_slugs": []}))
     agent_run = AsyncMock(side_effect=AssertionError("the Basics agent must not be called"))
     monkeypatch.setattr(basics.basics_agent, "run", agent_run)
-    uid, h = account(client, "safety@example.com")
+    uid, h = account(client, "safety")
 
     r = client.post("/api/basics/ask", json={"question": RED_FLAG_QUESTION}, headers=h)
 
@@ -119,8 +120,8 @@ def test_red_flag_question_never_reaches_the_agent(client, use_script, monkeypat
     events = rows("SELECT * FROM safety_events_report")
     assert len(events) == 1
     e = events[0]
-    assert (e["source"], e["trigger_text"], e["action_taken"], e["user_email"]) == \
-        ("basics_qa", RED_FLAG_QUESTION, "redirected_to_professional", "safety@example.com")
+    assert (e["source"], e["trigger_text"], e["action_taken"], e["username"]) == \
+        ("basics_qa", RED_FLAG_QUESTION, "redirected_to_professional", "safety")
     print("\nsafety_events row created by the red-flag pre-filter:")
     print(json.dumps(rows("SELECT * FROM safety_events WHERE id = ?", body["meta"]["safety_event_id"])[0], indent=2))
 
@@ -133,7 +134,7 @@ def test_red_flag_question_never_reaches_the_agent(client, use_script, monkeypat
 ])
 def test_every_red_flag_redirects_and_logs(client, use_script, question):
     script = use_script(("final", {"answered": True, "answer": "x", "source_slugs": []}))
-    uid, h = account(client, "rf@example.com")
+    uid, h = account(client, "user_rf")
     r = client.post("/api/basics/ask", json={"question": question}, headers=h).json()
     assert r["result"]["redirected_to_professional"] and script.calls == 0
     assert rows("SELECT trigger_text FROM safety_events WHERE user_id = ?", uid) == [{"trigger_text": question}]
@@ -143,7 +144,7 @@ def test_ordinary_question_is_answered_from_the_knowledge_base(client, use_scrip
     use_script(("search_basics_kb", {"query": "rest between sets"}),
                ("final", {"answered": True, "source_slugs": ["rest_between_sets"],
                           "answer": "Our guide says about 60 to 90 seconds for moderate sets of 8 to 15 reps."}))
-    uid, h = account(client, "ask@example.com")
+    uid, h = account(client, "ask")
     r = client.post("/api/basics/ask", json={"question": "How long should I rest between sets?"}, headers=h).json()
     res = r["result"]
     assert res["answered"] and not res["redirected_to_professional"]
@@ -154,7 +155,7 @@ def test_ordinary_question_is_answered_from_the_knowledge_base(client, use_scrip
 
 def test_question_with_no_matching_article_never_calls_the_model(client, use_script):
     script = use_script(("final", {"answered": True, "answer": "made up", "source_slugs": []}))
-    uid, h = account(client, "nomatch@example.com")
+    uid, h = account(client, "nomatch")
     r = client.post("/api/basics/ask", json={"question": "Which protein powder brand is best?"}, headers=h).json()
     assert r["result"]["answer"] == basics.NO_INFO_MESSAGE and script.calls == 0
     assert rows("SELECT COUNT(*) AS n FROM agent_runs")[0]["n"] == 0
@@ -167,7 +168,7 @@ def test_basics_rejects_invented_sources_and_science_claims(client, use_script):
                           "source_slugs": ["rest_between_sets"]}),
                ("final", {"answered": True, "answer": "Our guide says 60 to 90 seconds for moderate sets.",
                           "source_slugs": ["rest_between_sets"]}))
-    uid, h = account(client, "claims@example.com")
+    uid, h = account(client, "claims")
     res = client.post("/api/basics/ask", json={"question": "How long should I rest between sets?"}, headers=h).json()["result"]
     assert res["answered"] and "research" not in res["answer"].lower()
 
@@ -175,7 +176,7 @@ def test_basics_rejects_invented_sources_and_science_claims(client, use_script):
 def test_basics_falls_back_to_no_info_if_the_model_keeps_making_claims(client, use_script):
     use_script(("search_basics_kb", {"query": "rest"}),
                ("final", {"answered": True, "answer": "Studies prove it.", "source_slugs": ["rest_between_sets"]}))
-    uid, h = account(client, "claims2@example.com")
+    uid, h = account(client, "claims2")
     res = client.post("/api/basics/ask", json={"question": "How long should I rest between sets?"}, headers=h).json()["result"]
     assert res["answer"] == basics.NO_INFO_MESSAGE and not res["answered"]
 
@@ -184,7 +185,7 @@ def test_basics_falls_back_to_no_info_if_the_model_keeps_making_claims(client, u
 
 def test_model_never_sees_user_id_injury_flags_or_checked_only(client, use_script):
     """The tool schemas the model is shown have no way to name a user or loosen a filter."""
-    a, ha = account(client, "a@example.com")
+    a, ha = account(client, "user_a")
     shown = {}
     for route, method, body, final in [
         ("/api/programs/recommend", "post", {}, {"explanation": "A gentle plan for your goals."}),
@@ -206,9 +207,45 @@ def test_model_never_sees_user_id_injury_flags_or_checked_only(client, use_scrip
                                                 "compute_strength_equivalents"}
 
 
+def test_no_agent_ever_sees_the_username_or_first_name(client, use_script, mcp_calls):
+    """shared_rules.md rule 2: the username and first name identify the person, so like email they never reach a
+    model. Runs all five agents, tools included, and searches everything each model was sent."""
+    username, first_name = "zenobia.q", "Zenobia"
+    r = client.post("/api/users", json={"username": username, "first_name": first_name, "password": "correct horse 1"}).json()
+    uid, h = r["user_id"], {"Authorization": f"Bearer {r['token']}"}
+    assert client.put(f"/api/users/{uid}/quiz-profile", headers=h, json={
+        "consent_accepted": True, "consent_version": "test", "answers": quiz_answers()}).status_code == 200
+    log_days(uid, range(3))
+    assert client.get(f"/api/users/{uid}", headers=h).json()["first_name"] == first_name   # stored for the greeting
+    dead_bug = {"exercise_id": "dead_bug", "sets": 2, "reps": "8 each side", "rest_seconds": 30}
+    sent = []
+    for method, route, body, steps in [
+        ("POST", "/api/programs/recommend", {}, [("final", {"explanation": "A gentle plan for your goals."})]),
+        ("POST", "/api/workouts/build", {"picks": {"core": 1}, "time_budget_minutes": 10},
+         [("search_exercises", {"muscle_group": "core"}), ("final", {"items": [dead_bug], "balance_note": "Core only."})]),
+        ("GET", "/api/coach/summary", None,
+         [("get_progress_summary", {}), ("check_goal_achievement", {}),
+          ("compute_strength_equivalents", {"total_weight_lifted_lbs": 1800}),
+          ("final", {"encouragement": "Three days in a row, nice!", "fun_fact_comparison": None})]),
+        ("POST", "/api/basics/ask", {"question": "How long should I rest between sets?"},
+         [("search_basics_kb", {"query": "rest between sets"}),
+          ("final", {"answered": True, "source_slugs": ["rest_between_sets"], "answer": "About 60 to 90 seconds."})]),
+        ("POST", "/api/workouts/review", {"items": [dead_bug]}, [("final", {"summary": "A short core session."})]),
+    ]:
+        script = use_script(*steps)
+        res = client.request(method, route, json=body, headers=h)
+        assert res.status_code == 200 and script.calls >= 1, (route, res.text)
+        sent += script.seen
+    text = " ".join(sent).lower()
+    assert "dead_bug" in text and "rest_between_sets" in text and "streak" in text   # tool results were in there
+    for secret in (username, "zenobia"):
+        assert secret not in text, secret
+    assert "zenobia" not in json.dumps(mcp_calls).lower()                          # nor in any tool call
+
+
 def test_user_cannot_reach_another_users_data(client, use_script, mcp_calls):
-    a, ha = account(client, "a@example.com", injuries=("lower_back",))
-    b, hb = account(client, "b@example.com", injuries=("knee",), goals=["strength"])
+    a, ha = account(client, "user_a", injuries=("lower_back",))
+    b, hb = account(client, "user_b", injuries=("knee",), goals=["strength"])
     log_days(b, range(12), weight=50)        # B has an 12-day streak and real lifting; A has nothing
 
     # 1. Request bodies can't carry a user_id.
@@ -241,7 +278,7 @@ def test_routes_need_a_valid_sign_in(client, use_script):
     for method, route in [("POST", "/api/programs/recommend"), ("GET", "/api/coach/summary")]:
         assert client.request(method, route).status_code == 401
         assert client.request(method, route, headers={"Authorization": "Bearer 1.forged"}).status_code == 401
-    uid, h = account(client, "gone@example.com")
+    uid, h = account(client, "gone")
     client.delete(f"/api/users/{uid}", headers=h)
     assert client.get("/api/coach/summary", headers=h).status_code == 401      # deleted account's old token
 
@@ -249,7 +286,7 @@ def test_routes_need_a_valid_sign_in(client, use_script):
 # ================================================================ checked_only, set by code
 
 def test_injured_user_always_gets_checked_only(client, use_script, mcp_calls):
-    a, ha = account(client, "inj@example.com", injuries=("knee",))
+    a, ha = account(client, "inj", injuries=("knee",))
     use_script(("search_exercises", {"muscle_group": "legs", "injury_flags": [], "checked_only": False}),  # tries to loosen
                ("search_exercises", {"muscle_group": "legs", "limit": 10}),
                ("final", {"items": [{"exercise_id": "glute_bridge", "sets": 3, "reps": "12", "rest_seconds": 45},
@@ -266,7 +303,7 @@ def test_injured_user_always_gets_checked_only(client, use_script, mcp_calls):
 
 
 def test_uninjured_user_gets_checked_only_false(client, use_script, mcp_calls):
-    a, ha = account(client, "fine@example.com", injuries=())
+    a, ha = account(client, "fine", injuries=())
     use_script(("search_exercises", {"muscle_group": "core"}),
                ("final", {"items": [{"exercise_id": "dead_bug", "sets": 2, "reps": "8 each side", "rest_seconds": 30}],
                           "balance_note": "Core only."}))
@@ -277,7 +314,7 @@ def test_uninjured_user_gets_checked_only_false(client, use_script, mcp_calls):
 # ================================================================ Workout Builder checks
 
 def test_workout_builder_fixes_invented_ids_counts_and_time(client, use_script):
-    a, ha = account(client, "wb@example.com", injuries=())
+    a, ha = account(client, "user_wb", injuries=())
     ok_items = [{"exercise_id": "dead_bug", "sets": 2, "reps": "8 each side", "rest_seconds": 30},
                 {"exercise_id": "bird_dog", "sets": 2, "reps": "8 each side", "rest_seconds": 30}]
     use_script(("search_exercises", {"muscle_group": "core"}), ("search_exercises", {"muscle_group": "back"}),
@@ -295,7 +332,7 @@ def test_workout_builder_fixes_invented_ids_counts_and_time(client, use_script):
 
 
 def test_workout_request_validation(client):
-    a, ha = account(client, "val@example.com")
+    a, ha = account(client, "val")
     for bad in ({"picks": {}, "time_budget_minutes": 20}, {"picks": {"legs": 9}, "time_budget_minutes": 20},
                 {"picks": {"wings": 1}, "time_budget_minutes": 20}, {"picks": {"legs": 1}, "time_budget_minutes": 500}):
         assert client.post("/api/workouts/build", headers=ha, json=bad).status_code == 422
@@ -304,7 +341,7 @@ def test_workout_request_validation(client):
 # ================================================================ Coach
 
 def test_coach_flags_and_facts_come_from_data_not_the_model(client, use_script):
-    a, ha = account(client, "coach@example.com")
+    a, ha = account(client, "coach")
     log_days(a, range(11), weight=20)            # 11 days in a row, 600 lb a day = 6,600 lb
     use_script(("get_progress_summary", {}), ("check_goal_achievement", {}),
                ("compute_strength_equivalents", {"total_weight_lifted_lbs": 999999}),   # model passes a wrong number
@@ -317,7 +354,7 @@ def test_coach_flags_and_facts_come_from_data_not_the_model(client, use_script):
 
 
 def test_coach_tone_guard(client, use_script):
-    a, ha = account(client, "tone@example.com")
+    a, ha = account(client, "tone")
     use_script(("get_progress_summary", {}),
                ("final", {"encouragement": "Burn off that pizza, no excuses!", "fun_fact_comparison": None}),
                ("final", {"encouragement": "Every session counts. Proud of you!", "fun_fact_comparison": None}))
@@ -327,10 +364,24 @@ def test_coach_tone_guard(client, use_script):
     assert client.get("/api/coach/summary", headers=ha).json()["result"]["encouragement"] == SAFE_ENCOURAGEMENT
 
 
+def test_model_written_text_never_shows_emoji(client, use_script):
+    """shared_rules.md rule 5: the site uses no decorative emoji, and neither may the model's words."""
+    a, ha = account(client, "noemoji", injuries=())
+    use_script(("final", {"encouragement": "Three days in a row \U0001F525\U0001F525, proud of you ❤️!",
+                          "fun_fact_comparison": None}))
+    assert client.get("/api/coach/summary", headers=ha).json()["result"]["encouragement"] == \
+        "Three days in a row, proud of you!"
+    use_script(("search_exercises", {"muscle_group": "core"}),
+               ("final", {"items": [{"exercise_id": "dead_bug", "sets": 2, "reps": "8 each side", "rest_seconds": 30}],
+                          "balance_note": "Core only \U0001F4AA"}))
+    r = client.post("/api/workouts/build", headers=ha, json={"picks": {"core": 1}, "time_budget_minutes": 10})
+    assert r.json()["result"]["balance_note"] == "Core only"
+
+
 # ================================================================ token logging
 
 def test_every_agent_call_is_logged_with_tokens(client, use_script):
-    a, ha = account(client, "tok@example.com")
+    a, ha = account(client, "tok")
     use_script(("search_basics_kb", {"query": "rest between sets"}),
                ("final", {"answered": True, "answer": "Our guide says 60 to 90 seconds.", "source_slugs": ["rest_between_sets"]}))
     meta = client.post("/api/basics/ask", json={"question": "How long should I rest between sets?"}, headers=ha).json()["meta"]
@@ -345,7 +396,7 @@ def test_failed_agent_calls_are_logged_too(client, monkeypatch):
     def boom(messages, info):
         raise RuntimeError("provider down")
     monkeypatch.setattr(harness, "get_model", lambda: FunctionModel(boom))
-    a, ha = account(client, "fail@example.com")
+    a, ha = account(client, "fail")
     with pytest.raises(RuntimeError):
         client.get("/api/coach/summary", headers=ha)
     run = rows("SELECT * FROM agent_runs")[-1]
@@ -353,7 +404,7 @@ def test_failed_agent_calls_are_logged_too(client, monkeypatch):
 
 
 def test_deleting_a_user_keeps_token_rows_but_unlinks_them(client, use_script):
-    a, ha = account(client, "del@example.com")
+    a, ha = account(client, "del")
     use_script(("final", {"encouragement": "Hi!", "fun_fact_comparison": None}))
     client.get("/api/coach/summary", headers=ha)
     r = client.delete(f"/api/users/{a}", headers=ha).json()
@@ -364,7 +415,7 @@ def test_deleting_a_user_keeps_token_rows_but_unlinks_them(client, use_script):
 def test_reset_keeps_the_token_log(client, use_script, test_db, tmp_path, monkeypatch):
     from app import config
     from app.db.reset import reset
-    a, ha = account(client, "reset@example.com")
+    a, ha = account(client, "reset")
     use_script(("final", {"encouragement": "Hi!", "fun_fact_comparison": None}))
     client.get("/api/coach/summary", headers=ha)
     original = tmp_path / "original.db"
@@ -380,6 +431,6 @@ def test_no_api_key_gives_a_clear_503(client, monkeypatch):
     def unavailable():
         raise harness.AgentUnavailable("No PORTKEY_API_KEY or OPENAI_API_KEY is set, so the AI features are off.")
     monkeypatch.setattr(harness, "get_model", unavailable)
-    a, ha = account(client, "nokey@example.com")
+    a, ha = account(client, "nokey")
     r = client.get("/api/coach/summary", headers=ha)
     assert r.status_code == 503 and "AI features are off" in r.json()["detail"]

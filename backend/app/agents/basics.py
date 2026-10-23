@@ -15,7 +15,7 @@ The pipeline, in order (each step can end the request before any model call):
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry, RunContext
 
-from app.agents.harness import AgentDeps, McpGateway, load_prompt, makes_science_claim, run_logged
+from app.agents.harness import AgentDeps, McpGateway, load_prompt, makes_science_claim, no_emoji, run_logged
 from app.agents.safety import REDIRECT_MESSAGE, log_safety_event, red_flags_in
 from app.safety_rules import CLINICAL_REVIEW_NO_AI, CLINICAL_REVIEW_PAGE
 
@@ -88,7 +88,7 @@ def finalize(draft: BasicsDraft, deps: AgentDeps) -> BasicsAnswer:
     sources = [{k: deps.seen["articles"][s][k] for k in ("slug", "title", "status", "review_notice", "citations")}
                for s in dict.fromkeys(draft.source_slugs)]
     pending = any(s["status"] == "placeholder" for s in sources)
-    return BasicsAnswer(answer=draft.answer.strip(), answered=True, sources=sources,
+    return BasicsAnswer(answer=no_emoji(draft.answer), answered=True, sources=sources,
                         review_note=PENDING_NOTE if pending else None)
 
 

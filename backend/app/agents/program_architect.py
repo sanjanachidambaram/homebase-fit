@@ -19,7 +19,7 @@ import json
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry, RunContext
 
-from app.agents.harness import AgentDeps, McpGateway, load_prompt, makes_science_claim, run_logged
+from app.agents.harness import AgentDeps, McpGateway, load_prompt, makes_science_claim, no_emoji, run_logged
 from app.services.program_generator import WeeklyProgram, generate_for_user
 
 PENDING_NOTE = ("Pending expert review: the training settings behind this plan haven't been checked by a "
@@ -92,7 +92,7 @@ async def recommend_plan(user_id: int, route: str) -> tuple[PlanRecommendation, 
     deps.seen["plan"] = plan
     out, meta = await run_logged(program_architect, agent_name="program_architect", deps=deps, route=route,
                                  prompt=plan_for_model(plan))
-    explanation = out.explanation.strip()
+    explanation = no_emoji(out.explanation)
     if not plan.protocol.citations and makes_science_claim(explanation):   # never ship an unsupported claim
         explanation = plain_explanation(plan)
     return PlanRecommendation(plan=plan, explanation=explanation,

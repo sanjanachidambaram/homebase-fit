@@ -28,11 +28,13 @@ function Dashboard({ session }: { session: Session }) {
     }
   }, [session])
 
+  // The first name is only for this greeting; it never leaves the app (no agent sees it). Accounts made before
+  // names were asked for have none. Blank until the account loads, so "Hi there" doesn't flash before the name.
+  const greeting = account?.first_name ? `Hi ${account.first_name}` : 'Hi there'
+
   return (
     <div className="dashboard">
-      <h2 className="page-title">
-        Hey you! <span aria-hidden="true">👋</span>
-      </h2>
+      <h2 className="page-title">{account || loadFailed ? greeting : ' '}</h2>
       <p className="page-sub">Here's your day at a glance.</p>
 
       {account && !account.quiz_profile && (

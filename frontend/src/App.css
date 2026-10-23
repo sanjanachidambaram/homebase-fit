@@ -1044,17 +1044,6 @@ fieldset.question {
   font-size: 1.4rem;
 }
 
-.card-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 2.2rem;
-  height: 2.2rem;
-  margin-right: 0.25rem;
-  border-radius: 50%;
-  background: var(--yellow-tint);
-  font-size: 1.1rem;
-}
-
 .quiz-prompt {
   margin-bottom: 1.25rem;
   background: linear-gradient(135deg, var(--yellow-tint), var(--pink-tint));

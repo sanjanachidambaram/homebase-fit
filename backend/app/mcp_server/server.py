@@ -8,11 +8,11 @@ Least privilege: exactly six tools, listed below, and none of them writes anythi
   The read tools open the database through a SQLite connection opened read-only (mode=ro), so even a bug
       in a query cannot change data. compute_strength_equivalents touches no database.
 Logging workouts and measurements stays a direct REST call from the calendar page; it is not a tool.
-There is no delete tool and no tool that returns an email address.
+There is no delete tool and no tool that returns a username, first name or email address.
 
 Privacy: get_user_profile is the only tool that returns profile data, and it goes through
-app.agents.context.agent_profile_for, so email, name, user id, and free-text injury notes never
-come out of this server.
+app.agents.context.agent_profile_for, so nothing in app.agents.context.EXCLUDED_USER_FIELDS (username,
+first name, email, user id, free-text injury notes) ever comes out of this server. No tool reads the users table.
 
 NOTE FOR THE AGENT HARNESS (next step): three tools take a user_id. This server cannot tell WHO is
 asking, so the code that calls these tools must set user_id from the signed-in session and must not
@@ -60,7 +60,7 @@ def _run(fn: Callable[..., dict], *args: Any, **kwargs: Any) -> dict:
 def get_user_profile(user_id: int) -> dict:
     """Get a user's profile for personalization: goals, timeline, injury_flags, age, weight_lb, height_in.
 
-    Returns ONLY those fields. No email, name, or free-text notes are ever returned. If the user has not taken
+    Returns ONLY those fields. No username, first name, email, or free-text notes are ever returned. If the user has not taken
     the quiz yet, returns found=false."""
     conn = connect_readonly()
     try:

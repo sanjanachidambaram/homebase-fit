@@ -13,7 +13,7 @@ export function CardioList({ logs, token, onChange }: { logs: CardioLog[]; token
       {logs.map((l) => (
         <li key={l.id}>
           <span>
-            🏃 {l.activity ?? l.exercise_name} · {l.duration_minutes} min
+            {l.activity ?? l.exercise_name} · {l.duration_minutes} min
           </span>
           <button
             type="button"

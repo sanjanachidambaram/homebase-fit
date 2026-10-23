@@ -58,7 +58,7 @@ def test_a_fresh_instance_works_end_to_end(fresh_instance):
     from app.main import app
     with TestClient(app) as client:                                     # startup (lifespan) creates the DB
         assert fresh_instance.exists()
-        r = client.post("/api/users", json={"email": "fresh@example.com", "password": "correct horse 1"}).json()
+        r = client.post("/api/users", json={"username": "fresh", "first_name": "Tester", "password": "correct horse 1"}).json()
         h = {"Authorization": f"Bearer {r['token']}"}
         assert client.put(f"/api/users/{r['user_id']}/quiz-profile", headers=h, json={
             "consent_accepted": True, "consent_version": "t", "answers": quiz_answers()}).status_code == 200
@@ -146,17 +146,17 @@ def disk(tmp_path, monkeypatch):
     return mount
 
 
-def add_user(email):
+def add_user(username):
     conn = sqlite3.connect(config.WORKING_DB)
     with conn:
-        conn.execute("INSERT INTO users (email, password_hash) VALUES (?, 'x')", (email,))
+        conn.execute("INSERT INTO users (username, first_name, password_hash) VALUES (?, 'Tester', 'x')", (username,))
     conn.close()
 
 
 def users():
     conn = sqlite3.connect(config.WORKING_DB)
     try:
-        return [r[0] for r in conn.execute("SELECT email FROM users ORDER BY id")]
+        return [r[0] for r in conn.execute("SELECT username FROM users ORDER BY id")]
     finally:
         conn.close()
 
@@ -170,17 +170,17 @@ def test_first_use_of_an_empty_disk_builds_the_db_there(disk):
 
 def test_a_normal_redeploy_leaves_the_data_alone(disk):
     ensure_working_db()
-    add_user("survivor@example.com")
+    add_user("survivor")
     before = (disk / "homebase.db").read_bytes()
     for _ in range(3):                                                  # three restarts / redeploys, same content
         assert ensure_working_db() == "unchanged"
-    assert (disk / "homebase.db").read_bytes() == before and users() == ["survivor@example.com"]
+    assert (disk / "homebase.db").read_bytes() == before and users() == ["survivor"]
     assert not list(disk.glob("*before-refresh*"))                      # nothing to back up, nothing touched
 
 
 def test_a_deploy_with_new_content_refreshes_but_keeps_accounts_and_a_backup(disk, tmp_path, monkeypatch):
     ensure_working_db()
-    add_user("keepme@example.com")
+    add_user("keepme")
     new_original = tmp_path / "new_original.db"                         # this deploy ships new content
     copy_db(config.ORIGINAL_DB, new_original)
     conn = sqlite3.connect(new_original)
@@ -190,23 +190,23 @@ def test_a_deploy_with_new_content_refreshes_but_keeps_accounts_and_a_backup(dis
     monkeypatch.setattr(config, "ORIGINAL_DB", new_original)
 
     assert ensure_working_db() == "refreshed"
-    assert users() == ["keepme@example.com"]                            # the account survived
+    assert users() == ["keepme"]                            # the account survived
     conn = sqlite3.connect(config.WORKING_DB)
     assert conn.execute("SELECT name FROM sources WHERE id = 'free-exercise-db'").fetchone()[0] == "Renamed in a new deploy"
     conn.close()
     backups = list(disk.glob("homebase.before-refresh-*.db"))
-    assert len(backups) == 1 and "keepme@example.com" in [r[0] for r in sqlite3.connect(backups[0]).execute("SELECT email FROM users")]
+    assert len(backups) == 1 and "keepme" in [r[0] for r in sqlite3.connect(backups[0]).execute("SELECT username FROM users")]
     assert ensure_working_db() == "unchanged"                           # and the next restart leaves it alone
 
 
 def test_a_working_db_from_before_this_change_is_upgraded_not_wiped(disk):
     ensure_working_db()
-    add_user("old-timer@example.com")
+    add_user("old-timer")
     conn = sqlite3.connect(config.WORKING_DB)
     with conn:
         conn.execute("DROP TABLE app_meta")                             # what the live DB looked like before
     conn.close()
-    assert ensure_working_db() == "refreshed" and users() == ["old-timer@example.com"]
+    assert ensure_working_db() == "refreshed" and users() == ["old-timer"]
     assert working_db_stamp() == original_fingerprint()
 
 

@@ -4,7 +4,7 @@ Triggered by POST /api/workouts/review (a Build Your Own session) and POST /api/
 calendar day), both in app/agent_routes.py.
   1. Code computes the review: app/services/workout_review.py (coverage, push/pull balance, and the
      Compendium-based calorie / weight-change range, with its caveats and citations).
-  2. This agent gets that result (and nothing about the person: no id, email, name, weight or free text) and
+  2. This agent gets that result (and nothing about the person: no id, username, name, email, weight or free text) and
      writes a short, warm explanation. It has NO tools.
 
 Enforced in code (shared_rules.md rule 7):
@@ -21,7 +21,7 @@ import re
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry, RunContext
 
-from app.agents.harness import AgentDeps, McpGateway, load_prompt, run_logged
+from app.agents.harness import AgentDeps, McpGateway, load_prompt, no_emoji, run_logged
 
 NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
 # The Coach's blocklist minus the words this agent needs for its estimate (calories, pounds, weight, eating habits).
@@ -102,7 +102,7 @@ async def narrate(user_id: int, review: dict, route: str) -> tuple[dict, dict]:
     deps.seen["review"] = review
     out, meta = await run_logged(workout_reviewer, agent_name="workout_reviewer", deps=deps, route=route,
                                  prompt=review_for_model(review))
-    summary = out.summary.strip()
+    summary = no_emoji(out.summary)
     # Belt and braces: whatever happened above, never ship a number the code didn't compute.
     if numbers_in(summary) - numbers_in(review_for_model(review)) or PROMISE.search(summary) or TONE.search(summary):
         summary, deps.seen["fallback"] = plain_summary(review), True

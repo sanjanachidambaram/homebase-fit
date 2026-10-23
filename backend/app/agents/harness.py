@@ -211,6 +211,19 @@ def makes_science_claim(text: str) -> bool:
     return bool(SCIENCE_CLAIM.search(text or ""))
 
 
+# ---------------------------------------------------------------- no emoji (shared_rules rule 5)
+
+# Pictographs, symbols and dingbats, flags, and the joiners/variation selectors that build emoji sequences.
+EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\u2300-\u23FF\uFE0E\uFE0F\u200D\u20E3]")
+
+
+def no_emoji(text: str) -> str:
+    """Model-written text the user sees has no emoji (the site's copy uses none). The prompts ask for none;
+    this makes sure, and tidies the spaces an emoji leaves behind."""
+    text = re.sub(r"[ \t]{2,}", " ", EMOJI.sub("", text or ""))
+    return re.sub(r" +([.,!?;:])", r"\1", text).strip()
+
+
 # ---------------------------------------------------------------- run + token log
 
 def _log_run(agent_name: str, user_id: int | None, route: str, usage: RunUsage, status: str,

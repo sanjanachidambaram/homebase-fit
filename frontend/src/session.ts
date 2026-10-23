@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 export interface Session {
   userId: number
   token: string
-  email: string
+  username: string
 }
 
 const KEY = 'homebase.session'
@@ -13,7 +13,10 @@ const EVENT = 'homebase-session'
 export function getSession(): Session | null {
   try {
     const raw = localStorage.getItem(KEY)
-    return raw ? (JSON.parse(raw) as Session) : null
+    if (!raw) return null
+    // Sessions saved before usernames (2026-10-23) have `email`; that email is now the account's username.
+    const s = JSON.parse(raw) as Session & { email?: string }
+    return { userId: s.userId, token: s.token, username: s.username ?? s.email ?? '' }
   } catch {
     return null
   }

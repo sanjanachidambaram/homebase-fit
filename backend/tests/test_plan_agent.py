@@ -40,8 +40,8 @@ def explainer(monkeypatch):
     return install
 
 
-def account(client, email="plan@example.com", **answer_overrides):
-    r = client.post("/api/users", json={"email": email, "password": "correct horse 1"}).json()
+def account(client, username="plan", first_name="Tester", **answer_overrides):
+    r = client.post("/api/users", json={"username": username, "first_name": first_name, "password": "correct horse 1"}).json()
     h = {"Authorization": f"Bearer {r['token']}"}
     res = client.put(f"/api/users/{r['user_id']}/quiz-profile", headers=h, json={
         "consent_accepted": True, "consent_version": "test", "answers": quiz_answers(**answer_overrides),
@@ -68,12 +68,12 @@ def test_recommend_returns_the_generated_plan_and_an_explanation(client, explain
 
 def test_the_model_sees_only_goals_and_the_plan(client, explainer):
     e = explainer("Here's why it fits.")
-    uid, h = account(client, email="private.person@example.com", other_activity_notes="PRIVATE-ACTIVITY",
+    uid, h = account(client, username="private.person", first_name="Zenobia", other_activity_notes="PRIVATE-ACTIVITY",
                      goal_weight=150, goal_date=(date.today() + timedelta(days=90)).isoformat())
     client.post("/api/programs/recommend", headers=h)
     shown = " ".join(e.prompts)
     assert '"goals":["rehab","weight_loss"]' in shown and "Glute Bridge" in shown
-    for private in ("private.person", "example.com", "PRIVATE-NOTE", "Dr. Smith", "PRIVATE-ACTIVITY",
+    for private in ("private.person", "Zenobia", "PRIVATE-NOTE", "Dr. Smith", "PRIVATE-ACTIVITY",
                     '"age"', '"weight"', "150", "pregnan", f'"user_id"'):
         assert private not in shown, private
 
@@ -111,7 +111,7 @@ def test_pregnant_or_postpartum_never_calls_the_model(client, explainer, status)
 
 def test_plan_routes_need_a_quiz_and_a_sign_in(client, explainer):
     explainer("x")
-    r = client.post("/api/users", json={"email": "noquiz@example.com", "password": "correct horse 1"}).json()
+    r = client.post("/api/users", json={"username": "noquiz", "first_name": "Tester", "password": "correct horse 1"}).json()
     h = {"Authorization": f"Bearer {r['token']}"}
     assert client.post("/api/programs/recommend", headers=h).status_code == 409
     assert client.get("/api/plan", headers=h).status_code == 409
@@ -145,12 +145,12 @@ def test_new_quiz_fields_are_saved(client):
 
 @pytest.mark.parametrize("status, flagged", [("none", False), ("pregnant", True), ("postpartum", True)])
 def test_pregnancy_answers_are_flagged_for_clinical_review(client, status, flagged):
-    uid, h = account(client, email=f"{status}@example.com", pregnancy_status=status)
+    uid, h = account(client, username=f"{status}", pregnancy_status=status)
     assert client.get(f"/api/users/{uid}", headers=h).json()["quiz_profile"]["needs_clinical_review"] is flagged
 
 
 def test_quiz_validation(client):
-    r = client.post("/api/users", json={"email": "v@example.com", "password": "correct horse 1"}).json()
+    r = client.post("/api/users", json={"username": "user_v", "first_name": "Tester", "password": "correct horse 1"}).json()
     h = {"Authorization": f"Bearer {r['token']}"}
 
     def put(**over):

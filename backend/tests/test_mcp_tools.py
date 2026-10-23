@@ -39,11 +39,11 @@ def day(n: int) -> str:
     return (TODAY - timedelta(days=n)).isoformat()
 
 
-def make_user(email="private.person@example.com", goals=("weight_loss",), timeline="8_weeks", injuries=("lower_back",),
+def make_user(username="private.person", first_name="Zenobia", goals=("weight_loss",), timeline="8_weeks", injuries=("lower_back",),
               quiz_days_ago=20, notes="Dr. Smith said L4 disc issue") -> int:
     conn = connect()
     with conn:
-        uid = conn.execute("INSERT INTO users (email, password_hash) VALUES (?, 'x')", (email,)).lastrowid
+        uid = conn.execute("INSERT INTO users (username, first_name, password_hash) VALUES (?, ?, 'x')", (username, first_name)).lastrowid
         stamp = (datetime.now(timezone.utc) - timedelta(days=quiz_days_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
         conn.execute(
             "INSERT INTO quiz_profiles (user_id, goals, timeline, injury_flags, injury_notes, age, weight, height, "
@@ -137,7 +137,7 @@ def test_profile_not_found_cases(test_db):
     assert call("get_user_profile", user_id=uid)["found"] is False
 
 
-def test_no_tool_ever_returns_email_or_notes(test_db):
+def test_no_tool_ever_returns_username_name_or_notes(test_db):
     uid = make_user()
     log(uid, 0)
     weigh(uid, 5, 170.0)
@@ -149,7 +149,7 @@ def test_no_tool_ever_returns_email_or_notes(test_db):
         call("compute_strength_equivalents", total_weight_lifted_lbs=5000),
     ]
     text = json.dumps(outputs).lower()
-    for secret in ("private.person", "@example.com", "dr. smith", "l4 disc", "password"):
+    for secret in ("private.person", "zenobia", "dr. smith", "l4 disc", "password"):
         assert secret not in text
 
 
@@ -267,10 +267,10 @@ def test_streak_rules(test_db):
         log(uid, d)
     s = progress.get_progress_summary(uid, TODAY)
     assert s["current_streak_days"] == 10 and s["rest_day_suggested"] is True     # today not over: still counts
-    other = make_user("b@example.com")
+    other = make_user("user_b")
     log(other, 0); log(other, 2)
     assert progress.get_progress_summary(other, TODAY)["current_streak_days"] == 1  # gap breaks it
-    third = make_user("c@example.com")
+    third = make_user("user_c")
     log(third, 5)
     assert progress.get_progress_summary(third, TODAY)["current_streak_days"] == 0  # nothing today or yesterday
 
@@ -311,19 +311,19 @@ def test_goal_check_insufficient_data(test_db):
 
 def test_goal_check_on_track_ahead_behind(test_db):
     # on track: 8_weeks target is 3 a week; 9 sessions over a 20-day-old quiz is ~3.2 a week
-    ok = make_user("a@example.com", goals=("tone",), timeline="8_weeks", quiz_days_ago=20)
+    ok = make_user("user_a", goals=("tone",), timeline="8_weeks", quiz_days_ago=20)
     for d in (0, 2, 4, 6, 8, 10, 12, 14, 16):
         log(ok, d)
     r = call("check_goal_achievement", user_id=ok)
     assert r["status"] == "on_track" and r["checks"][0]["check"] == "consistency"
     assert r["checks"][1]["status"] == "not_measurable"
 
-    ahead = make_user("b@example.com", goals=("tone", "rehab"), timeline="8_weeks", quiz_days_ago=14)
+    ahead = make_user("user_b", goals=("tone", "rehab"), timeline="8_weeks", quiz_days_ago=14)
     for d in range(12):
         log(ahead, d)
     assert call("check_goal_achievement", user_id=ahead)["status"] == "ahead"
 
-    behind = make_user("c@example.com", goals=("tone",), timeline="4_weeks", quiz_days_ago=20)
+    behind = make_user("user_c", goals=("tone",), timeline="4_weeks", quiz_days_ago=20)
     log(behind, 1)
     r = call("check_goal_achievement", user_id=behind)
     assert r["status"] == "behind" and r["thresholds_used"]["ahead_if_ratio_at_least"] == 1.25
@@ -331,7 +331,7 @@ def test_goal_check_on_track_ahead_behind(test_db):
 
 
 def test_goal_check_weight_loss_and_strength_signals(test_db):
-    gaining = make_user("d@example.com", goals=("weight_loss",), quiz_days_ago=25)
+    gaining = make_user("user_d", goals=("weight_loss",), quiz_days_ago=25)
     for d in range(0, 24, 2):
         log(gaining, d)
     weigh(gaining, 20, 160.0)
@@ -339,18 +339,18 @@ def test_goal_check_weight_loss_and_strength_signals(test_db):
     r = call("check_goal_achievement", user_id=gaining)
     assert r["status"] == "behind" and {"check": "weight_loss", "status": "behind"}.items() <= r["checks"][1].items()
 
-    losing = make_user("e@example.com", goals=("weight_loss",), quiz_days_ago=25)
+    losing = make_user("user_e", goals=("weight_loss",), quiz_days_ago=25)
     for d in range(0, 24, 2):
         log(losing, d)
     weigh(losing, 20, 163.0)
     weigh(losing, 0, 160.0)
     assert call("check_goal_achievement", user_id=losing)["checks"][1]["status"] == "on_track"
 
-    nodata = make_user("f@example.com", goals=("weight_loss",), quiz_days_ago=25)
+    nodata = make_user("user_f", goals=("weight_loss",), quiz_days_ago=25)
     log(nodata, 0)
     assert call("check_goal_achievement", user_id=nodata)["checks"][1]["status"] == "not_enough_data"
 
-    lifter = make_user("g@example.com", goals=("strength",), quiz_days_ago=25)
+    lifter = make_user("user_g", goals=("strength",), quiz_days_ago=25)
     for d in range(0, 24, 2):
         log(lifter, d, weight=40 if d >= 15 else 10)       # lifts got lighter recently
     r = call("check_goal_achievement", user_id=lifter)

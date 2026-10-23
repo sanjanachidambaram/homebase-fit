@@ -79,8 +79,13 @@ export default function SettingsPage() {
       <section className="settings-section">
         <h3>Your account</h3>
         <p>
-          <strong>Email:</strong> {session.email}
+          <strong>Username:</strong> {account?.username ?? session.username}
         </p>
+        {account?.first_name && (
+          <p>
+            <strong>First name:</strong> {account.first_name}
+          </p>
+        )}
         {account && (
           <p>
             <strong>Member since:</strong> {new Date(account.created_at).toLocaleDateString()}
@@ -123,7 +128,7 @@ export default function SettingsPage() {
         ) : (
           <div className="confirm-box" role="alertdialog" aria-label="Confirm deletion">
             <p>
-              <strong>Are you sure?</strong> Everything stored for {session.email} will be deleted right away.
+              <strong>Are you sure?</strong> Everything stored for {account?.username ?? session.username} will be deleted right away.
             </p>
             <div className="button-row">
               <button className="btn-secondary" onClick={() => setConfirming(false)} disabled={deleting}>

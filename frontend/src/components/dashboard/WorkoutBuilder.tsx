@@ -95,7 +95,7 @@ export default function WorkoutBuilder({
     <section className={`dash-card builder-card${compact ? '' : ' builder-full'}`} aria-labelledby={titleId}>
       <div className="dash-card-head">
         <h3 id={titleId}>
-          <span className="card-icon" aria-hidden="true">🧩</span> {title}
+          {title}
         </h3>
       </div>
 

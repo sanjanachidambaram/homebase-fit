@@ -29,7 +29,7 @@ def test_the_library_has_real_cardio_exercises(client):
 
 def test_free_text_cardio_on_a_rest_day_is_saved_and_counts_as_activity(client, on_day, use_script):
     script = use_script(("final", {"encouragement": "x", "fun_fact_comparison": None}))
-    uid, h = account(client, "cardio@example.com")
+    uid, h = account(client, "cardio")
     assert by_date(get_days(client, h))[d(1)]["day_type"] == "rest"
     r = log(client, h, activity="ran 20 min around the park")
     assert r.status_code == 201, r.text
@@ -46,7 +46,7 @@ def test_free_text_cardio_on_a_rest_day_is_saved_and_counts_as_activity(client, 
 
 
 def test_picking_a_library_cardio_exercise(client, on_day):
-    uid, h = account(client, "pick@example.com")
+    uid, h = account(client, "pick")
     r = log(client, h, exercise_id="Rope_Jumping", duration_minutes=10)
     assert r.status_code == 201 and r.json()["log"]["exercise_name"] == "Rope Jumping"
     assert rows("SELECT exercise_id, duration_seconds FROM workout_logs WHERE user_id = ?", uid) == [
@@ -59,7 +59,7 @@ def test_picking_a_library_cardio_exercise(client, on_day):
 
 def test_red_flag_in_a_cardio_log_is_saved_logged_and_answered_without_ai(client, on_day, use_script):
     script = use_script(("final", {"encouragement": "x", "fun_fact_comparison": None}))
-    uid, h = account(client, "cardioflag@example.com")
+    uid, h = account(client, "cardioflag")
     text = "ran 3 miles, sharp pain in my knee"
     r = log(client, h, activity=text).json()
     assert r["log"]["activity"] == text and r["safety"]["flagged"] is True
@@ -72,7 +72,7 @@ def test_red_flag_in_a_cardio_log_is_saved_logged_and_answered_without_ai(client
 def test_pregnant_users_can_log_in_their_own_words_only(client, on_day):
     """Decision (shared_rules.md rule 9): yes to free-text logging (it's their own log, no AI, no prescription),
     no to the exercise library (a list of exercises reads as a suggestion while they have no plan)."""
-    uid, h = account(client, "expecting@example.com", pregnancy_status="pregnant")
+    uid, h = account(client, "expecting", pregnancy_status="pregnant")
     r = log(client, h, activity="prenatal yoga class", duration_minutes=45)
     assert r.status_code == 201, r.text
     cal = get_days(client, h)
@@ -86,7 +86,7 @@ def test_pregnant_users_can_log_in_their_own_words_only(client, on_day):
 
 
 def test_cardio_text_never_reaches_any_model(client, on_day, monkeypatch):
-    uid, h = account(client, "cardioprivate@example.com", injuries=["none"])
+    uid, h = account(client, "cardioprivate", injuries=["none"])
     assert log(client, h, activity=SENTINEL, date=d(0)).status_code == 201
     sent = []
     for method, route, body, steps in [
@@ -106,8 +106,8 @@ def test_cardio_text_never_reaches_any_model(client, on_day, monkeypatch):
 
 @pytest.mark.parametrize("who", ["other user"])
 def test_only_the_owner_can_delete_a_log(client, on_day, who):
-    uid, h = account(client, "owner@example.com")
-    other, oh = account(client, "notowner@example.com")
+    uid, h = account(client, "owner")
+    other, oh = account(client, "notowner")
     log_id = log(client, h, activity="swim").json()["log"]["id"]
     assert client.delete(f"/api/cardio/{log_id}", headers=oh).status_code == 404
     assert client.get("/api/cardio", headers=oh, params={"start": d(0), "end": d(6)}).json() == []

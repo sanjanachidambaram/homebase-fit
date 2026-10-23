@@ -25,7 +25,9 @@ from app.security import hash_password, make_token, require_same_user, token_use
 router = APIRouter(prefix="/api")
 log = logging.getLogger(__name__)
 
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]{3,30}$")
+USERNAME_RULE = "3 to 30 characters: letters, numbers, dots, dashes or underscores"
+FIRST_NAME_MAX = 50
 
 # Quiz question id -> quiz_profiles column. The quiz file can change wording and
 # options freely, but these ids must stay (see content/quiz/quiz_questions.yaml).
@@ -61,8 +63,14 @@ def db():
 
 # ---------------------------------------------------------------- accounts
 
-class Credentials(BaseModel):
-    email: str = Field(max_length=254)
+class SignUp(BaseModel):
+    username: str = Field(max_length=30)
+    first_name: str = Field(max_length=FIRST_NAME_MAX)   # the Dashboard greeting; never sent to any agent
+    password: str = Field(min_length=8, max_length=200)
+
+
+class SignIn(BaseModel):
+    username: str = Field(max_length=254)   # 254: accounts from before usernames sign in with their old email
     password: str = Field(min_length=8, max_length=200)
 
 
@@ -72,25 +80,28 @@ class AuthResult(BaseModel):
 
 
 @router.post("/users", status_code=201)
-def sign_up(body: Credentials, conn: sqlite3.Connection = Depends(db)) -> AuthResult:
-    email = body.email.strip().lower()
-    if not EMAIL_RE.match(email):
-        raise HTTPException(422, "Enter a valid email address.")
+def sign_up(body: SignUp, conn: sqlite3.Connection = Depends(db)) -> AuthResult:
+    username = body.username.strip()
+    if not USERNAME_RE.match(username):
+        raise HTTPException(422, f"Pick a username of {USERNAME_RULE}.")
+    first_name = " ".join(body.first_name.split())   # trims and collapses whitespace, drops tabs/newlines
+    if not first_name:
+        raise HTTPException(422, "Enter your first name.")
     try:
-        cur = conn.execute("INSERT INTO users (email, password_hash) VALUES (?, ?)",
-                           (email, hash_password(body.password)))
+        cur = conn.execute("INSERT INTO users (username, first_name, password_hash) VALUES (?, ?, ?)",
+                           (username, first_name, hash_password(body.password)))
         conn.commit()
-    except sqlite3.IntegrityError:
-        raise HTTPException(409, "An account with that email already exists. Sign in instead.")
+    except sqlite3.IntegrityError:   # usernames are unique ignoring case (schema.sql: COLLATE NOCASE)
+        raise HTTPException(409, "That username is taken. Pick another, or sign in if it's yours.")
     return AuthResult(user_id=cur.lastrowid, token=make_token(cur.lastrowid))
 
 
 @router.post("/login")
-def log_in(body: Credentials, conn: sqlite3.Connection = Depends(db)) -> AuthResult:
-    row = conn.execute("SELECT id, password_hash FROM users WHERE email = ?",
-                       (body.email.strip().lower(),)).fetchone()
+def log_in(body: SignIn, conn: sqlite3.Connection = Depends(db)) -> AuthResult:
+    row = conn.execute("SELECT id, password_hash FROM users WHERE username = ?",   # NOCASE: any capitalization
+                       (body.username.strip(),)).fetchone()
     if not row or not verify_password(body.password, row["password_hash"]):
-        raise HTTPException(401, "Email or password is incorrect.")
+        raise HTTPException(401, "Username or password is incorrect.")
     return AuthResult(user_id=row["id"], token=make_token(row["id"]))
 
 
@@ -111,7 +122,7 @@ def profile_dict(row: sqlite3.Row | None) -> dict | None:
 @router.get("/users/{user_id}")
 def get_user(user_id: int, uid: int = Depends(token_user_id), conn: sqlite3.Connection = Depends(db)) -> dict:
     require_same_user(user_id, uid)
-    user = conn.execute("SELECT id, email, created_at FROM users WHERE id = ?", (user_id,)).fetchone()
+    user = conn.execute("SELECT id, username, first_name, created_at FROM users WHERE id = ?", (user_id,)).fetchone()
     if not user:
         raise HTTPException(404, "Account not found.")
     profile = conn.execute("SELECT * FROM quiz_profiles WHERE user_id = ?", (user_id,)).fetchone()

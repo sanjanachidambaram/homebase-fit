@@ -18,7 +18,7 @@ import re
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry, RunContext
 
-from app.agents.harness import AgentDeps, McpGateway, load_prompt, run_logged
+from app.agents.harness import AgentDeps, McpGateway, load_prompt, no_emoji, run_logged
 from app.mcp_server.progress import REST_SUGGESTED_AFTER_DAYS
 
 TONE_BLOCKLIST = re.compile(
@@ -116,7 +116,7 @@ async def finalize(draft: CoachDraft, deps: AgentDeps) -> CoachMessage:
 
     streak = int(summary.get("current_streak_days") or 0)
     overtraining = streak >= REST_SUGGESTED_AFTER_DAYS
-    encouragement = draft.encouragement.strip()
+    encouragement = no_emoji(draft.encouragement)
     if tone_problems(encouragement):   # belt and braces: never ship a message that fails the tone guard
         encouragement = SAFE_ENCOURAGEMENT
     return CoachMessage(

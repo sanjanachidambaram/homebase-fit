@@ -17,9 +17,13 @@ PRAGMA foreign_keys = ON;
 -- Deleting a user (DELETE /api/users/{id}) removes their quiz_profiles,
 -- exercise_favorites, workout_logs, measurements, and safety_events too (ON DELETE CASCADE, plus
 -- explicit deletes in app/users.py). AUTOINCREMENT means ids are never reused.
+-- username and first_name identify the person, so neither ever reaches an agent (app/agents/context.py,
+-- EXCLUDED_USER_FIELDS). Accounts from before usernames (2026-10-23) kept their old email as their username, so
+-- they still sign in with what they typed before (app/db/reset.py, RENAMED_COLUMNS); their first_name is NULL.
 CREATE TABLE users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    email         TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    first_name    TEXT,                            -- only for the Dashboard greeting ("Hi Sarah")
     password_hash TEXT NOT NULL,
     created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
@@ -323,12 +327,12 @@ CREATE TABLE agent_runs (
 );
 CREATE INDEX idx_agent_runs_agent_time ON agent_runs(agent_name, timestamp);
 
--- Display-ready view for the safety report: newest first, with the user's email.
+-- Display-ready view for the safety report: newest first, with the user's username.
 CREATE VIEW safety_events_report AS
 SELECT s.id,
        s.timestamp,
        s.source,
-       COALESCE(u.email, '(anonymous)') AS user_email,
+       COALESCE(u.username, '(anonymous)') AS username,
        s.trigger_text,
        s.action_taken
 FROM safety_events s

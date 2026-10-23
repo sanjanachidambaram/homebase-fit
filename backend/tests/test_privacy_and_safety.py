@@ -20,8 +20,8 @@ USER_TABLES = ("quiz_profiles", "workout_logs", "measurements", "safety_events",
                "calendar_entries", "cardio_logs", "built_workouts")
 
 
-def sign_up(client, email):
-    r = client.post("/api/users", json={"email": email, "password": "correct horse 1"})
+def sign_up(client, username, first_name="Tester"):
+    r = client.post("/api/users", json={"username": username, "first_name": first_name, "password": "correct horse 1"})
     assert r.status_code == 201, r.text
     body = r.json()
     return body["user_id"], {"Authorization": f"Bearer {body['token']}"}
@@ -43,7 +43,7 @@ def count(table, uid):
 # ---------------------------------------------------------------- consent
 
 def test_quiz_rejected_without_consent(client):
-    uid, h = sign_up(client, "a@example.com")
+    uid, h = sign_up(client, "user_a")
     r = submit_quiz(client, uid, h, consent=False)
     assert r.status_code == 422
     assert "disclaimer" in r.json()["detail"]
@@ -51,7 +51,7 @@ def test_quiz_rejected_without_consent(client):
 
 
 def test_database_refuses_profile_without_consent(client):
-    uid, _ = sign_up(client, "a@example.com")
+    uid, _ = sign_up(client, "user_a")
     conn = connect()
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute("INSERT INTO quiz_profiles (user_id, consent_accepted) VALUES (?, 0)", (uid,))
@@ -59,7 +59,7 @@ def test_database_refuses_profile_without_consent(client):
 
 
 def test_quiz_saved_with_consent_timestamp(client):
-    uid, h = sign_up(client, "a@example.com")
+    uid, h = sign_up(client, "user_a")
     r = submit_quiz(client, uid, h)
     assert r.status_code == 200, r.text
     p = r.json()
@@ -70,7 +70,7 @@ def test_quiz_saved_with_consent_timestamp(client):
 
 
 def test_password_is_hashed(client):
-    sign_up(client, "a@example.com")
+    sign_up(client, "user_a")
     conn = connect()
     stored = conn.execute("SELECT password_hash FROM users").fetchone()[0]
     conn.close()
@@ -80,8 +80,8 @@ def test_password_is_hashed(client):
 # ---------------------------------------------------------------- deletion
 
 def test_delete_removes_user_and_all_related_rows(client):
-    a, ha = sign_up(client, "a@example.com")
-    b, hb = sign_up(client, "b@example.com")
+    a, ha = sign_up(client, "user_a")
+    b, hb = sign_up(client, "user_b")
     for uid, h in ((a, ha), (b, hb)):
         assert submit_quiz(client, uid, h).status_code == 200
     conn = connect()
@@ -152,13 +152,16 @@ def test_seed_rejects_pt_reviewed_without_citation():
 # ---------------------------------------------------------------- PII boundary
 
 def test_agent_profile_contains_no_pii(client):
-    from app.agents.context import AgentUserProfile, agent_profile_for
+    from app.agents.context import EXCLUDED_USER_FIELDS, AgentUserProfile, agent_profile_for
     assert set(AgentUserProfile.model_fields) == {"goals", "timeline", "injury_flags", "age", "weight_lb", "height_in"}
-    uid, h = sign_up(client, "private.person@example.com")
+    assert {"username", "first_name", "email"} <= EXCLUDED_USER_FIELDS          # name sits on the same list as email
+    assert not set(AgentUserProfile.model_fields) & EXCLUDED_USER_FIELDS
+    uid, h = sign_up(client, "private.person", first_name="Zenobia")
+    assert client.get(f"/api/users/{uid}", headers=h).json()["first_name"] == "Zenobia"   # stored, for the greeting
     client.put(f"/api/users/{uid}/quiz-profile", headers=h, json={
         "consent_accepted": True, "consent_version": "2026-10-22", "answers": ANSWERS,
         "injury_notes": "Dr. Smith said L4 disc issue"})
     prompt = agent_profile_for(uid).to_prompt_json()
-    for secret in ("private.person", "example.com", "Dr. Smith", "L4", str(uid) + ","):
+    for secret in ("private.person", "Zenobia", "Dr. Smith", "L4", str(uid) + ","):
         assert secret not in prompt
     assert json.loads(prompt)["injury_flags"] == ["lower_back"]

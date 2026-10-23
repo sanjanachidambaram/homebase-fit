@@ -17,8 +17,8 @@ from tests.test_agents import RED_FLAG_QUESTION, rows, use_script  # noqa: F401 
 ANSWERABLE = "How long should I rest between sets?"   # has a Basics article, so only the clinical block can stop it
 
 
-def account(client, email, pregnancy_status) -> tuple[int, dict]:
-    r = client.post("/api/users", json={"email": email, "password": "correct horse 1"}).json()
+def account(client, username, pregnancy_status) -> tuple[int, dict]:
+    r = client.post("/api/users", json={"username": username, "first_name": "Tester", "password": "correct horse 1"}).json()
     h = {"Authorization": f"Bearer {r['token']}"}
     assert client.put(f"/api/users/{r['user_id']}/quiz-profile", headers=h, json={
         "consent_accepted": True, "consent_version": "test",
@@ -36,7 +36,7 @@ def any_model_answer(use_script):
 @pytest.mark.parametrize("status", ["pregnant", "postpartum"])
 def test_no_ai_route_calls_the_model(client, use_script, status):
     script = any_model_answer(use_script)
-    uid, h = account(client, f"{status}@example.com", status)
+    uid, h = account(client, f"{status}", status)
 
     build = client.post("/api/workouts/build", headers=h, json={"picks": {"core": 1}, "time_budget_minutes": 10})
     coach = client.get("/api/coach/summary", headers=h)
@@ -59,7 +59,7 @@ def test_no_ai_route_calls_the_model(client, use_script, status):
 
 def test_red_flag_check_still_runs_first(client, use_script):
     script = any_model_answer(use_script)
-    uid, h = account(client, "rf-pregnant@example.com", "pregnant")
+    uid, h = account(client, "rf-pregnant", "pregnant")
     r = client.post("/api/basics/ask", headers=h, json={"question": RED_FLAG_QUESTION}).json()
     assert r["result"]["redirected_to_professional"] is True and script.calls == 0
     assert rows("SELECT trigger_text FROM safety_events WHERE user_id = ?", uid) == [{"trigger_text": RED_FLAG_QUESTION}]
@@ -69,7 +69,7 @@ def test_other_users_are_unaffected(client, use_script):
     use_script(("search_basics_kb", {"query": "rest between sets"}),
                ("final", {"answered": True, "source_slugs": ["rest_between_sets"],
                           "answer": "Our guide says about 60 to 90 seconds for moderate sets."}))
-    uid, h = account(client, "not-pregnant@example.com", "none")
+    uid, h = account(client, "not-pregnant", "none")
     r = client.post("/api/basics/ask", headers=h, json={"question": ANSWERABLE}).json()
     assert r["meta"]["agent_called"] is True and r["result"]["answered"] is True
     assert client.get("/api/coach/summary", headers=h).status_code != 403
@@ -77,7 +77,7 @@ def test_other_users_are_unaffected(client, use_script):
 
 def test_changing_the_answer_lifts_the_block(client, use_script):
     any_model_answer(use_script)
-    uid, h = account(client, "after@example.com", "pregnant")
+    uid, h = account(client, "after", "pregnant")
     assert client.get("/api/coach/summary", headers=h).status_code == 403
     assert client.put(f"/api/users/{uid}/quiz-profile", headers=h, json={
         "consent_accepted": True, "consent_version": "test",

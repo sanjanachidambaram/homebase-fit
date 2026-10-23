@@ -190,7 +190,8 @@ export type CalendarMode = 'generated' | 'review' | 'self'
 
 export interface Account {
   id: number
-  email: string
+  username: string
+  first_name: string | null // null for accounts made before names were asked for
   created_at: string
   quiz_profile: QuizProfile | null
 }
@@ -238,11 +239,14 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
   return body as T
 }
 
-export const signUp = (email: string, password: string) =>
-  request<AuthResult>('/api/users', { method: 'POST', body: JSON.stringify({ email, password }) })
+export const signUp = (username: string, firstName: string, password: string) =>
+  request<AuthResult>('/api/users', {
+    method: 'POST',
+    body: JSON.stringify({ username, first_name: firstName, password }),
+  })
 
-export const logIn = (email: string, password: string) =>
-  request<AuthResult>('/api/login', { method: 'POST', body: JSON.stringify({ email, password }) })
+export const logIn = (username: string, password: string) =>
+  request<AuthResult>('/api/login', { method: 'POST', body: JSON.stringify({ username, password }) })
 
 export const fetchQuizQuestions = () => request<QuizQuestion[]>('/api/quiz/questions')
 

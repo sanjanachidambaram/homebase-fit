@@ -47,7 +47,7 @@ def four_weeks(client, h, start=MONDAY):
 
 def test_quiz_retake_into_push_pull_lays_out_correct_days(client, on_day):
     """The reported path: a full-body plan, then a retake that switches to push/pull/legs."""
-    uid, h = account(client, "retake-ppl@example.com")                      # beginner: full body
+    uid, h = account(client, "retake-ppl")                      # beginner: full body
     assert {e["workout"].get("focus") for e in four_weeks(client, h)} <= {"Full body A", "Full body B", None}
 
     on_day(MONDAY + timedelta(days=2))
@@ -61,7 +61,7 @@ def test_quiz_retake_into_push_pull_lays_out_correct_days(client, on_day):
 
 
 def test_first_quiz_and_calendar_top_up_lay_out_correct_days(client, on_day):
-    uid, h = account(client, "first-ppl@example.com", **PPL)               # first quiz save
+    uid, h = account(client, "first-ppl", **PPL)               # first quiz save
     assert_directions_hold(four_weeks(client, h))
 
     on_day(MONDAY + timedelta(days=28))                                      # the 4 weeks ran out
@@ -75,7 +75,7 @@ def test_a_retake_clears_stale_pull_days_from_before_the_fix_but_keeps_the_users
     """Calendar days are snapshots. A Pull day laid out BEFORE the fix kept its push-ups until it was refreshed.
     A retake refreshes every untouched future day; days the user completed, wrote on or built stay as they are
     (the preservation rule), so an old snapshot can only survive on a day the user deliberately kept."""
-    uid, h = account(client, "stale@example.com", **PPL)
+    uid, h = account(client, "stale", **PPL)
     pull_days = [e for e in four_weeks(client, h) if e["workout"].get("focus") == "Pull"]
     conn = connect()
     with conn:                                                               # recreate the pre-fix snapshots

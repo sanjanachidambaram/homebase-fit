@@ -36,7 +36,7 @@ export default function AskBasics({ token }: { token: string }) {
     <section className="dash-card ask-card" aria-labelledby="ask-title">
       <div className="dash-card-head">
         <h3 id="ask-title">
-          <span className="card-icon" aria-hidden="true">💬</span> Ask the Basics
+          Ask the Basics
         </h3>
       </div>
       <form onSubmit={submit} className="ask-form">

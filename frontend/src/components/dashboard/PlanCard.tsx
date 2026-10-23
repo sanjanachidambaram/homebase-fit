@@ -32,7 +32,7 @@ export default function PlanCard({ token, userId }: { token: string; userId: num
     <section className="dash-card program-card" aria-labelledby="plan-title">
       <div className="dash-card-head">
         <h3 id="plan-title">
-          <span className="card-icon" aria-hidden="true">🗓️</span> Recommended for you
+          Recommended for you
         </h3>
       </div>
 

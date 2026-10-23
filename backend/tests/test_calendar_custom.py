@@ -42,7 +42,7 @@ def contraindications(exercise_id: str) -> list[str]:
 
 def test_override_replaces_the_day_and_keeps_the_injury_filter(client, on_day, use_script, mcp_calls):
     script = use_script(*CORE_SCRIPT)
-    uid, h = account(client, "custom@example.com")
+    uid, h = account(client, "custom")
     wed = by_date(get_days(client, h))[d(2)]
     assert wed["source"] == "generated" and wed["can_override"] is True
 
@@ -69,7 +69,7 @@ def test_override_replaces_the_day_and_keeps_the_injury_filter(client, on_day, u
 
 def test_a_rest_day_can_become_a_custom_workout_and_back(client, on_day, use_script):
     use_script(*CORE_SCRIPT)
-    uid, h = account(client, "restday@example.com")
+    uid, h = account(client, "restday")
     tue = by_date(get_days(client, h))[d(1)]
     assert tue["day_type"] == "rest"
     assert override(client, h, tue["id"]).json()["entry"]["day_type"] == "workout"
@@ -79,7 +79,7 @@ def test_a_rest_day_can_become_a_custom_workout_and_back(client, on_day, use_scr
 
 def test_custom_day_can_be_marked_done_and_logs_its_own_exercises(client, on_day, use_script):
     use_script(*CORE_SCRIPT)
-    uid, h = account(client, "customdone@example.com")
+    uid, h = account(client, "customdone")
     mon = by_date(get_days(client, h))[d(0)]
     override(client, h, mon["id"])
     assert patch(client, h, mon["id"], completed=True).json()["workout_logs_added"] == 2
@@ -91,7 +91,7 @@ def test_custom_day_can_be_marked_done_and_logs_its_own_exercises(client, on_day
 
 def test_revert_restores_the_planned_workout_exactly(client, on_day, use_script):
     use_script(*CORE_SCRIPT)
-    uid, h = account(client, "revert@example.com")
+    uid, h = account(client, "revert")
     wed = by_date(get_days(client, h))[d(2)]
     override(client, h, wed["id"])
     override(client, h, wed["id"])                       # a second override keeps the ORIGINAL plan, not the first custom
@@ -108,7 +108,7 @@ def test_revert_restores_the_planned_workout_exactly(client, on_day, use_script)
 
 def test_custom_day_survives_a_quiz_retake(client, on_day, use_script):
     use_script(*CORE_SCRIPT)
-    uid, h = account(client, "keepmine@example.com")
+    uid, h = account(client, "keepmine")
     before = by_date(get_days(client, h))
     custom = override(client, h, before[d(3)]["id"]).json()["entry"]          # Thursday, a rest day in the plan
 
@@ -127,8 +127,8 @@ def test_custom_day_survives_a_quiz_retake(client, on_day, use_script):
 
 def test_done_past_and_other_peoples_days_cant_be_overridden(client, on_day, use_script):
     script = use_script(*CORE_SCRIPT)
-    uid, h = account(client, "rules@example.com")
-    other, oh = account(client, "other@example.com")
+    uid, h = account(client, "rules")
+    other, oh = account(client, "other")
     days = by_date(get_days(client, h))
     patch(client, h, days[d(0)]["id"], completed=True)
     assert override(client, h, days[d(0)]["id"]).status_code == 409           # done
@@ -143,7 +143,7 @@ def test_done_past_and_other_peoples_days_cant_be_overridden(client, on_day, use
 
 def test_pregnant_and_postpartum_users_are_blocked_at_the_api(client, on_day, use_script):
     script = use_script(*CORE_SCRIPT)
-    uid, h = account(client, "was-planned@example.com")
+    uid, h = account(client, "was-planned")
     days = by_date(get_days(client, h))
     override(client, h, days[d(2)]["id"])                                     # a custom day from before
     script.calls = 0

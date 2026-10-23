@@ -27,8 +27,8 @@ from tests.test_agents import rows, use_script  # noqa: F401  (use_script is a f
 PASSWORD = "correct horse 1"
 
 
-def sign_up(client, email) -> tuple[int, dict]:
-    r = client.post("/api/users", json={"email": email, "password": PASSWORD})
+def sign_up(client, username) -> tuple[int, dict]:
+    r = client.post("/api/users", json={"username": username, "first_name": "Tester", "password": PASSWORD})
     assert r.status_code == 201, r.text
     return r.json()["user_id"], {"Authorization": f"Bearer {r.json()['token']}"}
 
@@ -38,13 +38,13 @@ def submit_quiz(client, uid, h, **answers):
         "consent_accepted": True, "consent_version": "2026-10-22", "answers": quiz_answers(**answers)})
 
 
-def assert_signed_in(client, uid, h, email):
+def assert_signed_in(client, uid, h, username):
     """The same token still works everywhere a signed-in page calls, and the password still signs in."""
     me = client.get(f"/api/users/{uid}", headers=h)
     assert me.status_code == 200, me.text
     for path in ("/api/favorites", "/api/calendar", "/api/plan"):
         assert client.get(path, headers=h).status_code == 200, path
-    login = client.post("/api/login", json={"email": email, "password": PASSWORD})
+    login = client.post("/api/login", json={"username": username, "password": PASSWORD})
     assert login.status_code == 200 and login.json()["user_id"] == uid
     return me.json()
 
@@ -53,8 +53,8 @@ def assert_signed_in(client, uid, h, email):
 
 @pytest.mark.parametrize("pregnancy", ["none", "pregnant", "postpartum"])
 def test_sign_up_quiz_plan_calendar_and_still_signed_in(client, pregnancy):
-    email = f"flow-{pregnancy}@example.com"
-    uid, h = sign_up(client, email)
+    username = f"flow-{pregnancy}"
+    uid, h = sign_up(client, username)
     assert client.get(f"/api/users/{uid}", headers=h).status_code == 200
     assert client.get("/api/plan", headers=h).status_code == 409       # no quiz yet
 
@@ -62,7 +62,7 @@ def test_sign_up_quiz_plan_calendar_and_still_signed_in(client, pregnancy):
     assert r.status_code == 200, r.text
     assert r.json()["needs_clinical_review"] is (pregnancy != "none")
 
-    me = assert_signed_in(client, uid, h, email)
+    me = assert_signed_in(client, uid, h, username)
     assert me["quiz_profile"]["pregnancy_status"] == pregnancy
     plan = client.get("/api/plan", headers=h).json()
     cal = client.get("/api/calendar", headers=h).json()
@@ -75,7 +75,7 @@ def test_sign_up_quiz_plan_calendar_and_still_signed_in(client, pregnancy):
         assert stored == 0 and cal["needs_clinical_review"] is True and cal["entries"] == []
 
     assert submit_quiz(client, uid, h, pregnancy_status=pregnancy, days_available=5).status_code == 200   # retake
-    assert_signed_in(client, uid, h, email)
+    assert_signed_in(client, uid, h, username)
 
 
 # ---------------------------------------------------------------- the actual incident: a content rebuild mid-session
@@ -92,8 +92,8 @@ def private_original(tmp_path, monkeypatch):
 def test_running_the_seed_mid_session_keeps_the_user_signed_in(client, private_original):
     from app.db.seed import main as seed_main
 
-    email = "live-session@example.com"
-    uid, h = sign_up(client, email)
+    username = "live-session"
+    uid, h = sign_up(client, username)
     assert submit_quiz(client, uid, h).status_code == 200
     days = {e["date"]: e for e in client.get("/api/calendar", headers=h).json()["entries"]}
     first = days[min(days)]
@@ -105,7 +105,7 @@ def test_running_the_seed_mid_session_keeps_the_user_signed_in(client, private_o
     summary = seed_main([])                     # exactly what was run during the incident: python -m app.db.seed
 
     assert summary["kept"]["users"] == 1 and not any(summary["dropped"].values())
-    assert_signed_in(client, uid, h, email)     # same token, same password
+    assert_signed_in(client, uid, h, username)     # same token, same password
     for table, old in before.items():
         assert rows(f"SELECT * FROM {table} WHERE user_id = ? ORDER BY id", uid) == old, table
     assert submit_quiz(client, uid, h, days_available=2).status_code == 200
@@ -114,7 +114,7 @@ def test_running_the_seed_mid_session_keeps_the_user_signed_in(client, private_o
 def test_wiping_users_is_now_explicit(client, private_original):
     from app.db.seed import main as seed_main
 
-    uid, h = sign_up(client, "demo-wipe@example.com")
+    uid, h = sign_up(client, "demo-wipe")
     seed_main(["--wipe-users"])                 # the old behavior, only on purpose
     assert rows("SELECT COUNT(*) AS n FROM users") == [{"n": 0}]
     assert client.get(f"/api/users/{uid}", headers=h).status_code == 404   # the frontend treats this as signed out
@@ -125,8 +125,8 @@ def test_wiping_users_is_now_explicit(client, private_original):
 def test_quiz_save_survives_a_calendar_failure(client):
     def broken(*a, **k):
         raise RuntimeError("calendar exploded")
-    email = "calendar-down@example.com"
-    uid, h = sign_up(client, email)
+    username = "calendar-down"
+    uid, h = sign_up(client, username)
 
     with pytest.MonkeyPatch.context() as mp:                              # only the calendar breaks
         mp.setattr(calendar, "materialize_plan", broken)
@@ -135,7 +135,7 @@ def test_quiz_save_survives_a_calendar_failure(client):
     assert rows("SELECT COUNT(*) AS n FROM calendar_entries WHERE user_id = ?", uid) == [{"n": 0}]
 
     # ...and once the calendar works again,
-    me = assert_signed_in(client, uid, h, email)                          # the user is still signed in,
+    me = assert_signed_in(client, uid, h, username)                          # the user is still signed in,
     assert me["quiz_profile"]["goals"] == ["rehab", "weight_loss"]
     assert rows("SELECT COUNT(*) AS n FROM calendar_entries WHERE user_id = ?", uid) == [{"n": 28}]   # filled on visit
 
@@ -146,7 +146,7 @@ def test_account_deleted_during_an_agent_call_is_not_a_500(client, monkeypatch, 
     from app.agents import harness
     from app.db import connect
 
-    uid, h = sign_up(client, "vanishing@example.com")
+    uid, h = sign_up(client, "vanishing")
     assert submit_quiz(client, uid, h, injuries=["none"]).status_code == 200
     script = use_script(("final", {"items": [{"exercise_id": "dead_bug", "sets": 2, "reps": "8", "rest_seconds": 30}],
                                    "balance_note": "-"}))

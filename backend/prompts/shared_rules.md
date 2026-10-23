@@ -52,6 +52,16 @@ All data access goes through the MCP tool server (`app/mcp_server/server.py`) vi
 
 - User context comes only from `app/agents/context.py` (`agent_profile_for`): goals, timeline,
   injury_flags, age, weight, height. Never email, name, user id, password data, or free-text notes.
+- **Username and first name are identifying, exactly like email (decided 2026-10-23).** Sign-in uses a username,
+  and sign-up asks for a first name, used only for the Dashboard greeting ("Hi Sarah"). Both live only in the
+  `users` table, which no agent, prompt, or MCP tool ever reads. They sit on the same excluded list as email,
+  `EXCLUDED_USER_FIELDS` in `app/agents/context.py`, and the module refuses to load if any of them is ever added
+  to the agent profile. Accounts from before usernames kept their old email as their username, so `email` stays
+  on that list too. Tests: `test_no_agent_ever_sees_the_username_or_first_name` runs all five agents, tools
+  included, with a fake model that records everything it is sent and checks neither appears;
+  `test_agent_profile_contains_no_pii`, `test_the_model_sees_only_goals_and_the_plan`,
+  `test_the_model_never_sees_who_the_user_is` and `test_no_tool_ever_returns_username_name_or_notes` check the
+  name too.
 - The user is always the one in the sign-in token. Nothing the user types and nothing the model outputs
   can choose which user's data is read.
 - **Calendar notes never reach any model, for any purpose.** They are the user's own words, on the same
@@ -116,6 +126,10 @@ Tests: `test_injured_user_always_gets_checked_only`, `test_injury_filter_is_appl
   weight. Silly ballpark weights are fine; they're labelled as fun approximations, not measurements. Code picks
   the headline at random within the size tier the total reaches, so repeat visits vary. Test:
   `test_comparisons_are_about_objects_and_animals_never_food_or_bodies`.
+- **No emoji (decided 2026-10-23).** The site's copy uses no decorative emoji, and neither may anything a model
+  writes. The prompts ask for none, and `harness.no_emoji` strips any from every model-written text the user sees
+  (Coach encouragement, Basics answers, plan explanations, Workout Builder balance notes, Workout Reviewer
+  summaries). Test: `test_model_written_text_never_shows_emoji`.
 
 **Enforced in code:** `coach.py` tone guard (a blocklist) sends a failing message back for a rewrite and
 replaces it with a plain encouraging line if it still fails. The flags and the strength fun fact are
@@ -167,8 +181,8 @@ generation, equipment, pregnancy), `tests/test_plan_agent.py` (the agent's input
   rule of thumb, and are always labelled "a rough, long-used approximation, not a precise prediction", with the
   caveat that exercise alone is usually a small piece of weight change compared with eating. Sources: the
   Compendium and the CDC pace guidance, both in `/api/sources`.
-- Same privacy as every agent (rule 2): the model gets the computed review only, never the user's id, email,
-  weight, or any free text. Pregnant / postpartum users get a 403 before anything is computed or sent.
+- Same privacy as every agent (rule 2): the model gets the computed review only, never the user's id, username,
+  first name, email, weight, or any free text. Pregnant / postpartum users get a 403 before anything is computed or sent.
 
 **Enforced in code:** `app/agents/workout_reviewer.py` extracts every number in the reply and compares it with the
 numbers in the model's input. Any number that isn't there sends the draft back; after two tries, and once more as

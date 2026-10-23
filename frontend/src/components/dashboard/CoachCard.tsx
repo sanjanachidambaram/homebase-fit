@@ -35,7 +35,7 @@ export default function CoachCard({ token, userId }: { token: string; userId: nu
       {celebrate && <Confetti />}
       <div className="dash-card-head">
         <h3 id="coach-title">
-          <span className="card-icon" aria-hidden="true">✨</span> Your coach
+          Your coach
         </h3>
         {coach && (
           <button type="button" className="btn-ghost" onClick={() => setRound((n) => n + 1)}>
@@ -52,7 +52,6 @@ export default function CoachCard({ token, userId }: { token: string; userId: nu
           <p className="coach-text">{coach.encouragement}</p>
           <div className="coach-row">
             <span className={`goal-badge ${STATUS[coach.goal_status].className}${celebrate ? ' goal-celebrate' : ''}`}>
-              {celebrate && <span aria-hidden="true">🎉 </span>}
               Goal: {STATUS[coach.goal_status].label}
             </span>
           </div>
@@ -78,7 +77,7 @@ export default function CoachCard({ token, userId }: { token: string; userId: nu
           {coach.overtraining_flag && coach.rest_suggestion && (
             <div className="rest-note" role="note">
               <strong>
-                <span aria-hidden="true">💜 </span>Rest day, recommended
+                Rest day, recommended
               </strong>
               <p>{coach.rest_suggestion}</p>
             </div>

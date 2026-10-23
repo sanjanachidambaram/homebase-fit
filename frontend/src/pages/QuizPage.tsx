@@ -223,7 +223,7 @@ export default function QuizPage() {
   return (
     <>
       <h2 className="page-title">Your fitness quiz</h2>
-      <p className="meta">Signed in as {session.email}</p>
+      <p className="meta">Signed in as {session.username}</p>
       <ol className="steps">
         <li className={step === 'general' ? 'current' : ''}>Goals</li>
         <li className={step === 'consent' ? 'current' : ''}>Disclaimer</li>
