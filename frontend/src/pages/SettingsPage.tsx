@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { deleteAccount, fetchAccount, isSignInGone, type Account } from '../api'
 import AccountForm from '../components/AccountForm'
+import CalendarModeChooser from '../components/CalendarModeChooser'
 import { PrivacyNote } from '../components/Legal'
 import Link from '../components/Link'
 import { setSession, useSession } from '../session'
@@ -99,6 +100,13 @@ export default function SettingsPage() {
           Sign out
         </button>
       </section>
+
+      {profile && !profile.needs_clinical_review && (
+        <section className="settings-section">
+          <h3>Your calendar</h3>
+          <CalendarModeChooser key={profile.calendar_mode} token={session.token} current={profile.calendar_mode} />
+        </section>
+      )}
 
       <PrivacyNote />
 

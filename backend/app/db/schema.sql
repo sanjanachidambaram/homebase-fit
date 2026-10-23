@@ -65,6 +65,17 @@ CREATE TABLE quiz_profiles (
     consent_accepted    INTEGER NOT NULL CHECK (consent_accepted IN (0, 1)),
     consent_accepted_at TEXT,                                                  -- UTC timestamp of acceptance
     consent_version     TEXT,                                                  -- which disclaimer text was accepted
+    -- How the calendar gets filled (asked after the quiz, changeable in Settings):
+    --   generated  the quiz-generated plan, laid out on the calendar (the default)
+    --   review     the generated plan, but the user reviews and swaps exercises before any day is laid out
+    --   self       no generated workouts: days are open, and the user builds them (Build Your Own)
+    calendar_mode   TEXT NOT NULL DEFAULT 'generated' CHECK (calendar_mode IN ('generated', 'review', 'self')),
+    plan_reviewed   INTEGER NOT NULL DEFAULT 0 CHECK (plan_reviewed IN (0, 1)),   -- review mode: finalized yet?
+    -- Review-mode swaps, {"original exercise id": "replacement id"}. Only replacements from the same injury- and
+    -- equipment-filtered pool are accepted (checked when saved AND when applied). Cleared on every quiz save.
+    plan_swaps      TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(plan_swaps) AND json_type(plan_swaps) = 'object'),
+    -- Week 1 of the current plan (YYYY-MM-DD): progressive overload counts weeks from here. Reset on every quiz save.
+    plan_started_on TEXT,
     created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     CHECK (consent_accepted = 1 AND consent_accepted_at IS NOT NULL AND consent_version IS NOT NULL)
@@ -161,6 +172,33 @@ CREATE TABLE basics_articles (
 
 -- ---------------------------------------------------------------- user activity
 
+-- Workout Builder sessions as the server built them, so "Save to calendar" can only ever save a session that went
+-- through the builder's checks (a client can't send its own exercise list). Pruned to the last week; deleted with
+-- the user.
+CREATE TABLE built_workouts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    request     TEXT NOT NULL CHECK (json_valid(request)),
+    session     TEXT NOT NULL CHECK (json_valid(session)),
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+-- Cardio the user did (a log, not a recommendation; no AI). Either free text ("ran 20 min") or one of the library's
+-- cardio exercises, plus minutes. activity is the user's own words, like calendar notes: never sent to any model,
+-- red-flag checked when saved (safety_events source 'cardio_log'). Each log also writes one workout_logs row, so the
+-- Coach's streak and rest-day checks see the activity.
+CREATE TABLE cardio_logs (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    date             TEXT NOT NULL CHECK (date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+    activity         TEXT CHECK (activity IS NULL OR length(activity) <= 80),
+    exercise_id      TEXT REFERENCES exercises(id),
+    duration_minutes INTEGER NOT NULL CHECK (duration_minutes BETWEEN 1 AND 600),
+    created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    CHECK (activity IS NOT NULL OR exercise_id IS NOT NULL)
+);
+CREATE INDEX idx_cardio_logs_user_date ON cardio_logs(user_id, date);
+
 -- The generated plan laid out on real dates (app/calendar.py): 4 weeks from the day the quiz is saved.
 -- workout_content is a SNAPSHOT of that day's plan when the entry was made, so a later change to the
 -- generator never silently rewrites a scheduled day. A retake only replaces entries dated today or later
@@ -199,7 +237,9 @@ CREATE TABLE workout_logs (
     notes            TEXT,
     -- Set when the row was written by marking a calendar day completed (and removed if it's un-marked).
     -- Calendar notes are NOT copied into notes above.
-    calendar_entry_id INTEGER REFERENCES calendar_entries(id) ON DELETE CASCADE
+    calendar_entry_id INTEGER REFERENCES calendar_entries(id) ON DELETE CASCADE,
+    -- Set when the row was written by a cardio log (removed with it). The activity text is NOT copied.
+    cardio_log_id     INTEGER REFERENCES cardio_logs(id) ON DELETE CASCADE
 );
 CREATE INDEX idx_workout_logs_user_date ON workout_logs(user_id, date);
 CREATE INDEX idx_workout_logs_calendar ON workout_logs(calendar_entry_id);
@@ -230,7 +270,7 @@ CREATE TABLE safety_events (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id      INTEGER REFERENCES users(id) ON DELETE CASCADE,    -- NULL if not signed in
     timestamp    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    source       TEXT NOT NULL CHECK (source IN ('quiz', 'basics_qa', 'calendar_note')),
+    source       TEXT NOT NULL CHECK (source IN ('quiz', 'basics_qa', 'calendar_note', 'cardio_log')),
     trigger_text TEXT NOT NULL,     -- the user text that tripped the check
     action_taken TEXT NOT NULL      -- e.g. 'redirected_to_professional'
 );

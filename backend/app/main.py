@@ -25,6 +25,7 @@ from app.content import media_url, review_info
 from app.db import connect, ensure_working_db, table_counts
 from app.agent_routes import router as agent_router
 from app.calendar import router as calendar_router
+from app.cardio import router as cardio_router
 from app.exercises import router as exercises_router
 from app.services.program_generator import worked_example
 from app.users import router as users_router
@@ -53,6 +54,7 @@ app.include_router(users_router)
 app.include_router(exercises_router)
 app.include_router(agent_router)
 app.include_router(calendar_router)
+app.include_router(cardio_router)
 
 
 @app.get("/api/health")

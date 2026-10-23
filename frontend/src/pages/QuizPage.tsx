@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { fetchQuizQuestions, isSignInGone, submitQuiz, type QuizProfile, type QuizQuestion } from '../api'
 import AccountForm from '../components/AccountForm'
+import CalendarModeChooser from '../components/CalendarModeChooser'
 import { ConsentStep } from '../components/Legal'
 import { CONSENT_VERSION } from '../legal'
 import Link from '../components/Link'
@@ -295,6 +296,7 @@ export default function QuizPage() {
       {step === 'done' && saved && (
         <div className="quiz-step">
           <p className="success">Thanks! Your answers are saved.</p>
+          <CalendarModeChooser token={session.token} current={saved.calendar_mode ?? 'generated'} />
           <p>
             Disclaimer accepted on {new Date(saved.consent_accepted_at).toLocaleString()}. You can review or delete
             your data any time in <Link to="/settings">Settings</Link>.

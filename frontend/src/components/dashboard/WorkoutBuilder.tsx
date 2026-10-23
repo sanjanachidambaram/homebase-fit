@@ -15,6 +15,7 @@ import { useEquipmentOptions } from '../../equipment'
 import { useFavorites } from '../../favorites'
 import ExerciseDetail from '../ExerciseDetail'
 import ReviewWorkout from '../WorkoutReview'
+import SaveToCalendar from '../SaveToCalendar'
 import Loading from './Loading'
 
 const MAX_PER_GROUP = 6
@@ -48,6 +49,7 @@ export default function WorkoutBuilder({
   // The equipment chips come from the exercises themselves (GET /api/exercises/equipment), never a typed list.
   const equipmentOptions = useEquipmentOptions()
   const [session, setSession] = useState<WorkoutSession | null>(null)
+  const [builtId, setBuiltId] = useState<number | null>(null) // the server's copy of this session ("Save to calendar")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -71,7 +73,15 @@ export default function WorkoutBuilder({
     try {
       const chosen = Object.fromEntries(Object.entries(picks).filter(([, n]) => n > 0))
       const req = { picks: chosen, time_budget_minutes: minutes, equipment }
-      const result = build ? await build(req) : (await buildWorkout(token, req)).result
+      let result: WorkoutSession
+      if (build) {
+        result = await build(req)
+        setBuiltId(null)
+      } else {
+        const r = await buildWorkout(token, req)
+        result = r.result
+        setBuiltId(r.built_id)
+      }
       setSession(result)
       onBuilt?.(result)
     } catch (err) {
@@ -208,6 +218,10 @@ export default function WorkoutBuilder({
               )
             }
           />
+          {/* Standalone Build Your Own page only (the calendar's own builder already saves to its day). */}
+          {!build && builtId !== null && session.exercises.length > 0 && (
+            <SaveToCalendar key={builtId} token={token} builtId={builtId} />
+          )}
         </div>
       )}
 

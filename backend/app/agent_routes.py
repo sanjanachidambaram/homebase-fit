@@ -90,7 +90,10 @@ async def recommend_program(body: NoBody | None = None, uid: int = Depends(signe
 
 @router.post("/workouts/build")
 async def build_workout(body: workout_builder.WorkoutRequest, uid: int = Depends(no_ai_for_clinical_review)) -> dict:
-    return await _run(workout_builder.build_workout(uid, body, route="POST /api/workouts/build"))
+    out = await _run(workout_builder.build_workout(uid, body, route="POST /api/workouts/build"))
+    # Kept server-side so "Save to calendar" saves exactly this checked session (the client only sends its id).
+    out["built_id"] = calendar.store_built(uid, body.model_dump(), out["result"])
+    return out
 
 
 @router.post("/calendar/{entry_id}/custom")

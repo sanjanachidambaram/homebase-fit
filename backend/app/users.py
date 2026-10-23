@@ -43,8 +43,8 @@ GOAL_DATE_MAX_YEARS = 5
 
 # Every table holding a user's data. DELETE /api/users/{id} clears all of them.
 # workout_logs goes before calendar_entries (a log can point at a calendar day).
-USER_DATA_TABLES = ("safety_events", "measurements", "workout_logs", "calendar_entries", "exercise_favorites",
-                    "quiz_profiles")
+USER_DATA_TABLES = ("safety_events", "measurements", "workout_logs", "calendar_entries", "cardio_logs",
+                    "built_workouts", "exercise_favorites", "quiz_profiles")
 
 
 def now_utc() -> str:
@@ -101,6 +101,9 @@ def profile_dict(row: sqlite3.Row | None) -> dict | None:
     for col in ("goals", "injury_flags", "equipment"):
         p[col] = json.loads(p[col])
     p["consent_accepted"] = bool(p["consent_accepted"])
+    if "plan_swaps" in p:
+        p["plan_swaps"] = json.loads(p["plan_swaps"] or "{}")
+        p["plan_reviewed"] = bool(p["plan_reviewed"])
     p["needs_clinical_review"] = bool(p.get("needs_clinical_review"))
     return p
 
@@ -227,6 +230,10 @@ def save_quiz(user_id: int, body: QuizSubmission, uid: int = Depends(token_user_
     row.update(user_id=user_id, injury_notes=(body.injury_notes or "").strip() or None,
                consent_accepted=1, consent_accepted_at=now_utc(), consent_version=body.consent_version)
     row["updated_at"] = row["consent_accepted_at"]
+    # A (re)taken quiz is a new plan: progression starts again at week 1 today, and review-mode swaps from the old
+    # plan no longer apply (the user reviews the new plan). The calendar mode itself is kept.
+    from app.calendar import today as calendar_today   # local import: calendar imports this module's db helpers
+    row.update(plan_started_on=calendar_today().isoformat(), plan_swaps="{}", plan_reviewed=0)
     cols = list(row)
     updates = ", ".join(f"{c} = excluded.{c}" for c in cols if c != "user_id")
     conn.execute(

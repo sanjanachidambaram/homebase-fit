@@ -176,3 +176,58 @@ a final check before returning, the reply is replaced by a plain summary written
 Coach's applies (no shaming, guilt or food talk; it allows "calories" and "pounds", which the estimate needs), plus
 no promises ("you will lose..."). Tests: `tests/test_workout_review.py`.
 
+## 8. Progressive overload (decided 2026-10-23)
+
+- Plans do a little more over time, a general training principle: every 2 weeks, +1 rep up to the top of the
+  protocol's rep range, then +1 set (reps back to the bottom) up to the top of its set range, then it holds. It never
+  goes past the protocol's own ranges (which are what a PT will review), and the session still fits its time (the
+  generator already plans for the top of the set range).
+- It changes **only sets and reps**. Never which exercises are picked (the injury filter alone decides that, untouched)
+  and never rest.
+- Weeks count from `quiz_profiles.plan_started_on` (set whenever the quiz is saved; a retake is a new plan and starts
+  week 1 again), so days laid out later, on a top-up or by "Save to calendar", get the right week.
+- **DECISION: no automatic progression for anyone with an injury flag or a rehab goal.** Their sets and reps stay at
+  the protocol's starting values, and the plan says why ("paused until a physical therapist has reviewed your plan").
+  Reason: the protocols and the injury tags are unreviewed drafts, and raising training volume for someone working
+  around an injury is a clinical judgment the app can't make. Flat is the most conservative option; it can be
+  revisited once a PT has reviewed the rehab protocols. Pregnant / postpartum users have no plan at all (rule 6).
+
+**Enforced in code:** `progression_enabled`, `progressed` and `exercise_for_week` in
+`app/services/program_generator.py`; each calendar day's snapshot carries its `week` and `progression_step`.
+Tests: `test_injured_and_rehab_profiles_do_not_progress_but_the_same_goal_without_injury_does`,
+`test_an_injured_calendar_stays_flat_week_after_week`, `test_progression_never_goes_past_the_protocols_own_ranges`.
+
+## 9. Cardio logs (decided 2026-10-23)
+
+- A cardio log is something the user did, not something we recommend: free text ("ran 20 min") or one of the
+  library's cardio exercises (free-exercise-db category "cardio"), plus minutes. **No AI, anywhere.**
+- The free text is the user's own words, under the same rules as calendar notes (rule 2): never sent to any model,
+  and checked by the code-only red-flag filter (rule 3) when saved. A match still saves the log, returns a supportive
+  message, and writes a `safety_events` row (`source = 'cardio_log'`).
+- Each log writes one `workout_logs` row (minutes, and the exercise if picked; never the text), so the Coach's streak
+  and rest-day suggestion see the activity.
+- **DECISION: pregnant / postpartum users can log cardio, in their own words only.** Reason: a log is a personal
+  record, like a note: no AI, no exercise prescription, nothing generated for them. Keeping a record of the activity
+  their own clinician okays is reasonable, and the red-flag check still runs, with a message that points to their
+  OB-GYN or midwife (and to urgent care for severe or sudden symptoms). What they don't get is the library picker: a
+  list of exercises shown to someone with no plan reads like a suggestion, which is exactly what we've held back until
+  an OB-GYN has reviewed pregnancy guidance (rule 6). The API refuses `exercise_id` for them (403).
+
+**Enforced in code:** `app/cardio.py`. Tests: `tests/test_cardio.py`
+(`test_pregnant_users_can_log_in_their_own_words_only`, `test_cardio_text_never_reaches_any_model`,
+`test_red_flag_in_a_cardio_log_is_saved_logged_and_answered_without_ai`).
+
+## 10. Calendar population modes, and saving Build Your Own to the calendar
+
+- After the quiz (and any time in Settings) the user picks how the calendar is filled: **generated** (the default),
+  **review** (the generated plan, laid out only after they review it and optionally swap exercises), or **self** (open
+  days they fill with Build Your Own). Every mode keeps per-day overrides, and the retake rules (rule 2 of the calendar:
+  completed, noted and custom days are never replaced).
+- Review swaps can only pick from the same injury-, equipment- and level-filtered pool the generator used for that slot
+  (and the same Push/Pull direction). They're checked when saved (422 otherwise) and again every time the plan is built.
+- "Save to calendar" from the Build Your Own page reuses the custom-day mechanism (source 'custom', kept on retake,
+  revertible). The client sends only the id of a session the server's Workout Builder made and stored
+  (`built_workouts`), never an exercise list, so nothing can skip the builder's injury filter. A date beyond the laid-out
+  days extends the calendar up to it (up to 6 months ahead). Blocked for pregnant / postpartum users (403), like every
+  plan feature.
+

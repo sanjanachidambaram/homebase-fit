@@ -31,6 +31,7 @@ import re
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from datetime import date as Day   # for the CalendarUpdate.date field, whose name shadows the type
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -39,7 +40,8 @@ from app.agents.safety import NOTE_SUPPORT_MESSAGE, log_safety_event, red_flags_
 from app.db import connect
 from app.safety_rules import CLINICAL_REVIEW_NO_AI, CLINICAL_REVIEW_PAGE, profile_needs_clinical_review
 from app.security import token_user_id
-from app.services.program_generator import NoProfile, PlanDay, WeeklyProgram, generate_for_user
+from app.services.program_generator import (NoProfile, PlanDay, WeeklyProgram, exercise_for_week, generate_for_user,
+                                             progression_step)
 
 router = APIRouter(prefix="/api")
 
@@ -63,52 +65,120 @@ def now_utc() -> str:
 
 # ---------------------------------------------------------------- plan -> calendar
 
-def snapshot(plan: WeeklyProgram, day: PlanDay) -> dict:
-    """What the day widget shows, frozen at creation so later generator changes can't rewrite it."""
+MAX_AHEAD_DAYS = 182   # "Save to calendar" can extend the calendar this far (about 6 months)
+
+
+def plan_week(day: date, started: date) -> int:
+    """Week number of the plan on a date (week 1 = the 7 days from the day the plan started)."""
+    return max(1, (day - started).days // 7 + 1)
+
+
+def snapshot(plan: WeeklyProgram, day: PlanDay, on: date | None = None, started: date | None = None) -> dict:
+    """What the day widget shows, frozen at creation so later generator changes can't rewrite it. With a date, the
+    sets and reps are that week's (progressive overload; flat for injured / rehab profiles)."""
+    enabled = bool(plan.progression and plan.progression.enabled)
+    week = plan_week(on, started) if on and started else 1
     return {
         "plan_day": day.day,
         "focus": day.focus,
         "est_minutes": round(day.est_minutes, 1),
-        "exercises": [e.model_dump() for e in day.exercises],
+        "exercises": [exercise_for_week(e.model_dump(), week, enabled) for e in day.exercises],
+        "week": week,
+        "progression_step": progression_step(week, enabled),
         "protocol_status": plan.protocol.status if plan.protocol else None,
         "review_notice": plan.protocol.review_notice if plan.protocol else None,
         "snapshot_at": now_utc(),
     }
 
 
+def open_day(on: date) -> dict:
+    """A day with nothing planned yet ("I'll build it myself" mode, or a date opened for "Save to calendar")."""
+    return {"plan_day": WEEKDAYS[on.weekday()], "focus": None, "est_minutes": 0, "exercises": [], "open": True,
+            "protocol_status": None, "review_notice": None, "snapshot_at": now_utc()}
+
+
+def calendar_settings(conn: sqlite3.Connection, user_id: int) -> dict | None:
+    row = conn.execute("SELECT calendar_mode, plan_reviewed, plan_started_on FROM quiz_profiles WHERE user_id = ?",
+                       (user_id,)).fetchone()
+    if row is None:
+        return None
+    started = date.fromisoformat(row["plan_started_on"]) if row["plan_started_on"] else None
+    if started is None:   # profiles from before plan_started_on: their first calendar day, else today
+        first = conn.execute("SELECT MIN(date) FROM calendar_entries WHERE user_id = ?", (user_id,)).fetchone()[0]
+        started = date.fromisoformat(first) if first else today()
+    mode = row["calendar_mode"]
+    return {"mode": mode, "reviewed": bool(row["plan_reviewed"]), "started": started,
+            "review_pending": mode == "review" and not row["plan_reviewed"]}
+
+
+def _fill(conn: sqlite3.Connection, user_id: int, dates: list[date], plan: WeeklyProgram | None, cfg: dict) -> int:
+    """Create entries for the dates that don't have one, per the calendar mode. Never touches an existing entry."""
+    if not dates:
+        return 0
+    taken = {r[0] for r in conn.execute(
+        "SELECT date FROM calendar_entries WHERE user_id = ? AND date BETWEEN ? AND ?",
+        (user_id, min(dates).isoformat(), max(dates).isoformat()))}
+    by_weekday = {d.day: d for d in plan.days} if plan and plan.generated else {}
+    created = 0
+    for d in dates:
+        if d.isoformat() in taken:
+            continue   # a day the user completed, wrote on, or built: keep it exactly as it is
+        if cfg["mode"] == "self":
+            day_type, content = "rest", open_day(d)
+        elif cfg["review_pending"] or not by_weekday:   # waiting for the review, or no plan (pregnant/postpartum)
+            continue
+        else:
+            pd = by_weekday[WEEKDAYS[d.weekday()]]
+            day_type = "workout" if pd.kind == "training" else "rest"
+            content = snapshot(plan, pd, d, cfg["started"])
+        conn.execute("INSERT INTO calendar_entries (user_id, date, day_type, workout_content) VALUES (?, ?, ?, ?)",
+                     (user_id, d.isoformat(), day_type, json.dumps(content)))
+        created += 1
+    return created
+
+
 def materialize_plan(user_id: int, start: date | None = None) -> dict:
-    """Create (or refresh) 4 weeks of calendar entries from `start` (default today) for the user's current plan.
-    Only untouched days dated `start` or later are replaced; see the module docstring."""
+    """Create (or refresh) 4 weeks of calendar entries from `start` (default today) for the user's current plan and
+    calendar mode. Only untouched days dated `start` or later are replaced; see the module docstring."""
     start = start or today()
     days = [start + timedelta(days=i) for i in range(7 * WEEKS)]
     try:
         plan = generate_for_user(user_id)
     except NoProfile:
         return {"created": 0, "refreshed": 0, "kept": 0, "generated": False}
-    by_weekday = {d.day: d for d in plan.days}
     conn = connect()
     try:
         with conn:
+            cfg = calendar_settings(conn, user_id)
             refreshed = conn.execute(
                 "DELETE FROM calendar_entries WHERE user_id = ? AND date >= ? AND completed = 0 "
                 "AND (notes IS NULL OR TRIM(notes) = '') AND source = 'generated'", (user_id, start.isoformat())).rowcount
-            taken = {r[0] for r in conn.execute(
-                "SELECT date FROM calendar_entries WHERE user_id = ? AND date BETWEEN ? AND ?",
-                (user_id, days[0].isoformat(), days[-1].isoformat()))}
-            created = 0
-            if plan.generated:   # pregnant / postpartum: no plan, so nothing new is scheduled
-                for d in days:
-                    if d.isoformat() in taken:
-                        continue   # a day the user completed, wrote on, or built: keep it exactly as it is
-                    pd = by_weekday[WEEKDAYS[d.weekday()]]
-                    conn.execute(
-                        "INSERT INTO calendar_entries (user_id, date, day_type, workout_content) VALUES (?, ?, ?, ?)",
-                        (user_id, d.isoformat(), "workout" if pd.kind == "training" else "rest",
-                         json.dumps(snapshot(plan, pd))))
-                    created += 1
+            kept = conn.execute("SELECT COUNT(*) FROM calendar_entries WHERE user_id = ? AND date BETWEEN ? AND ?",
+                                (user_id, days[0].isoformat(), days[-1].isoformat())).fetchone()[0]
+            created = _fill(conn, user_id, days, plan, cfg)
     finally:
         conn.close()
-    return {"created": created, "refreshed": refreshed, "kept": len(taken), "generated": plan.generated}
+    return {"created": created, "refreshed": refreshed, "kept": kept, "generated": plan.generated, "mode": cfg["mode"]}
+
+
+def ensure_through(user_id: int, target: date) -> int:
+    """Lay out every missing day from today through `target` (per the calendar mode), and make sure `target` itself
+    has an entry to hold a workout (an open day if the mode wouldn't create one, e.g. review not finished yet)."""
+    plan = generate_for_user(user_id)
+    conn = connect()
+    try:
+        with conn:
+            cfg = calendar_settings(conn, user_id)
+            n = (target - today()).days
+            created = _fill(conn, user_id, [today() + timedelta(days=i) for i in range(n + 1)], plan, cfg)
+            if not conn.execute("SELECT 1 FROM calendar_entries WHERE user_id = ? AND date = ?",
+                                (user_id, target.isoformat())).fetchone():
+                conn.execute("INSERT INTO calendar_entries (user_id, date, day_type, workout_content) VALUES (?, ?, ?, ?)",
+                             (user_id, target.isoformat(), "rest", json.dumps(open_day(target))))
+                created += 1
+    finally:
+        conn.close()
+    return created
 
 
 # ---------------------------------------------------------------- reading
@@ -163,17 +233,22 @@ def get_calendar(
         raise HTTPException(422, f"end must be on or after start, at most {MAX_RANGE_DAYS} days in all.")
     base = {"start": start.isoformat(), "end": end.isoformat(), "today": today().isoformat()}
 
+    from app.cardio import cardio_logs_between   # local import: cardio imports this module
+    base["cardio"] = cardio_logs_between(uid, start, end)   # the user's own activity log, shown in every case
+
     if profile_needs_clinical_review(uid):   # no plan for them: an empty calendar, never stale workouts
         return {**base, "needs_quiz": False, "needs_clinical_review": True, "message": CLINICAL_REVIEW_NO_AI,
-                "page": CLINICAL_REVIEW_PAGE, "entries": []}
+                "page": CLINICAL_REVIEW_PAGE, "entries": [], "calendar_mode": None, "needs_review": False}
 
     conn = connect()
     try:
         has_quiz = conn.execute("SELECT 1 FROM quiz_profiles WHERE user_id = ?", (uid,)).fetchone() is not None
         upcoming = conn.execute("SELECT COUNT(*) FROM calendar_entries WHERE user_id = ? AND date >= ?",
                                 (uid, today().isoformat())).fetchone()[0]
+        cfg = calendar_settings(conn, uid)
     finally:
         conn.close()
+    base.update(calendar_mode=cfg["mode"] if cfg else None, needs_review=bool(cfg and cfg["review_pending"]))
     if has_quiz and not upcoming:   # accounts from before the calendar, or the 4 weeks ran out: top up
         materialize_plan(uid)
 
@@ -410,4 +485,140 @@ def custom_day_items(uid: int, entry_id: int) -> list[dict]:
         raise HTTPException(409, "Reviews are for workouts you build yourself. Build your own for this day first.")
     return [{"exercise_id": x["exercise_id"], "est_minutes": x["est_minutes"]}
             for x in json.loads(entry["workout_content"])["exercises"]]
+
+
+# ---------------------------------------------------------------- how the calendar is filled (the mode)
+
+CalendarMode = Literal["generated", "review", "self"]
+
+
+class ModeIn(BaseModel):
+    model_config = {"extra": "forbid"}
+    mode: CalendarMode
+
+
+def _clinical_block(uid: int) -> None:
+    if profile_needs_clinical_review(uid):
+        raise HTTPException(403, {"code": "needs_clinical_review", "message": CLINICAL_REVIEW_NO_AI,
+                                  "page": CLINICAL_REVIEW_PAGE})
+
+
+@router.put("/calendar/mode")
+def set_mode(body: ModeIn, uid: int = Depends(signed_in)) -> dict:
+    """generated: the quiz plan on the calendar. review: the quiz plan, laid out only after the user reviews it.
+    self: open days the user fills with Build Your Own. Untouched future days are re-laid out to match; days the
+    user completed, wrote on or built are kept, as always."""
+    conn = connect()
+    try:
+        with conn:
+            n = conn.execute("UPDATE quiz_profiles SET calendar_mode = ?, plan_reviewed = 0 WHERE user_id = ?",
+                             (body.mode, uid)).rowcount
+    finally:
+        conn.close()
+    if not n:
+        raise HTTPException(409, "Take the quiz first.")
+    result = materialize_plan(uid)
+    return {"calendar_mode": body.mode, "needs_review": body.mode == "review", "laid_out": result["created"]}
+
+
+class ReviewIn(BaseModel):
+    model_config = {"extra": "forbid"}
+    swaps: dict[str, str] = Field(default_factory=dict, max_length=60)   # {generated exercise id: replacement id}
+
+
+@router.get("/calendar/review")
+def get_review(uid: int = Depends(signed_in)) -> dict:
+    """The generated plan with, for every exercise, what it may be swapped for (same safety filters)."""
+    _clinical_block(uid)
+    try:
+        plan = generate_for_user(uid, with_swap_options=True)
+    except NoProfile as e:
+        raise HTTPException(409, str(e)) from e
+    conn = connect()
+    try:
+        cfg = calendar_settings(conn, uid)
+        swaps = json.loads(conn.execute("SELECT plan_swaps FROM quiz_profiles WHERE user_id = ?", (uid,)).fetchone()[0])
+    finally:
+        conn.close()
+    return {"plan": plan.model_dump(), "swaps": swaps, "calendar_mode": cfg["mode"], "reviewed": cfg["reviewed"]}
+
+
+@router.post("/calendar/review")
+def finalize_review(body: ReviewIn, uid: int = Depends(signed_in)) -> dict:
+    """Save the swaps and lay the reviewed plan out on the calendar. Every replacement must be one of the options
+    the safety filters allow for that exercise (422 otherwise), and it's checked again whenever the plan is built."""
+    _clinical_block(uid)
+    try:
+        options = generate_for_user(uid, with_swap_options=True).swap_options or {}
+    except NoProfile as e:
+        raise HTTPException(409, str(e)) from e
+    bad = [f"{a} -> {b}" for a, b in body.swaps.items()
+           if a not in options or b not in {o["id"] for o in options[a]}]
+    if bad:
+        raise HTTPException(422, f"Not an allowed swap for this plan: {bad}.")
+    conn = connect()
+    try:
+        with conn:
+            conn.execute("UPDATE quiz_profiles SET plan_swaps = ?, plan_reviewed = 1 WHERE user_id = ?",
+                         (json.dumps(body.swaps), uid))
+    finally:
+        conn.close()
+    result = materialize_plan(uid)
+    return {"swaps": body.swaps, "laid_out": result["created"]}
+
+
+# ---------------------------------------------------------------- Build Your Own -> calendar ("Save to calendar")
+
+BUILT_KEEP_DAYS = 7
+
+
+def store_built(uid: int, request: dict, session: dict) -> int:
+    """Remember a session exactly as the Workout Builder made it (and drop this user's old ones)."""
+    conn = connect()
+    try:
+        with conn:
+            conn.execute("DELETE FROM built_workouts WHERE user_id = ? AND created_at < ?",
+                         (uid, (datetime.now(timezone.utc) - timedelta(days=BUILT_KEEP_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")))
+            return conn.execute("INSERT INTO built_workouts (user_id, request, session) VALUES (?, ?, ?)",
+                                (uid, json.dumps(request), json.dumps(session))).lastrowid
+    finally:
+        conn.close()
+
+
+class SaveBuiltIn(BaseModel):
+    model_config = {"extra": "forbid"}   # no exercises from the client: only the id of a session the server built
+    built_id: int
+    date: Day
+
+
+@router.post("/calendar/save-built")
+def save_built(body: SaveBuiltIn, uid: int = Depends(signed_in)) -> dict:
+    """A second way into the custom-day mechanism: put a session built on the Build Your Own page onto a calendar
+    day. Same apply_custom as "Build your own for this day" (source 'custom', kept on retake, revertible). If the
+    date isn't laid out yet, the calendar is extended to it."""
+    _clinical_block(uid)
+    if body.date < today():
+        raise HTTPException(422, "Past days can't be changed.")
+    if (body.date - today()).days > MAX_AHEAD_DAYS:
+        raise HTTPException(422, f"Pick a date within the next {MAX_AHEAD_DAYS // 30} months.")
+    conn = connect()
+    try:
+        row = conn.execute("SELECT request, session FROM built_workouts WHERE id = ? AND user_id = ?",
+                           (body.built_id, uid)).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        raise HTTPException(404, "That workout isn't available any more. Build it again, then save it.")
+    try:
+        extended = ensure_through(uid, body.date)
+    except NoProfile as e:
+        raise HTTPException(409, str(e)) from e
+    conn = connect()
+    try:
+        entry_id = conn.execute("SELECT id FROM calendar_entries WHERE user_id = ? AND date = ?",
+                                (uid, body.date.isoformat())).fetchone()[0]
+    finally:
+        conn.close()
+    entry = apply_custom(uid, entry_id, json.loads(row["session"]), json.loads(row["request"]))
+    return {"entry": entry, "days_added": extended}
 

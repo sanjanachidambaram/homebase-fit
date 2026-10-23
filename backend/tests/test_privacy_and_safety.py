@@ -17,7 +17,7 @@ from tests.helpers import quiz_answers
 
 ANSWERS = quiz_answers()
 USER_TABLES = ("quiz_profiles", "workout_logs", "measurements", "safety_events", "exercise_favorites",
-               "calendar_entries")
+               "calendar_entries", "cardio_logs", "built_workouts")
 
 
 def sign_up(client, email):
@@ -96,6 +96,9 @@ def test_delete_removes_user_and_all_related_rows(client):
                          "VALUES (?, 'basics_qa', 'sharp pain in my back', 'redirected_to_professional')", (uid,))
             conn.execute("UPDATE calendar_entries SET notes = 'my own words' WHERE user_id = ? AND date = "
                          "(SELECT MIN(date) FROM calendar_entries WHERE user_id = ?)", (uid, uid))
+            conn.execute("INSERT INTO cardio_logs (user_id, date, activity, duration_minutes) "
+                         "VALUES (?, '2026-10-20', 'ran 20 min', 20)", (uid,))
+            conn.execute("INSERT INTO built_workouts (user_id, request, session) VALUES (?, '{}', '{}')", (uid,))
     conn.close()
     assert count("calendar_entries", a) == 28      # saving the quiz laid out 4 weeks of plan days
 
@@ -104,9 +107,9 @@ def test_delete_removes_user_and_all_related_rows(client):
     r = client.delete(f"/api/users/{a}", headers=ha)
     assert r.status_code == 200, r.text
     assert r.json()["rows_removed"] == {"safety_events": 1, "measurements": 1, "workout_logs": 2,
-                                        "calendar_entries": 28, "exercise_favorites": 1, "quiz_profiles": 1,
-                                        "users": 1}
-    assert len(USER_TABLES) == 6 and set(USER_TABLES) | {"users"} == set(r.json()["rows_removed"])
+                                        "calendar_entries": 28, "cardio_logs": 1, "built_workouts": 1,
+                                        "exercise_favorites": 1, "quiz_profiles": 1, "users": 1}
+    assert len(USER_TABLES) == 8 and set(USER_TABLES) | {"users"} == set(r.json()["rows_removed"])
 
     for table in USER_TABLES:
         assert count(table, a) == 0, table

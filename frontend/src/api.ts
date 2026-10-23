@@ -179,7 +179,14 @@ export interface QuizProfile {
   consent_accepted_at: string
   consent_version: string
   updated_at: string
+  calendar_mode: CalendarMode
+  plan_reviewed: boolean
+  plan_swaps: Record<string, string>
+  plan_started_on: string | null
 }
+
+/** How the calendar is filled: the quiz plan, the quiz plan after a review pass, or open days you build yourself. */
+export type CalendarMode = 'generated' | 'review' | 'self'
 
 export interface Account {
   id: number
@@ -286,6 +293,7 @@ export interface PlanExercise {
   rest_seconds: number
   est_minutes: number
   injury_check: string
+  swapped_from?: string | null // review mode: the generated exercise this replaced
 }
 
 export interface PlanDay {
@@ -296,7 +304,17 @@ export interface PlanDay {
   est_minutes: number
 }
 
+/** Progressive overload (shared_rules rule 8): steps every 2 weeks, or paused for injured / rehab profiles. */
+export interface Progression {
+  enabled: boolean
+  every_weeks: number | null
+  reason: string
+  schedule: { week: number; sets: number; reps: number }[]
+}
+
 export interface WeeklyProgram {
+  progression?: Progression | null
+  swap_options?: Record<string, { id: string; name: string; injury_check: string }[]> | null
   generated: boolean
   blocked_reason: string | null
   needs_clinical_review: boolean
@@ -393,7 +411,11 @@ export const recommendProgram = (token: string) =>
   request<AgentResponse<PlanRecommendation>>('/api/programs/recommend', { method: 'POST' }, token)
 
 export const buildWorkout = (token: string, body: WorkoutRequest) =>
-  request<AgentResponse<WorkoutSession>>('/api/workouts/build', { method: 'POST', body: JSON.stringify(body) }, token)
+  request<AgentResponse<WorkoutSession> & { built_id: number }>(
+    '/api/workouts/build',
+    { method: 'POST', body: JSON.stringify(body) },
+    token,
+  )
 
 export const fetchCoach = (token: string) => request<AgentResponse<CoachMessage>>('/api/coach/summary', {}, token)
 
@@ -446,6 +468,9 @@ export interface CalendarEntry {
     protocol_status: 'placeholder' | 'pt_reviewed' | null
     review_notice: string | null
     notes?: string[] // custom days: the Workout Builder's notes (e.g. fewer moves fit your filters)
+    open?: boolean // nothing planned: "I'll build it myself" mode, or a day opened by "Save to calendar"
+    week?: number // week of the plan (progressive overload)
+    progression_step?: number
   }
   completed: boolean
   notes: string | null // the user's own words; never sent to any AI model
@@ -465,6 +490,9 @@ export interface CalendarRange {
   needs_clinical_review: boolean
   page?: string
   entries: CalendarEntry[]
+  cardio: CardioLog[] // the user's own activity log, shown even when there's no plan
+  calendar_mode: CalendarMode | null
+  needs_review: boolean // review mode, plan not reviewed yet: nothing is laid out
 }
 
 export const fetchCalendar = (token: string, start: string, end: string) =>
@@ -539,3 +567,71 @@ export const reviewWorkout = (
 
 export const reviewCalendarDay = (token: string, id: number) =>
   request<AgentResponse<WorkoutReview>>(`/api/calendar/${id}/review`, { method: 'POST' }, token)
+
+// ---------------------------------------------------------------- calendar mode, plan review, Save to calendar
+
+export const setCalendarMode = (token: string, mode: CalendarMode) =>
+  request<{ calendar_mode: CalendarMode; needs_review: boolean; laid_out: number }>(
+    '/api/calendar/mode',
+    { method: 'PUT', body: JSON.stringify({ mode }) },
+    token,
+  )
+
+export interface PlanReview {
+  plan: WeeklyProgram
+  swaps: Record<string, string>
+  calendar_mode: CalendarMode
+  reviewed: boolean
+}
+
+export const fetchPlanReview = (token: string) => request<PlanReview>('/api/calendar/review', {}, token)
+
+export const finalizePlanReview = (token: string, swaps: Record<string, string>) =>
+  request<{ swaps: Record<string, string>; laid_out: number }>(
+    '/api/calendar/review',
+    { method: 'POST', body: JSON.stringify({ swaps }) },
+    token,
+  )
+
+/** Put a session the Workout Builder built (by its id) onto a calendar day; extends the calendar if needed. */
+export const saveBuiltToCalendar = (token: string, builtId: number, date: string) =>
+  request<{ entry: CalendarEntry; days_added: number }>(
+    '/api/calendar/save-built',
+    { method: 'POST', body: JSON.stringify({ built_id: builtId, date }) },
+    token,
+  )
+
+// ---------------------------------------------------------------- cardio log (no AI; your own record)
+
+export interface CardioLog {
+  id: number
+  date: string
+  activity: string | null
+  exercise_id: string | null
+  exercise_name: string | null
+  duration_minutes: number
+  created_at: string
+}
+
+export interface CardioExercise {
+  id: string
+  name: string
+  equipment_needed: string[]
+  difficulty: string
+}
+
+export const fetchCardioExercises = () => getJson<CardioExercise[]>('/api/cardio/exercises')
+
+export const logCardio = (
+  token: string,
+  body: { date: string; activity?: string; exercise_id?: string; duration_minutes: number },
+) =>
+  request<{ log: CardioLog; safety: { flagged: boolean; message?: string } }>(
+    '/api/cardio',
+    { method: 'POST', body: JSON.stringify(body) },
+    token,
+  )
+
+export const deleteCardio = (token: string, id: number) =>
+  request<{ deleted: boolean }>(`/api/cardio/${id}`, { method: 'DELETE' }, token)
+

@@ -125,6 +125,24 @@ export default function WeeklyPlanView({ plan, startOpen = true }: { plan: Weekl
         </details>
       )}
 
+      {plan.progression && (
+        <section className={`progression${plan.progression.enabled ? '' : ' progression-paused'}`} aria-label="Progression">
+          <h4>{plan.progression.enabled ? 'How it builds over time' : 'Progression is paused'}</h4>
+          <p>{plan.progression.reason}</p>
+          <ol className="progression-weeks">
+            {plan.progression.schedule.map((w) => (
+              <li key={w.week}>
+                <span>Wk {w.week}</span>
+                <strong>
+                  {w.sets}×{w.reps}
+                </strong>
+              </li>
+            ))}
+          </ol>
+          <p className="hint">Sets × reps per exercise (holds: seconds = reps × 2). Rest and exercises stay the same.</p>
+        </section>
+      )}
+
       <div className="plan-footnotes">
         <ReviewInfo item={p} />
         <details>

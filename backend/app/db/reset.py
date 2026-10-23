@@ -27,8 +27,8 @@ from app import config
 from app.db import connect, copy_db, table_counts
 
 # Parents first, so ids line up. (app/users.py USER_DATA_TABLES lists the same tables for account deletion.)
-USER_TABLES = ("users", "quiz_profiles", "exercise_favorites", "measurements", "calendar_entries", "workout_logs",
-               "safety_events")
+USER_TABLES = ("users", "quiz_profiles", "exercise_favorites", "measurements", "calendar_entries", "cardio_logs",
+               "built_workouts", "workout_logs", "safety_events")
 
 
 def _read(table: str) -> list[dict]:

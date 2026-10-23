@@ -28,6 +28,7 @@ import {
   type CalendarRange,
 } from '../api'
 import AccountForm from '../components/AccountForm'
+import CardioForm, { CardioList } from '../components/CardioLog'
 import ClinicalSupportCard from '../components/ClinicalSupport'
 import WorkoutBuilder from '../components/dashboard/WorkoutBuilder'
 import ReviewWorkout from '../components/WorkoutReview'
@@ -61,8 +62,10 @@ function DayCard({
   onBuild,
   onRevert,
   onReview,
+  cardio,
 }: {
   entry: CalendarEntry
+  cardio?: ReactNode // rest and open days: the cardio log for that date
   busy: boolean
   supportMessage: string | null
   onChange: (id: number, change: { notes?: string | null; completed?: boolean }) => Promise<boolean>
@@ -113,7 +116,9 @@ function DayCard({
 
       {entry.day_type === 'workout' ? (
         <>
-          <p className="hint">About {Math.round(w.est_minutes)} min</p>
+          <p className="hint">
+            About {Math.round(w.est_minutes)} min{w.week && entry.source === 'generated' ? ` · Week ${w.week}` : ''}
+          </p>
           <ul className="day-exercises">
             {w.exercises.map((x) => (
               <li key={x.exercise_id}>
@@ -141,7 +146,14 @@ function DayCard({
           {!entry.completed && !entry.can_complete && <p className="hint">Tick it off on the day.</p>}
         </>
       ) : (
-        <p className="rest-text">Rest and recover. Your muscles get stronger on days like this.</p>
+        <>
+          <p className="rest-text">
+            {w.open
+              ? 'Open day: build your own workout for it, or log some cardio.'
+              : 'Rest and recover. Your muscles get stronger on days like this.'}
+          </p>
+          {cardio}
+        </>
       )}
 
       {entry.source === 'custom' && (
@@ -404,6 +416,13 @@ function Calendar({ session }: { session: Session }) {
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   const byDate = new Map((data?.entries ?? []).map((e) => [e.date, e]))
+  const loggable = (date: string) => !!data && date <= addDays(data.today, 1) // not ahead of time
+  const cardioFor = (date: string, allowLibrary: boolean) => (
+    <div className="day-cardio">
+      <CardioList logs={(data?.cardio ?? []).filter((c) => c.date === date)} token={session.token} onChange={load} />
+      {loggable(date) && <CardioForm token={session.token} date={date} allowLibrary={allowLibrary} onLogged={load} />}
+    </div>
+  )
 
   return (
     <div className="calendar">
@@ -430,7 +449,38 @@ function Calendar({ session }: { session: Session }) {
       )}
       {!data && !error && <p className="hint">Loading your week…</p>}
 
-      {data?.needs_clinical_review && <ClinicalSupportCard />}
+      {data?.needs_clinical_review && (
+        <>
+          <ClinicalSupportCard />
+          {/* No plan or workouts for them, but their own activity log works (shared_rules rule 9): own words only. */}
+          <section className="dash-card activity-log" aria-labelledby="activity-log-title">
+            <h3 id="activity-log-title">Your activity log</h3>
+            <p className="hint">
+              Keep a note of the activity your OB-GYN or midwife has okayed. It’s just for you: no AI, and never shared.
+            </p>
+            <ul className="activity-days">
+              {days.map((date) => (
+                <li key={date}>
+                  <strong>
+                    {dayName(date).slice(0, 3)} {shortDate(date)}
+                  </strong>
+                  {cardioFor(date, false)}
+                </li>
+              ))}
+            </ul>
+          </section>
+        </>
+      )}
+
+      {data?.needs_review && (
+        <section className="dash-card quiz-prompt">
+          <h3>Your plan is waiting for your review</h3>
+          <p>You chose to review your plan before it goes on the calendar. Swap anything you like, then add it.</p>
+          <Link to="/plan/review" className="btn btn-big">
+            Review my plan
+          </Link>
+        </section>
+      )}
 
       {data?.needs_quiz && (
         <section className="dash-card quiz-prompt">
@@ -467,9 +517,13 @@ function Calendar({ session }: { session: Session }) {
                         }}
                         onRevert={revert}
                         onReview={setReviewingFor}
+                        cardio={entry.day_type === 'rest' ? cardioFor(date, true) : undefined}
                       />
                     ) : (
-                      <p className="hint day-empty">Nothing planned</p>
+                      <>
+                        <p className="hint day-empty">Nothing planned</p>
+                        {cardioFor(date, true)}
+                      </>
                     )}
                   </DayCell>
                 )

@@ -2762,3 +2762,199 @@ fieldset.question {
   opacity: 0.85;
   cursor: default;
 }
+
+/* ---------------------------------------------------------------- calendar mode chooser */
+.mode-chooser {
+  border: 0;
+  padding: 0;
+  margin: 1.25rem 0;
+}
+
+.mode-chooser legend {
+  font-weight: 800;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.mode-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.mode-option {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  border: 2px solid var(--lavender);
+  background: #fff;
+  cursor: pointer;
+}
+
+.mode-option input {
+  accent-color: var(--pink-deep);
+}
+
+.mode-option span {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.mode-option.mode-on {
+  border-color: var(--pink);
+  background: var(--pink-tint);
+}
+
+/* ---------------------------------------------------------------- plan review */
+.review-day h3 {
+  margin-top: 0;
+}
+
+.review-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.review-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.review-list select {
+  min-height: 40px;
+  padding: 0.25rem 0.6rem;
+  border: 2px solid var(--lavender);
+  border-radius: var(--radius-input);
+  background: #fff;
+  max-width: 100%;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- save to calendar */
+.save-to-calendar {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  background: var(--mint-tint);
+}
+
+.save-to-calendar h4 {
+  margin: 0 0 0.5rem;
+}
+
+.save-to-calendar input[type='date'] {
+  min-height: 44px;
+  padding: 0.3rem 0.6rem;
+  border: 2px solid var(--lavender);
+  border-radius: var(--radius-input);
+}
+
+/* ---------------------------------------------------------------- cardio log */
+.day-cardio {
+  margin-top: 0.4rem;
+}
+
+.cardio-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.3rem 0;
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+}
+
+.cardio-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.3rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 10px;
+  background: var(--mint-tint);
+}
+
+.cardio-form {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.cardio-form label {
+  display: grid;
+  gap: 0.1rem;
+  font-weight: 700;
+}
+
+.cardio-form input,
+.cardio-form select {
+  min-height: 36px;
+  padding: 0.2rem 0.4rem;
+  border: 2px solid var(--lavender);
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 400;
+}
+
+.activity-log .activity-days {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.activity-log .activity-days li {
+  padding: 0.5rem 0.7rem;
+  border-radius: 14px;
+  background: var(--lavender-tint);
+}
+
+/* ---------------------------------------------------------------- progression */
+.progression {
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  border-radius: 18px;
+  background: var(--mint-tint);
+}
+
+.progression.progression-paused {
+  background: var(--lavender-tint);
+  border: 2px solid var(--lavender-deep);
+}
+
+.progression h4 {
+  margin: 0 0 0.3rem;
+}
+
+.progression-weeks {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.6rem, 1fr));
+  gap: 0.3rem;
+}
+
+.progression-weeks li {
+  display: grid;
+  justify-items: center;
+  padding: 0.3rem 0.2rem;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 0.8rem;
+}

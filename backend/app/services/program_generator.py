@@ -92,6 +92,7 @@ class PlanExercise(BaseModel):
     rest_seconds: int
     est_minutes: float
     injury_check: str
+    swapped_from: str | None = None      # review mode: the generated exercise this one replaced
 
 
 class PlanDay(BaseModel):
@@ -142,6 +143,19 @@ class SafetySummary(BaseModel):
     equipment: list[str] | None          # None = any equipment (full gym)
 
 
+class ProgressionWeek(BaseModel):
+    week: int
+    sets: int
+    reps: int        # for holds, seconds = reps x 2 (the same rule the plan uses for holds)
+
+
+class Progression(BaseModel):
+    enabled: bool
+    every_weeks: int | None
+    reason: str
+    schedule: list[ProgressionWeek]      # weeks 1-12 at the protocol's ranges, so the plan view can show the climb
+
+
 class WeeklyProgram(BaseModel):
     generated: bool
     blocked_reason: str | None = None
@@ -153,6 +167,10 @@ class WeeklyProgram(BaseModel):
     protocol: ProtocolSummary | None = None
     safety: SafetySummary | None = None
     notes: list[str] = []
+    progression: Progression | None = None
+    # Review mode only: for each generated exercise id, the exercises it may be swapped for (same muscle group, same
+    # injury/equipment/level filters, same Push/Pull direction).
+    swap_options: dict[str, list[dict]] | None = None
 
 
 # ---------------------------------------------------------------- protocols and blending
@@ -336,7 +354,7 @@ def exercise_seconds(est_time_seconds: int, b: Blended) -> int:
 
 
 def build_day(day: str, label: str, groups: list[str], picker: Picker, b: Blended,
-              direction: str | None = None) -> PlanDay:
+              direction: str | None = None, slots: dict | None = None) -> PlanDay:
     """Fill the day's muscle-group slots in order (cycling through them again if there's time left)
     until the session length or MAX_EXERCISES is reached."""
     budget = b.session_length_minutes * 60
@@ -354,6 +372,8 @@ def build_day(day: str, label: str, groups: list[str], picker: Picker, b: Blende
             picker.week_use[e["id"]] -= 1   # not used after all
             break
         used_today.add(e["id"])
+        if slots is not None:
+            slots[(day, len(exercises))] = (group, direction)
         total += seconds
         reps = f"{b.reps[0] * 2}-{b.reps[1] * 2}s hold" if is_hold(e["name"]) else fmt_range(*b.reps)
         exercises.append(PlanExercise(
@@ -363,10 +383,129 @@ def build_day(day: str, label: str, groups: list[str], picker: Picker, b: Blende
     return PlanDay(day=day, kind="training", focus=label, exercises=exercises, est_minutes=round(total / 60, 1))
 
 
+# ---------------------------------------------------------------- progressive overload
+# A general training principle: do a little more over time. Capped inside the protocol's own ranges, so it never
+# goes past what the (PT-reviewable) protocol allows and the session still fits its time (exercise_seconds plans for
+# the top of the set range). Changes only sets and reps; never which exercises are picked (the injury filter alone
+# decides that), and never rest (it stays at the protocol's rest).
+#
+# Every PROGRESSION_EVERY_WEEKS weeks, one step: +1 rep until the top of the rep range, then +1 set with reps back at
+# the bottom, up to the top of the set range; after that it holds. Holds progress the same way in 2-second steps.
+#
+# SAFETY (shared_rules.md rule 8): anyone with an injury flag or a rehab goal gets NO automatic progression. They stay
+# at the starting values until a physical therapist has reviewed their case (the protocols and injury tags are
+# unreviewed drafts), and the plan says so.
+
+PROGRESSION_EVERY_WEEKS = 2
+PROGRESSION_SCHEDULE_WEEKS = 12
+PROGRESSION_ON = ("Every {n} weeks your sets and reps step up a little (one rep at a time, then one more set), "
+                  "never past the top of this plan's ranges.")
+PROGRESSION_PAUSED = ("Progression is paused: because you flagged an injury or a rehab goal, your sets and reps stay "
+                      "at the starting values until a physical therapist has reviewed your plan. Don't push through "
+                      "pain to do more.")
+
+
+def progression_enabled(injury_flags: list[str], goals: list[str]) -> bool:
+    return not injury_flags and "rehab" not in goals
+
+
+def progression_step(week: int, enabled: bool) -> int:
+    """Week 1 is step 0. Disabled = always step 0 (the starting values)."""
+    return (max(1, week) - 1) // PROGRESSION_EVERY_WEEKS if enabled else 0
+
+
+def progressed(sets: tuple[int, int], reps: tuple[int, int], step: int) -> tuple[int, int]:
+    s_lo, s_hi = sets
+    r_lo, r_hi = reps
+    cur_sets, cur_reps = s_lo, r_lo
+    for _ in range(step):
+        if cur_reps < r_hi:
+            cur_reps += 1
+        elif cur_sets < s_hi:
+            cur_sets, cur_reps = cur_sets + 1, r_lo
+        else:
+            break                      # the ceiling: the top of both ranges
+    return cur_sets, cur_reps
+
+
+def _range(text: str) -> tuple[int, int]:
+    nums = [int(n) for n in re.findall(r"\d+", text or "")]
+    return (nums[0], nums[1]) if len(nums) >= 2 else (nums[0], nums[0]) if nums else (1, 1)
+
+
+def exercise_for_week(e: dict, week: int, enabled: bool) -> dict:
+    """One plan exercise (dict) with its sets/reps for a given week of the plan. Same exercise, same rest."""
+    step = progression_step(week, enabled)
+    hold = "hold" in str(e["reps"])
+    reps_lo, reps_hi = _range(e["reps"])
+    if hold:                                  # "24-30s hold" is reps 12-15 at 2 seconds a rep
+        reps_lo, reps_hi = reps_lo // 2, reps_hi // 2
+    sets, reps = progressed(_range(e["sets"]), (reps_lo, reps_hi), step)
+    return {**e, "sets": str(sets), "reps": f"{reps * 2}s hold" if hold else str(reps)}
+
+
+def progression_for(flags: list[str], goals: list[str], b: Blended) -> Progression:
+    enabled = progression_enabled(flags, goals)
+    schedule = []
+    for week in range(1, PROGRESSION_SCHEDULE_WEEKS + 1):
+        sets, reps = progressed(b.sets, b.reps, progression_step(week, enabled))
+        schedule.append(ProgressionWeek(week=week, sets=sets, reps=reps))
+    return Progression(enabled=enabled, every_weeks=PROGRESSION_EVERY_WEEKS if enabled else None,
+                       reason=PROGRESSION_ON.format(n=PROGRESSION_EVERY_WEEKS) if enabled else PROGRESSION_PAUSED,
+                       schedule=schedule)
+
+
+# ---------------------------------------------------------------- review-mode swaps
+
+def _swap_pool(picker: "Picker", group: str, direction: str | None) -> list[dict]:
+    pool = picker.pool(group)
+    if direction and group in DIRECTIONAL_GROUPS:
+        pool = [e for e in pool if e.get("force") != OPPOSITE[direction]]
+    return pool
+
+
+def _apply_swaps(days: list[PlanDay], slots: dict[tuple[str, int], tuple[str, str | None]], picker: "Picker",
+                 b: Blended, swaps: dict[str, str]) -> tuple[list[PlanDay], dict[str, list[dict]]]:
+    """Options for every generated exercise, and the plan with valid swaps applied. A swap only counts if the
+    replacement is in that slot's filtered pool right now, so it can never bring in an exercise the injury filter
+    would remove (checked again on every generation, not just when the swap was saved)."""
+    options: dict[str, list[dict]] = {}
+    new_days = []
+    for d in days:
+        if d.kind != "training":
+            new_days.append(d)
+            continue
+        used = {x.exercise_id for x in d.exercises}
+        exercises = []
+        for i, x in enumerate(d.exercises):
+            group, direction = slots[(d.day, i)]
+            pool = [e for e in _swap_pool(picker, group, direction) if e["id"] == x.exercise_id or e["id"] not in used]
+            options.setdefault(x.exercise_id, [])
+            known = {o["id"] for o in options[x.exercise_id]}
+            options[x.exercise_id] += [{"id": e["id"], "name": e["name"], "injury_check": e["injury_check"]}
+                                       for e in pool if e["id"] != x.exercise_id and e["id"] not in known]
+            want = swaps.get(x.exercise_id)
+            choice = next((e for e in pool if e["id"] == want and want != x.exercise_id), None)
+            if choice is None:
+                exercises.append(x)
+                continue
+            seconds = exercise_seconds(choice["est_time_seconds"], b)
+            reps = f"{b.reps[0] * 2}-{b.reps[1] * 2}s hold" if is_hold(choice["name"]) else fmt_range(*b.reps)
+            exercises.append(PlanExercise(
+                exercise_id=choice["id"], name=choice["name"], muscle_group=choice["muscle_group"], sets=x.sets,
+                reps=reps, rest_seconds=x.rest_seconds, est_minutes=round(seconds / 60, 1),
+                injury_check=choice["injury_check"], swapped_from=x.exercise_id))
+            used.add(choice["id"])
+        total = sum(x.est_minutes for x in exercises)
+        new_days.append(d.model_copy(update={"exercises": exercises, "est_minutes": round(total, 1)}))
+    return new_days, options
+
+
 # ---------------------------------------------------------------- the generator
 
-def generate(profile: dict) -> WeeklyProgram:
-    """Build the weekly plan for a quiz profile (dict with the quiz_profiles columns, lists decoded)."""
+def generate(profile: dict, swaps: dict[str, str] | None = None, with_swap_options: bool = False) -> WeeklyProgram:
+    """Build the weekly plan for a quiz profile (dict with the quiz_profiles columns, lists decoded).
+    swaps (review mode): {generated exercise id: replacement id}, applied only where valid (see _apply_swaps)."""
     goals = sorted(set(profile.get("goals") or [])) or ["general_health"]
     experience = profile.get("experience_level") or "beginner"
     flags = sorted(set(profile.get("injury_flags") or []))
@@ -396,12 +535,16 @@ def generate(profile: dict) -> WeeklyProgram:
     templates = DAY_TEMPLATES[b.split_type]
     training = DAY_PATTERNS[n]
     days = []
+    slots: dict[tuple[str, int], tuple[str, str | None]] = {}
     for day in WEEK:
         if day in training:
             label, groups, direction = templates[training.index(day) % len(templates)]
-            days.append(build_day(day, label, groups, picker, b, direction))
+            days.append(build_day(day, label, groups, picker, b, direction, slots))
         else:
             days.append(PlanDay(day=day, kind="rest"))
+    swap_options = None
+    if swaps or with_swap_options:
+        days, swap_options = _apply_swaps(days, slots, picker, b, swaps or {})
 
     if picker.empty_groups:
         reason = "your equipment" + (" and the injury filter" if checked_only else "")
@@ -423,6 +566,8 @@ def generate(profile: dict) -> WeeklyProgram:
             sets_range=fmt_range(*b.sets), reps_range=fmt_range(*b.reps), rest_seconds=b.rest_seconds,
             progression_notes=b.progression_notes, blending_rules_applied=b.rules, status=b.status,
             review_notice=REVIEW_NOTICE if b.status == "placeholder" else None, citations=b.citations),
+        progression=progression_for(flags, goals, b),
+        swap_options=swap_options if with_swap_options else None,
         safety=SafetySummary(injury_flags=flags, checked_only=checked_only, excluded_as_contraindicated=picker.excluded,
                              equipment=picker.equipment,
                              left_out_for_injury=contraindicated_exercises(flags, sorted(picker.candidates),
@@ -431,10 +576,10 @@ def generate(profile: dict) -> WeeklyProgram:
 
 
 PROFILE_COLUMNS = ("goals", "injury_flags", "experience_level", "days_available", "session_length_minutes",
-                   "equipment", "other_activity_days", "pregnancy_status")
+                   "equipment", "other_activity_days", "pregnancy_status", "plan_swaps")
 
 
-def generate_for_user(user_id: int) -> WeeklyProgram:
+def generate_for_user(user_id: int, with_swap_options: bool = False) -> WeeklyProgram:
     conn = connect_readonly()
     try:
         row = conn.execute(f"SELECT {', '.join(PROFILE_COLUMNS)} FROM quiz_profiles WHERE user_id = ?",
@@ -446,7 +591,8 @@ def generate_for_user(user_id: int) -> WeeklyProgram:
     profile = dict(row)
     for col in ("goals", "injury_flags", "equipment"):
         profile[col] = json.loads(profile[col] or "[]")
-    return generate(profile)
+    swaps = json.loads(profile.pop("plan_swaps") or "{}")
+    return generate(profile, swaps=swaps, with_swap_options=with_swap_options)
 
 
 # ---------------------------------------------------------------- the public worked example

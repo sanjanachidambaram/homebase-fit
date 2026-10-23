@@ -10,6 +10,7 @@ import DashboardPage from './pages/DashboardPage'
 import ExercisesPage from './pages/ExercisesPage'
 import HowWeBuildPage from './pages/HowWeBuildPage'
 import LegalPage from './pages/LegalPage'
+import PlanReviewPage from './pages/PlanReviewPage'
 import PregnancySupportPage from './pages/PregnancySupportPage'
 import QuizPage from './pages/QuizPage'
 import SettingsPage from './pages/SettingsPage'
@@ -28,6 +29,7 @@ const PAGES: Record<string, () => JSX.Element> = {
   '/legal': LegalPage, // linked from the footer on every page
   '/about': AboutPage, // public; Sanjana's essay (verbatim), her class-project disclaimer, the team
   '/about/data': AboutDataPage, // public; live data figures and every source (linked from About and the footer)
+  '/plan/review': PlanReviewPage, // review mode: swap exercises before the plan goes on the calendar
   '/how-we-build': HowWeBuildPage, // public; linked from the plan on the Dashboard and Your Plan page
   '/pregnancy-support': PregnancySupportPage, // pregnant / postpartum users are sent here (quiz, Dashboard, blocks)
 }

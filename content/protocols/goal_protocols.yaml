@@ -16,6 +16,13 @@
 #   sets_range, reps_range  "low-high" (or one number), e.g. "2-3", "12-15"
 #   rest_seconds            rest between sets
 #   progression_note        how to make it harder over time
+#
+# Progressive overload (applied by code to every calendar week; backend/prompts/shared_rules.md rule 8):
+#   the general principle of doing a little more over time. Every 2 weeks: +1 rep up to the top of reps_range, then
+#   +1 set (reps back to the bottom) up to the top of sets_range, then it holds. It never goes past these ranges, so
+#   reviewing the ranges reviews the ceiling. Only sets and reps change; rest and exercise choice never do.
+#   Anyone with an injury flag or a rehab goal stays at the starting values (no automatic progression) until a PT has
+#   reviewed their case.
 #   reference_notes         (optional) background notes, e.g. from the retired program templates
 #   status                  placeholder | pt_reviewed (pt_reviewed requires at least one citation)
 #   citations               list of { claim, source }. PT TO FILL IN.
