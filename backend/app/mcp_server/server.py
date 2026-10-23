@@ -85,7 +85,7 @@ def search_exercises(
     muscle_group: legs, arms, chest, shoulders, back, core, or full_body.
     equipment: the equipment the user HAS (e.g. ["dumbbells", "resistance_band"]); returns exercises that need
       only those items, plus bodyweight exercises. Omit to ignore equipment.
-    injury_flags: lower_back, knee, shoulder, wrist, ankle. Exercises tagged as unsafe for ANY of these are removed by the
+    injury_flags: neck, shoulder, upper_back, lower_back, wrist, hip, knee, ankle. Exercises tagged as unsafe for ANY of these are removed by the
       database query itself, so they can never appear.
     limit: 1 to 50 (default 20). Exercises with injury tags come first.
     checked_only: true returns only exercises that have injury tags (draft or PT-reviewed).

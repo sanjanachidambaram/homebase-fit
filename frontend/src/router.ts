@@ -12,6 +12,7 @@ export function usePath(): string {
   useEffect(() => {
     const onChange = () => setPath(window.location.pathname)
     window.addEventListener('popstate', onChange)
+    onChange() // catch a change made before this listener existed (a child's effect, like the /content redirect)
     return () => window.removeEventListener('popstate', onChange)
   }, [])
   return path

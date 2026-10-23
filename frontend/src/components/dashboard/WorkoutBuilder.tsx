@@ -44,7 +44,7 @@ export default function WorkoutBuilder({
     // Every muscle group starts at 0 (legs and core used to start at 2, a leftover sample default).
     () => Object.fromEntries(GROUPS.map((g) => [g, 0])) as Record<MuscleGroup, number>,
   )
-  const [minutes, setMinutes] = useState(25)
+  const [minutes, setMinutes] = useState(10) // the session-time slider starts at its 10-minute minimum
   const [equipment, setEquipment] = useState<string[]>([])
   // The equipment chips come from the exercises themselves (GET /api/exercises/equipment), never a typed list.
   const equipmentOptions = useEquipmentOptions()

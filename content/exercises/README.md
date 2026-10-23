@@ -8,8 +8,10 @@ Two sources feed the `exercises` table (see `content/sources.yaml`):
 | `source_free_exercise_db/` (see its `ATTRIBUTION.md`) | `free-exercise-db` | none yet (`untagged`) |
 
 For anyone with an injury flag, generated plans and custom workouts only use exercises that have injury tags
-(today, the hand-authored ones). The tags cover lower_back, knee, shoulder, wrist and ankle; the wrist and ankle
-tags were drafted 2026-10-22 and, like the rest, are waiting on PT review.
+(today, the hand-authored ones). The tags cover neck, shoulder, upper_back, lower_back, wrist, hip, knee and ankle;
+the wrist and ankle tags were drafted 2026-10-22, neck, upper_back and hip on 2026-10-23, and like the rest they are
+waiting on PT review. Every hand-authored exercise has been considered for every one of these, so a new injury flag
+has to be drafted across all of them (not just added to the quiz).
 
 Every exercise starts as `status: placeholder` with no citations, so the app shows "Content pending expert review" on it. For hand-authored exercises you can add `status: pt_reviewed` and a `citations:` list (each `{claim, source}`) in `exercises.yaml`; `pt_reviewed` requires at least one citation. Demo media type (image, gif, or video) is picked from the file extension when you rerun the seed.
 
@@ -18,7 +20,7 @@ Every exercise starts as `status: placeholder` with no citations, so the app sho
 `contraindication_tags_TEMPLATE.csv` lists **every** exercise from both sources, one row each.
 
 1. Save a copy as `contraindication_tags.csv` and fill that in. The template gets regenerated, so edits made to it directly would be lost.
-2. In `lower_back`, `knee`, `shoulder`, `wrist`, `ankle`: `Y` = unsafe for someone with that injury, `N` = OK, blank = not reviewed.
+2. In `neck`, `shoulder`, `upper_back`, `lower_back`, `wrist`, `hip`, `knee`, `ankle`: `Y` = unsafe for someone with that injury, `N` = OK, blank = not reviewed.
 3. `rationale` says **why** each `Y` is there, one `injury: reasoning` per line. Every one is pre-filled with
    AI-drafted reasoning (`rationale_tier` = `ai_drafted`): general exercise-science reasoning, with no citation
    behind it. Confirm it, correct it in place, or replace it; add a reason for any new `Y` you add.

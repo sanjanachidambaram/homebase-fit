@@ -91,3 +91,42 @@ def test_accounts_from_before_usernames_keep_signing_in_with_their_old_email(cli
     me = client.get(f"/api/users/{uid}", headers=h).json()
     assert (me["username"], me["first_name"]) == ("old.timer@example.com", None)
     assert [f["id"] for f in client.get("/api/favorites", headers=h).json()] == ["glute_bridge"]
+
+
+# ---------------------------------------------------------------- "Reset my quiz" (Settings)
+
+def test_reset_my_quiz_goes_back_to_no_plan_and_keeps_what_you_did(client):
+    from tests.helpers import quiz_answers
+    r = sign_up(client, "resetter").json()
+    uid, h = r["user_id"], {"Authorization": f"Bearer {r['token']}"}
+    assert client.put(f"/api/users/{uid}/quiz-profile", headers=h, json={
+        "consent_accepted": True, "consent_version": "t", "answers": quiz_answers()}).status_code == 200
+    from tests.test_agents import rows
+    stored = lambda: [r["id"] for r in rows("SELECT id FROM calendar_entries WHERE user_id = ? ORDER BY date", uid)]
+    days = stored()                                                             # four weeks, from today
+    assert len(days) == 28
+    done, noted = {"id": days[0]}, {"id": days[1]}
+    assert client.patch(f"/api/calendar/{done['id']}", headers=h, json={"completed": True}).status_code == 200
+    assert client.patch(f"/api/calendar/{noted['id']}", headers=h, json={"notes": "felt great"}).status_code == 200
+    client.post("/api/favorites", headers=h, json={"exercise_id": "glute_bridge"})
+
+    res = client.delete(f"/api/users/{uid}/quiz-profile", headers=h)
+    assert res.status_code == 200 and res.json()["reset"] is True and res.json()["calendar_days_cleared"] == len(days) - 2
+    me = client.get(f"/api/users/{uid}", headers=h)
+    assert me.status_code == 200 and me.json()["quiz_profile"] is None          # still signed in, no quiz
+    assert client.get("/api/plan", headers=h).status_code == 409                 # "take the quiz" state
+    assert set(stored()) == {done["id"], noted["id"]}                                     # what you did and wrote stays
+    assert [f["id"] for f in client.get("/api/favorites", headers=h).json()] == ["glute_bridge"]
+
+    # Retaking later works as normal (the disclaimer is asked again) and lays the calendar out again.
+    assert client.put(f"/api/users/{uid}/quiz-profile", headers=h, json={
+        "consent_accepted": True, "consent_version": "t", "answers": quiz_answers()}).status_code == 200
+    assert len(stored()) == 28 and {done["id"], noted["id"]} <= set(stored())
+
+
+def test_only_you_can_reset_your_quiz(client):
+    a = sign_up(client, "owner_a").json()
+    b = sign_up(client, "owner_b").json()
+    r = client.delete(f"/api/users/{a['user_id']}/quiz-profile", headers={"Authorization": f"Bearer {b['token']}"})
+    assert r.status_code == 403
+    assert client.delete(f"/api/users/{a['user_id']}/quiz-profile").status_code == 401

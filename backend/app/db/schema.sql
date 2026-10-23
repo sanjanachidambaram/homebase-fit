@@ -3,7 +3,7 @@
 -- Conventions:
 --   * JSON columns hold JSON text and are checked with json_valid().
 --   * Dates are ISO text: date = 'YYYY-MM-DD', timestamps = 'YYYY-MM-DDTHH:MM:SSZ' (UTC).
---   * Injury tags are lower_back | knee | shoulder | wrist | ankle everywhere (quiz answers,
+--   * Injury tags are neck | shoulder | upper_back | lower_back | wrist | hip | knee | ankle everywhere (quiz answers,
 --     exercises.injury_contraindications).
 --   * Content tables (sources, quiz_questions, exercises, goal_protocols, basics_articles)
 --     are loaded from content/ by app/db/seed.py. User tables start empty.

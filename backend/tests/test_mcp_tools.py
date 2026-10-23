@@ -223,7 +223,7 @@ def test_basics_search_finds_the_right_article(test_db):
     res = call("search_basics_kb", query="How long should I rest between sets?")
     assert res["answerable"] and res["matches"][0]["slug"] == "rest_between_sets"
     assert res["matches"][0]["status"] == "placeholder" and res["matches"][0]["review_notice"]
-    assert "Why rest matters" in res["matches"][0]["content"]
+    assert "30–90 seconds is common" in res["matches"][0]["content"]
     assert call("search_basics_kb", query="sharp pain, should I stop?")["matches"][0]["slug"] == "push_through_vs_stop"
     assert call("search_basics_kb", query="injuries")["matches"][0]["slug"] == "injury_prevention_basics"   # plural
 

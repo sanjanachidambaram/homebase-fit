@@ -2,7 +2,10 @@
 See backend/prompts/shared_rules.md, rule 4.
 """
 
-INJURY_FLAGS = ("lower_back", "knee", "shoulder", "wrist", "ankle")
+# Head to toe. Every hand-authored exercise has been considered for every flag here (its tags are drafted, then
+# PT-reviewed), so adding a flag means drafting it across content/exercises/*/exercises.yaml too.
+# neck, upper_back and hip were added 2026-10-23.
+INJURY_FLAGS = ("neck", "shoulder", "upper_back", "lower_back", "wrist", "hip", "knee", "ankle")
 CLINICAL_REVIEW_STATUSES = ("pregnant", "postpartum")
 
 # Why an exercise carries an injury tag (exercises.injury_rationale). Every rationale is ai_drafted until a

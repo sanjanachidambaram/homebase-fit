@@ -160,7 +160,8 @@ def test_a_newly_tagged_exercise_is_excluded_too(test_db, search_spy):
 
 
 def test_every_injury_flag_forces_checked_only(test_db, search_spy):
-    for flag in ("knee", "shoulder", "wrist", "ankle"):
+    from app.safety_rules import INJURY_FLAGS
+    for flag in INJURY_FLAGS:                     # every flag the quiz offers, including any added later
         search_spy.clear()
         plan = generate({**LOWER_BACK_REHAB, "goals": ["tone"], "injury_flags": [flag]})
         assert search_spy and all(c["checked_only"] is True and c["injury_flags"] == [flag] for c in search_spy)

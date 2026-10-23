@@ -8,21 +8,4 @@ citations: []
 
 > **PLACEHOLDER — PT/OB-GYN TO REVIEW.** Do not treat this text as reviewed guidance.
 
-## What strength training does
-
-Strength training means working your muscles against resistance: your body weight, dumbbells, or a resistance band. Over time your muscles adapt by getting stronger, and that makes everyday movement easier.
-
-## The basic building blocks
-
-- **Rep (repetition):** one full movement, like one squat.
-- **Set:** a group of reps done back to back, like 10 squats.
-- **Rest:** the break between sets.
-- **Progressive overload:** slowly making things harder over weeks by adding reps, sets, weight, or slowing the movement down.
-
-## Form comes first
-
-Move slowly and with control, especially when you're new. If you can't keep good form for the last few reps, the set is too hard. Lower the reps or choose an easier version.
-
-## How often
-
-Many beginners train two to three days a week with at least one rest day between sessions that work the same muscles.
+Strength training means working your muscles against resistance — your own body weight, a resistance band, dumbbells, or machines — so they adapt and get stronger over time. A typical session targets a few major muscle groups with a handful of exercises, done for a set number of reps and sets. The core idea behind getting stronger is 'progressive overload': gradually asking your muscles to do a little more over time, rather than doing the exact same thing forever.

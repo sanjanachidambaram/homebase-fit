@@ -43,13 +43,20 @@ export default function AskBasics({ token }: { token: string }) {
         <label htmlFor="ask-input" className="sr-only">
           Your question
         </label>
-        <input
+        <textarea
           id="ask-input"
-          type="text"
+          rows={2}
           maxLength={500}
           placeholder="e.g. How long should I rest between sets?"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter asks (like the old one-line box); Shift+Enter starts a new line.
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              ask(question)
+            }
+          }}
         />
         <button type="submit" className="btn" disabled={loading || question.trim().length < 3}>
           Ask

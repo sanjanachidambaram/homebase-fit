@@ -32,7 +32,7 @@ def library(client, **params) -> list[dict]:
 
 def test_every_injury_tag_has_an_ai_drafted_reason(client):
     tagged = [e for e in library(client) if e["injury_contraindications"]]
-    assert len(tagged) == 17 and sum(len(e["injury_contraindications"]) for e in tagged) == 30
+    assert len(tagged) == 18 and sum(len(e["injury_contraindications"]) for e in tagged) == 44
     for e in library(client):
         assert set(e["injury_rationale"]) == set(e["injury_contraindications"]), e["id"]
         for injury, r in e["injury_rationale"].items():
@@ -79,7 +79,7 @@ def test_pt_template_has_the_rationale_for_review():
     rows = {r["exercise_id"]: r for r in csv.DictReader(path.open(encoding="utf-8-sig"))}
     assert {"rationale", "rationale_tier", "reviewed_by"} <= set(next(iter(rows.values())))
     climber = rows["mountain_climber"]
-    assert climber["rationale"].splitlines()[0].startswith("lower_back: ") and climber["rationale_tier"] == "ai_drafted"
+    assert climber["rationale"].splitlines()[0].startswith("shoulder: ") and climber["rationale_tier"] == "ai_drafted"
     assert rows["dead_bug"]["rationale"] == "" and rows["3_4_Sit-Up"]["rationale"] == ""
 
 

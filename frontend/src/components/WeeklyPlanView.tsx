@@ -1,4 +1,4 @@
-// A generated weekly plan, day by day. Used by the Dashboard card and the "Your Plan & Basics" page.
+// A generated weekly plan, day by day. Used by the Dashboard card and the "Your Personalized Plan" page.
 import { useState } from 'react'
 import { MUSCLE_GROUP_LABELS, type WeeklyProgram } from '../api'
 import { useFavorites } from '../favorites'

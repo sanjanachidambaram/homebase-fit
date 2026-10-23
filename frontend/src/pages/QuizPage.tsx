@@ -2,7 +2,7 @@
 // acknowledgment -> health/injury questions -> submit.
 // Health questions (health: true in quiz_questions.yaml) stay hidden until the
 // disclaimer is accepted, and the API rejects any submission without consent.
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { fetchQuizQuestions, isSignInGone, submitQuiz, type QuizProfile, type QuizQuestion } from '../api'
 import AccountForm from '../components/AccountForm'
 import CalendarModeChooser from '../components/CalendarModeChooser'
@@ -21,12 +21,56 @@ function isAnswered(q: QuizQuestion, value: Answer | undefined): boolean {
   return value !== undefined && value !== ''
 }
 
+/** 70 -> "5 ft 10 in" */
+const feetInches = (inches: number) => `${Math.floor(inches / 12)} ft ${inches % 12} in`
+
 function rangeError(q: QuizQuestion, value: Answer | undefined): string | null {
   if (q.type !== 'number' || typeof value !== 'number') return null
   if ((q.min !== undefined && value < q.min) || (q.max !== undefined && value > q.max)) {
-    return `"${q.prompt}" must be between ${q.min} and ${q.max}.`
+    const show = (n: number | undefined) => (n !== undefined && q.input === 'feet_inches' ? feetInches(n) : n)
+    return `"${q.prompt}" must be between ${show(q.min)} and ${show(q.max)}.`
   }
   return null
+}
+
+/** Height in feet + inches. The answer stays total inches (what the API and the plan use). */
+function FeetInchesField({ q, value, onChange }: { q: QuizQuestion; value: Answer | undefined; onChange: (v: Answer) => void }) {
+  const total = typeof value === 'number' ? value : null
+  const [feet, setFeet] = useState(total === null ? '' : String(Math.floor(total / 12)))
+  const [inches, setInches] = useState(total === null ? '' : String(total % 12))
+  const update = (f: string, i: string) => {
+    setFeet(f)
+    setInches(i)
+    onChange(f === '' ? '' : Number(f) * 12 + (i === '' ? 0 : Number(i)))
+  }
+  return (
+    <fieldset className="question">
+      <legend>{q.prompt}</legend>
+      {q.help_text && <span className="hint question-help">{q.help_text}</span>}
+      <span className="number-row">
+        <input
+          type="number"
+          aria-label="Feet"
+          className="short"
+          min={Math.floor((q.min ?? 0) / 12)}
+          max={Math.floor((q.max ?? 120) / 12)}
+          value={feet}
+          onChange={(e) => update(e.target.value, inches)}
+        />
+        <span className="unit">ft</span>
+        <input
+          type="number"
+          aria-label="Inches"
+          className="short"
+          min={0}
+          max={11}
+          value={inches}
+          onChange={(e) => update(feet, e.target.value)}
+        />
+        <span className="unit">in</span>
+      </span>
+    </fieldset>
+  )
 }
 
 function OptionLabel({ label, description }: { label: string; description?: string }) {
@@ -78,6 +122,7 @@ function QuestionField({
 }) {
   const [tomorrow] = useState(() => new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 10))
   const help = q.help_text && <span className="hint question-help">{q.help_text}</span>
+  if (q.type === 'number' && q.input === 'feet_inches') return <FeetInchesField q={q} value={value} onChange={onChange} />
   if (q.type === 'multi_select') {
     const selected = Array.isArray(value) ? value : []
     const toggle = (v: string, checked: boolean) => {
@@ -154,6 +199,12 @@ export default function QuizPage() {
       .then(setQuestions)
       .catch((e: Error) => setError(e.message))
   }, [])
+
+  // Each step is a new screen on the same route, so the route-change scroll reset never fires: start every
+  // step at the top here (Next, Back, the disclaimer, and the thank-you screen after submitting).
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0)
+  }, [step])
 
   const general = questions.filter((q) => !q.health)
   const health = questions.filter((q) => q.health)

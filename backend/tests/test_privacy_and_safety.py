@@ -127,9 +127,11 @@ def test_placeholder_content_flagged_with_citations_field(client, route):
     items = client.get(route).json()
     assert items
     for item in items:
-        assert item["status"] == "placeholder"
+        assert item["status"] == "placeholder"                     # still pending expert review, citation or not
         assert item["review_notice"] == "Content pending expert review"
-        assert item["citations"] == []
+        # Only the weight-loss article cites anything: the CDC pace its text names (content/basics/*.md).
+        want = ["CDC, Losing Weight: https://www.cdc.gov/healthy-weight-growth/losing-weight/index.html"]             if item.get("slug") == "tracking_weight_loss" else []
+        assert [c["source"] for c in item["citations"]] == want, item.get("slug")
 
 
 def test_schema_has_citations_and_status():

@@ -123,6 +123,12 @@ def test_api_and_media_win_over_the_app(client):
     assert client.get("/content/nope.jpg").status_code == 404
 
 
+def test_the_old_combined_plan_page_address_goes_to_the_plan(client):
+    r = client.get("/content", follow_redirects=False)                  # "Your Plan & Basics" used to live here
+    assert r.status_code == 301 and r.headers["location"] == "/plan"
+    assert client.get("/content/images/team/README.md").status_code == 200   # the media mount is untouched
+
+
 @built
 def test_no_files_outside_the_built_app(client):
     for path in ("/..%2Fbackend%2Fapp%2Fconfig.py", "/../backend/app/config.py", "/%2e%2e/%2e%2e/.env"):

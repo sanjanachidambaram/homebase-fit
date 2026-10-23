@@ -25,11 +25,11 @@ from app import config
 from app.config import CONTENT_DIR, DB_DIR, PROJECT_ROOT
 from app.db import connect, table_counts
 from app.db.reset import refresh_content, reset
-from app.safety_rules import RATIONALE_PENDING_SOURCE, RATIONALE_TIERS
+from app.safety_rules import INJURY_FLAGS, RATIONALE_PENDING_SOURCE, RATIONALE_TIERS
 
 MUSCLE_GROUPS = ("legs", "arms", "chest", "shoulders", "back", "core", "full_body")
 FORCES = {"push", "pull", "static", None}   # movement direction; None = no single direction
-INJURY_TAGS = {"lower_back", "knee", "shoulder", "wrist", "ankle"}
+INJURY_TAGS = set(INJURY_FLAGS)   # app/safety_rules.py
 GOALS = ("weight_loss", "strength", "tone", "rehab", "general_health")
 EXPERIENCE = ("beginner", "intermediate", "advanced")
 SPLITS = {"full_body", "upper_lower", "push_pull_legs", "circuit"}

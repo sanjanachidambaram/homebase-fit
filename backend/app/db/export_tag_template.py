@@ -7,7 +7,7 @@ Run from backend/ after seeding:
 This OVERWRITES the template. The PT should fill in a copy saved as
 contraindication_tags.csv so a re-export never clobbers their work.
 
-Columns lower_back / knee / shoulder / wrist / ankle: Y = unsafe for that injury, N = OK,
+Columns neck / shoulder / upper_back / lower_back / wrist / hip / knee / ankle: Y = unsafe for that injury, N = OK,
 blank = not reviewed. Drafted tags are pre-filled; imported exercises are blank.
 
 Column rationale: WHY each Y is there, one "injury: reasoning" per line, pre-filled with the AI-drafted
@@ -19,9 +19,10 @@ import json
 
 from app.config import CONTENT_DIR, ORIGINAL_DB
 from app.db import connect
+from app.safety_rules import INJURY_FLAGS
 
 TEMPLATE = CONTENT_DIR / "exercises" / "contraindication_tags_TEMPLATE.csv"
-INJURIES = ("lower_back", "knee", "shoulder", "wrist", "ankle")
+INJURIES = INJURY_FLAGS   # app/safety_rules.py
 COLUMNS = ("exercise_id", "name", "source_dataset", "muscle_group", "category", "equipment",
            "primary_muscles", "contraindication_status", *INJURIES, "rationale", "rationale_tier",
            "pt_notes", "reviewed_by")

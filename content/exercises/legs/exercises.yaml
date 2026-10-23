@@ -4,7 +4,7 @@
 # difficulty: beginner | intermediate | advanced
 # force: push | pull | static (optional; free-exercise-db's movement direction). Push plan days never
 #   get pull moves and Pull days never get push moves. Leave it out for moves with no single direction.
-# injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder | wrist | ankle).
+# injury_contraindications: injuries this exercise is UNSAFE for (neck | shoulder | upper_back | lower_back | wrist | hip | knee | ankle).
 #   The app filters these out in code, so be conservative.
 # injury_rationale: one entry per tag above, {reasoning, tier, source}. reasoning = why the exercise is commonly
 #   avoided with that injury (general exercise-science reasoning, never an invented citation). tier: ai_drafted
@@ -17,10 +17,14 @@ exercises:
     equipment_needed: [none]
     difficulty: beginner
     force: push
-    injury_contraindications: [knee]
+    injury_contraindications: [hip, knee]
     injury_rationale:
       knee:
         reasoning: "Squatting bends the knees while they carry your body weight, and deep or repeated bending can aggravate a sore or recovering knee."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      hip:
+        reasoning: "Squatting takes the hips through a deep bend under your body weight, which can pinch or aggravate a sore or recovering hip."
         tier: ai_drafted
         source: Pending review by a licensed physical therapist
     est_time_seconds: 45
@@ -30,7 +34,7 @@ exercises:
     equipment_needed: [none]
     difficulty: beginner
     force: push
-    injury_contraindications: [knee, ankle]
+    injury_contraindications: [hip, knee, ankle]
     injury_rationale:
       knee:
         reasoning: "Lunges load one knee at a time through a deep bend, which can aggravate a sore knee."
@@ -38,6 +42,10 @@ exercises:
         source: Pending review by a licensed physical therapist
       ankle:
         reasoning: "Stepping back and balancing on one leg challenges the ankle's stability, which can be risky for an ankle that's sprained or still recovering."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      hip:
+        reasoning: "Lunging loads one hip at a time through a deep bend while you balance, which can aggravate a sore or recovering hip."
         tier: ai_drafted
         source: Pending review by a licensed physical therapist
     est_time_seconds: 60
@@ -67,7 +75,12 @@ exercises:
     name: Side-Lying Leg Raise
     equipment_needed: [mat]
     difficulty: beginner
-    injury_contraindications: []
+    injury_contraindications: [hip]
+    injury_rationale:
+      hip:
+        reasoning: "Lifting the top leg works the muscles around the hip directly, and lying on your side presses on the lower hip, so either side can be uncomfortable for a sore hip."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
     est_time_seconds: 60
     instructions: Lie on your side with legs straight. Lift the top leg about 45 degrees without rolling your hips back, then lower with control.
   - id: goblet_squat
@@ -75,7 +88,7 @@ exercises:
     equipment_needed: [dumbbells]
     difficulty: intermediate
     force: push
-    injury_contraindications: [knee, lower_back]
+    injury_contraindications: [lower_back, hip, knee]
     injury_rationale:
       knee:
         reasoning: "A weighted squat loads the knees through a deep bend."
@@ -83,6 +96,10 @@ exercises:
         source: Pending review by a licensed physical therapist
       lower_back:
         reasoning: "Holding a weight at your chest adds load that your back muscles must resist to keep you upright, which can strain a sensitive lower back if your posture slips."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      hip:
+        reasoning: "Holding a weight while you squat adds load to the hips at the bottom of a deep bend, which can aggravate a sore hip."
         tier: ai_drafted
         source: Pending review by a licensed physical therapist
     est_time_seconds: 60

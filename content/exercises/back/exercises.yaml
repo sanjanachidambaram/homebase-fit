@@ -4,7 +4,7 @@
 # difficulty: beginner | intermediate | advanced
 # force: push | pull | static (optional; free-exercise-db's movement direction). Push plan days never
 #   get pull moves and Pull days never get push moves. Leave it out for moves with no single direction.
-# injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder | wrist | ankle).
+# injury_contraindications: injuries this exercise is UNSAFE for (neck | shoulder | upper_back | lower_back | wrist | hip | knee | ankle).
 #   The app filters these out in code, so be conservative.
 # injury_rationale: one entry per tag above, {reasoning, tier, source}. reasoning = why the exercise is commonly
 #   avoided with that injury (general exercise-science reasoning, never an invented citation). tier: ai_drafted
@@ -38,10 +38,18 @@ exercises:
     equipment_needed: [mat]
     difficulty: beginner
     force: static
-    injury_contraindications: [lower_back]
+    injury_contraindications: [neck, upper_back, lower_back]
     injury_rationale:
       lower_back:
         reasoning: "Lifting your chest and legs off the floor arches the lower spine and squeezes the low-back muscles hard, which can aggravate a sensitive lower back."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      upper_back:
+        reasoning: "Holding the chest up squeezes the muscles along the upper back and arches the spine, which can aggravate a sore upper back."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      neck:
+        reasoning: "Lifting the chest off the floor tends to tip the head back and hold the neck bent backward, which can aggravate a sore neck."
         tier: ai_drafted
         source: Pending review by a licensed physical therapist
     est_time_seconds: 45
@@ -51,10 +59,14 @@ exercises:
     equipment_needed: [dumbbells]
     difficulty: intermediate
     force: pull
-    injury_contraindications: [lower_back]
+    injury_contraindications: [upper_back, lower_back]
     injury_rationale:
       lower_back:
         reasoning: "Holding a hip hinge while the weights hang in front of you makes the low-back muscles work hard to keep your spine still. If that flat-back position slips under load, it can strain a sensitive lower back."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      upper_back:
+        reasoning: "Rowing a weight while bent forward works the upper back muscles hard and asks them to hold the spine steady, which can aggravate a sore upper back."
         tier: ai_drafted
         source: Pending review by a licensed physical therapist
     est_time_seconds: 60

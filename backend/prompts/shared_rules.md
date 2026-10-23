@@ -101,8 +101,16 @@ There is no AI call either way. Test: `test_red_flag_note_is_saved_logged_and_an
 
 ## 4. Injury filtering (the plan generator and the Workout Builder)
 
-- Exercises tagged unsafe for the user's `injury_flags` (lower_back, knee, shoulder, wrist, ankle) are removed
-  by the SQL in `app/mcp_server/search.py: search_exercises`, which both the MCP tool and the plan generator use.
+- Exercises tagged unsafe for the user's `injury_flags` (neck, shoulder, upper_back, lower_back, wrist, hip, knee,
+  ankle) are removed by the SQL in `app/mcp_server/search.py: search_exercises`, which both the MCP tool and the
+  plan generator use. The one list lives in `app/safety_rules.py: INJURY_FLAGS`; the quiz, the seed, the MCP tool
+  and the PT's tagging template all follow it.
+- **neck, upper_back and hip were added 2026-10-23, and drafted across every hand-authored exercise**, not just
+  added as checkboxes: an exercise marked `draft` has been considered for every flag on the list, so adding a flag
+  means drafting its tags (and their `ai_drafted` reasons) on all of them. Twelve exercises got new cautions (for
+  example hip on squats, lunges and jumping; neck on crunches and Cat-Cow; upper back on rows and Superman Hold),
+  all pending PT review like the rest. Test: `tests/test_new_injury_flags.py` (quiz -> stored flag -> checked_only
+  -> tagged exercises out of the plan, the Workout Builder's search and the MCP tool).
 - Most exercises have no injury tags yet (`untagged`). Untagged exercises always carry
   `injury_check: "not_yet_checked"` and must never be described as safe.
 - **DECIDED (2026-10-22, project owner): users with an injury flag only ever get exercises that have

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { deleteAccount, fetchAccount, isSignInGone, type Account } from '../api'
+import { deleteAccount, fetchAccount, isSignInGone, resetQuiz, type Account } from '../api'
 import AccountForm from '../components/AccountForm'
 import CalendarModeChooser from '../components/CalendarModeChooser'
 import { PrivacyNote } from '../components/Legal'
@@ -13,6 +13,9 @@ export default function SettingsPage() {
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deletedSummary, setDeletedSummary] = useState<Record<string, number> | null>(null)
+  const [confirmingReset, setConfirmingReset] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [resetDone, setResetDone] = useState(false)
 
   useEffect(() => {
     if (!session) return
@@ -28,6 +31,23 @@ export default function SettingsPage() {
       cancelled = true
     }
   }, [session])
+
+  async function resetMyQuiz() {
+    if (!session) return
+    setResetting(true)
+    setError(null)
+    try {
+      await resetQuiz(session.userId, session.token)
+      setAccount(await fetchAccount(session.userId, session.token))
+      setConfirmingReset(false)
+      setResetDone(true)
+    } catch (e) {
+      if (isSignInGone(e)) setSession(null)
+      setError((e as Error).message)
+    } finally {
+      setResetting(false)
+    }
+  }
 
   async function deleteEverything() {
     if (!session) return
@@ -91,19 +111,63 @@ export default function SettingsPage() {
             <strong>Member since:</strong> {new Date(account.created_at).toLocaleDateString()}
           </p>
         )}
+        <button className="btn-secondary" onClick={() => setSession(null)}>
+          Sign out
+        </button>
+      </section>
+
+      <section className="settings-section" aria-labelledby="quiz-settings-title">
+        <h3 id="quiz-settings-title">Your quiz</h3>
+        {resetDone && !profile && (
+          <p className="success" role="status">
+            Your quiz is reset. You have no plan now; take the quiz again whenever you're ready.
+          </p>
+        )}
         {profile ? (
           <p>
             <strong>Quiz:</strong> completed. Medical disclaimer accepted{' '}
             {new Date(profile.consent_accepted_at).toLocaleString()}.
           </p>
         ) : (
-          <p>
-            <strong>Quiz:</strong> not taken yet. <Link to="/quiz">Take the quiz</Link>
+          account && (
+            <p>
+              <strong>Quiz:</strong> not taken yet.
+            </p>
+          )
+        )}
+        <div className="button-row">
+          <Link to="/quiz" className="btn">
+            {profile ? 'Retake the quiz' : 'Take the quiz'}
+          </Link>
+          {profile && !confirmingReset && (
+            <button className="btn-secondary" onClick={() => setConfirmingReset(true)}>
+              Reset my quiz
+            </button>
+          )}
+        </div>
+        {profile && (
+          <p className="hint">
+            Retaking gives you a fresh plan and four new weeks on your calendar. Resetting clears your answers so you
+            have no plan until you take the quiz again.
           </p>
         )}
-        <button className="btn-secondary" onClick={() => setSession(null)}>
-          Sign out
-        </button>
+        {profile && confirmingReset && (
+          <div className="confirm-box" role="alertdialog" aria-label="Confirm quiz reset">
+            <p>
+              <strong>Reset your quiz?</strong> Your answers and your plan are cleared, along with the planned days
+              on your calendar that you haven't done or written on. Days you finished, your notes, days you built
+              yourself, your logs and your favorites all stay.
+            </p>
+            <div className="button-row">
+              <button className="btn-secondary" onClick={() => setConfirmingReset(false)} disabled={resetting}>
+                Cancel
+              </button>
+              <button className="btn-danger" onClick={resetMyQuiz} disabled={resetting}>
+                {resetting ? 'Resetting…' : 'Yes, reset my quiz'}
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       {profile && !profile.needs_clinical_review && (

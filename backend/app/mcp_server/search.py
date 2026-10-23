@@ -11,16 +11,17 @@ described as safe.
 import json
 import re
 import sqlite3
-from typing import Literal
+from typing import Literal, get_args
 
 from app.content import REVIEW_NOTICE
 from app.db import connect_readonly
+from app.safety_rules import INJURY_FLAGS
 
 MuscleGroup = Literal["legs", "arms", "chest", "shoulders", "back", "core", "full_body"]
-InjuryFlag = Literal["lower_back", "knee", "shoulder", "wrist", "ankle"]
+InjuryFlag = Literal["neck", "shoulder", "upper_back", "lower_back", "wrist", "hip", "knee", "ankle"]
 
 MUSCLE_GROUPS = ("legs", "arms", "chest", "shoulders", "back", "core", "full_body")
-INJURY_FLAGS = ("lower_back", "knee", "shoulder", "wrist", "ankle")
+assert set(get_args(InjuryFlag)) == set(INJURY_FLAGS), "InjuryFlag must match safety_rules.INJURY_FLAGS"
 MAX_LIMIT = 50
 
 # Callers (an LLM) may use natural names; map them onto the equipment values stored in the database.

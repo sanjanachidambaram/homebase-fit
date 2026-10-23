@@ -4,7 +4,7 @@
 # difficulty: beginner | intermediate | advanced
 # force: push | pull | static (optional; free-exercise-db's movement direction). Push plan days never
 #   get pull moves and Pull days never get push moves. Leave it out for moves with no single direction.
-# injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder | wrist | ankle).
+# injury_contraindications: injuries this exercise is UNSAFE for (neck | shoulder | upper_back | lower_back | wrist | hip | knee | ankle).
 #   The app filters these out in code, so be conservative.
 # injury_rationale: one entry per tag above, {reasoning, tier, source}. reasoning = why the exercise is commonly
 #   avoided with that injury (general exercise-science reasoning, never an invented citation). tier: ai_drafted

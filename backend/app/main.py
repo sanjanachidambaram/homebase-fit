@@ -15,7 +15,7 @@ import json
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -49,6 +49,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# The old combined "Your Plan & Basics" page lived at /content, which is also the media mount below, so visiting it directly
+# got a 404. Send the bare path to the plan page; media under /content/... is unaffected.
+@app.get("/content", include_in_schema=False)
+def old_plan_page() -> RedirectResponse:
+    return RedirectResponse("/plan", status_code=301)
+
 
 # Demo images etc. DB media paths are project-relative ("content/..."), so the URL is "/" + path.
 app.mount("/content", StaticFiles(directory=CONTENT_DIR), name="content")

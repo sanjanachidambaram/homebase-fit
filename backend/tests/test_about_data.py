@@ -23,8 +23,8 @@ def test_summary_matches_the_database(client):
     assert {s["id"]: s["count"] for s in ex["by_source"]} == {"free-exercise-db": 876, "placeholder-authored": 27}
     assert sum(s["count"] for s in ex["by_source"]) == ex["total"]
     assert ex["injury_checked"] + ex["injury_unchecked"] == ex["total"]
-    assert (ex["injury_checked"], ex["with_cautions"], ex["cautions"]) == (27, 17, 30)
-    assert (ex["reasons_ai_drafted"], ex["reasons_pt_reviewed"], ex["injury_pt_reviewed"]) == (30, 0, 0)
+    assert (ex["injury_checked"], ex["with_cautions"], ex["cautions"]) == (27, 18, 44)
+    assert (ex["reasons_ai_drafted"], ex["reasons_pt_reviewed"], ex["injury_pt_reviewed"]) == (44, 0, 0)
     assert d["protocols"] == {"total": 15, "placeholder": 15, "with_citations": 0}
     assert d["basics_articles"] == {"total": 5, "placeholder": 5}
 
@@ -38,4 +38,4 @@ def test_summary_follows_the_data(client):
                      "WHERE id = '3_4_Sit-Up'")
     conn.close()
     ex = client.get("/api/data-summary").json()["exercises"]
-    assert (ex["injury_checked"], ex["with_cautions"], ex["cautions"], ex["reasons_ai_drafted"]) == (28, 18, 31, 31)
+    assert (ex["injury_checked"], ex["with_cautions"], ex["cautions"], ex["reasons_ai_drafted"]) == (28, 19, 45, 45)

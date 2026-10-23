@@ -1,15 +1,16 @@
-import { type JSX } from 'react'
+import { useLayoutEffect, type JSX } from 'react'
 import { DisclaimerBar } from './components/Legal'
 import Link from './components/Link'
 import AboutDataPage from './pages/AboutDataPage'
 import AboutPage from './pages/AboutPage'
+import BasicsPage from './pages/BasicsPage'
 import BuildPage from './pages/BuildPage'
 import CalendarPage from './pages/CalendarPage'
-import ContentPage from './pages/ContentPage'
 import DashboardPage from './pages/DashboardPage'
 import ExercisesPage from './pages/ExercisesPage'
 import HowWeBuildPage from './pages/HowWeBuildPage'
 import LegalPage from './pages/LegalPage'
+import PlanPage from './pages/PlanPage'
 import PlanReviewPage from './pages/PlanReviewPage'
 import PregnancySupportPage from './pages/PregnancySupportPage'
 import QuizPage from './pages/QuizPage'
@@ -17,9 +18,20 @@ import SettingsPage from './pages/SettingsPage'
 import { usePath, useScrollToTopOnRouteChange } from './router'
 import './App.css'
 
+/** An old address that moved: swap it in the address bar, so Back doesn't bounce. */
+function Moved({ to }: { to: string }) {
+  useLayoutEffect(() => {
+    window.history.replaceState({}, '', to)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }, [to])
+  return <></>
+}
+
 const PAGES: Record<string, () => JSX.Element> = {
   '/': DashboardPage,
-  '/content': ContentPage,
+  '/plan': PlanPage, // "Your Personalized Plan": the generated week only
+  '/basics': BasicsPage, // the Fitness Basics articles and Ask the Basics
+  '/content': () => <Moved to="/plan" />, // the old combined "Your Plan & Basics" page (2026-10-23)
   '/build': BuildPage,
   '/calendar': CalendarPage,
   '/faves': () => <ExercisesPage initialTab="faves" />,
@@ -30,18 +42,20 @@ const PAGES: Record<string, () => JSX.Element> = {
   '/about': AboutPage, // public; Sanjana's essay (verbatim), her class-project disclaimer, the team
   '/about/data': AboutDataPage, // public; live data figures and every source (linked from About and the footer)
   '/plan/review': PlanReviewPage, // review mode: swap exercises before the plan goes on the calendar
-  '/how-we-build': HowWeBuildPage, // public; linked from the plan on the Dashboard and Your Plan page
+  '/how-we-build': HowWeBuildPage, // public; linked from the plan on the Dashboard and Your Personalized Plan
   '/pregnancy-support': PregnancySupportPage, // pregnant / postpartum users are sent here (quiz, Dashboard, blocks)
 }
 
 // Only pages that exist get a nav link.
-// About sits right after Dashboard. My Faves lives inside the Exercise Library (a subtab), not in the nav.
+// About sits right after Dashboard, and Calendar right after Build Your Own. My Faves lives inside the Exercise
+// Library (a subtab), not in the nav.
 const NAV: { path: string; label: string; also?: (path: string) => boolean }[] = [
   { path: '/', label: 'Dashboard' },
   { path: '/about', label: 'About', also: (p) => p.startsWith('/about/') },
-  { path: '/content', label: 'Your Plan & Basics' },
-  { path: '/calendar', label: 'Calendar' },
+  { path: '/plan', label: 'Your Personalized Plan', also: (p) => p === '/plan/review' },
+  { path: '/basics', label: 'Basics' },
   { path: '/build', label: 'Build Your Own' },
+  { path: '/calendar', label: 'Calendar' },
   { path: '/exercises', label: 'Exercise Library', also: (p) => p === '/faves' },
   { path: '/settings', label: 'Settings' },
 ]

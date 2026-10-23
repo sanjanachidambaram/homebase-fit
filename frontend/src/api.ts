@@ -153,6 +153,8 @@ export interface QuizQuestion {
   unit?: string
   min?: number
   max?: number
+  /** number questions: 'feet_inches' asks in feet + inches; the answer is still total inches */
+  input?: 'feet_inches'
   /** goal_weight: gentle note when the goal implies losing faster than max_lbs_per_week (never a block) */
   rate_note?: { max_lbs_per_week: number; text: string; source: string }
 }
@@ -259,6 +261,10 @@ export function submitQuiz(
 ) {
   return request<QuizProfile>(`/api/users/${userId}/quiz-profile`, { method: 'PUT', body: JSON.stringify(body) }, token)
 }
+
+/** "Reset my quiz": back to no plan, without retaking now. Completed days, notes, logs and favorites are kept. */
+export const resetQuiz = (userId: number, token: string) =>
+  request<{ reset: boolean; calendar_days_cleared: number }>(`/api/users/${userId}/quiz-profile`, { method: 'DELETE' }, token)
 
 export const deleteAccount = (userId: number, token: string) =>
   request<{ deleted: boolean; rows_removed: Record<string, number> }>(`/api/users/${userId}`, { method: 'DELETE' }, token)

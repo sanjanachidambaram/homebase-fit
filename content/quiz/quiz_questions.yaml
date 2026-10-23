@@ -14,6 +14,8 @@
 #   exclusive        (multi_select, optional) a value that clears all others, e.g. "none"
 #   allow_free_text  (optional) also show a text box under the options (stored, never sent to the AI)
 #   unit, min, max   (number types, optional)
+#   input            (number types, optional) feet_inches = ask in feet + inches; the answer is still stored
+#                    in inches, and min/max are in inches
 #   required         true/false
 #   health           true = health/injury question. Only shown AFTER the user accepts the medical
 #                    disclaimer, so keep this flag on every health question.
@@ -21,7 +23,7 @@
 # Values the program generator relies on (app/services/program_generator.py):
 #   goals:            weight_loss | strength | tone | rehab | general_health (must match goal_protocols.yaml)
 #   experience_level: beginner | intermediate | advanced
-#   injuries:         lower_back | knee | shoulder | wrist | ankle (must match exercise injury tags)
+#   injuries:         neck | shoulder | upper_back | lower_back | wrist | hip | knee | ankle (must match exercise injury tags)
 #   equipment:        bodyweight | dumbbells | resistance_band | mat | bench | pull_up_bar | kettlebells | full_gym
 
 questions:
@@ -118,10 +120,13 @@ questions:
     allow_free_text: true
     free_text_prompt: Anything else we should know? (optional)
     options:
-      - { value: lower_back, label: Lower back }
-      - { value: knee,       label: Knee }
+      - { value: neck,       label: Neck }
       - { value: shoulder,   label: Shoulder }
+      - { value: upper_back, label: Upper back }
+      - { value: lower_back, label: Lower back }
       - { value: wrist,      label: Wrist }
+      - { value: hip,        label: Hip }
+      - { value: knee,       label: Knee }
       - { value: ankle,      label: Ankle }
       - { value: none,       label: None }
 
@@ -162,6 +167,7 @@ questions:
     prompt: How tall are you?
     type: number
     unit: in
+    input: feet_inches
     min: 48
     max: 90
     required: true

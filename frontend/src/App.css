@@ -857,6 +857,10 @@ fieldset.question {
   max-width: 10rem;
 }
 
+.number-row input.short {
+  max-width: 5.5rem;
+}
+
 .unit {
   font-weight: 700;
   color: var(--ink-soft);
@@ -1187,17 +1191,38 @@ fieldset.question {
 
 /* Ask the Basics */
 .ask-card {
+  grid-column: 1 / -1; /* full width on the Dashboard, so there's room to type a real question */
   border-top: 8px solid var(--lavender);
 }
 
 .ask-form {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  align-items: flex-end;
 }
 
-.ask-form input {
+.ask-form textarea {
   flex: 1;
   min-width: 0;
+  min-height: 4.5rem;
+  padding: 0.7rem 0.9rem;
+  border: 2px solid var(--lavender);
+  border-radius: var(--radius-input);
+  background: #fff;
+  font: inherit;
+  font-size: 1.05rem;
+  resize: vertical;
+}
+
+.ask-form textarea:focus {
+  border-color: var(--pink-deep);
+}
+
+@media (max-width: 560px) {
+  .ask-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .answer {

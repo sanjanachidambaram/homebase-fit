@@ -60,7 +60,7 @@ export default function PlanCard({ token, userId }: { token: string; userId: num
           {rec.review_note && <p className="pending-note">{rec.review_note}</p>}
           <WeeklyPlanView plan={rec.plan} startOpen={false} />
           <div className="button-row">
-            <Link to="/content" className="btn">
+            <Link to="/plan" className="btn">
               Open my full plan
             </Link>
             <Link to="/how-we-build" className="btn-ghost">

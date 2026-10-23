@@ -56,7 +56,7 @@ sources:
     name: "CDC: Losing Weight"
     url: https://www.cdc.gov/healthy-weight-growth/losing-weight/index.html
     license: U.S. government work (public domain)
-    used_for: The quiz note that losing about 1 to 2 pounds a week is more sustainable, and the same context next to the Workout Reviewer's weight-change estimate
+    used_for: The quiz note that losing about 1 to 2 pounds a week is more sustainable, and the same context next to the Workout Reviewer's weight-change estimate, and the "Tracking Weight Loss" Basics article
     status: active
 
   - id: acog-co-804

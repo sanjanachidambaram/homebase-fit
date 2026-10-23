@@ -4,7 +4,7 @@
 # difficulty: beginner | intermediate | advanced
 # force: push | pull | static (optional; free-exercise-db's movement direction). Push plan days never
 #   get pull moves and Pull days never get push moves. Leave it out for moves with no single direction.
-# injury_contraindications: injuries this exercise is UNSAFE for (lower_back | knee | shoulder | wrist | ankle).
+# injury_contraindications: injuries this exercise is UNSAFE for (neck | shoulder | upper_back | lower_back | wrist | hip | knee | ankle).
 #   The app filters these out in code, so be conservative.
 # injury_rationale: one entry per tag above, {reasoning, tier, source}. reasoning = why the exercise is commonly
 #   avoided with that injury (general exercise-science reasoning, never an invented citation). tier: ai_drafted
@@ -38,10 +38,14 @@ exercises:
     equipment_needed: [mat]
     difficulty: beginner
     force: static
-    injury_contraindications: [wrist]
+    injury_contraindications: [neck, wrist]
     injury_rationale:
       wrist:
         reasoning: "You stay on your hands and knees for the whole movement, with the wrists bent back and bearing weight, which can irritate a sore wrist."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      neck:
+        reasoning: "Cat-Cow moves the neck through its full range, tucking the chin and then lifting the head, which can aggravate a sore or stiff neck."
         tier: ai_drafted
         source: Pending review by a licensed physical therapist
     est_time_seconds: 45
@@ -59,10 +63,14 @@ exercises:
     equipment_needed: [mat]
     difficulty: beginner
     force: pull
-    injury_contraindications: [lower_back]
+    injury_contraindications: [neck, lower_back]
     injury_rationale:
       lower_back:
         reasoning: "Crunches repeatedly curl the spine forward. Many people with a sensitive lower back find repeated forward bending makes it worse."
+        tier: ai_drafted
+        source: Pending review by a licensed physical therapist
+      neck:
+        reasoning: "People often pull on the head or tuck the chin hard during crunches, which bends and strains the neck."
         tier: ai_drafted
         source: Pending review by a licensed physical therapist
     est_time_seconds: 45

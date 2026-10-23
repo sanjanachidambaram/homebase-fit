@@ -6,6 +6,7 @@ Routes:
   GET    /api/quiz/questions              the quiz (public)
   GET    /api/users/{id}                  account + quiz profile (own account only)
   PUT    /api/users/{id}/quiz-profile     save quiz answers; REQUIRES consent_accepted = true
+  DELETE /api/users/{id}/quiz-profile     "Reset my quiz": clear the answers and untouched planned days
   DELETE /api/users/{id}                  permanently delete the user and ALL their data
 """
 
@@ -262,3 +263,22 @@ def save_quiz(user_id: int, body: QuizSubmission, uid: int = Depends(token_user_
         log.exception("Calendar materialization failed after saving the quiz for user %s", user_id)
     row = conn.execute("SELECT * FROM quiz_profiles WHERE user_id = ?", (user_id,)).fetchone()
     return profile_dict(row)
+
+
+@router.delete("/users/{user_id}/quiz-profile")
+def reset_quiz(user_id: int, uid: int = Depends(token_user_id), conn: sqlite3.Connection = Depends(db)) -> dict:
+    """Reset my quiz: back to the no-plan state without retaking it now. Deletes the quiz answers (and the consent
+    record that came with them; retaking asks for the disclaimer again) and the planned calendar days that nobody
+    touched, from today on: the same days a retake would replace. Kept: the account, completed days, days with
+    notes, days you built yourself, past days, workout logs, cardio logs, measurements, and favorites."""
+    require_same_user(user_id, uid)
+    if not conn.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone():
+        raise HTTPException(404, "Account not found.")
+    from app.calendar import today as calendar_today   # local import: calendar imports this module's db helpers
+    with conn:
+        profile = conn.execute("DELETE FROM quiz_profiles WHERE user_id = ?", (user_id,)).rowcount
+        days = conn.execute(
+            "DELETE FROM calendar_entries WHERE user_id = ? AND date >= ? AND completed = 0 "
+            "AND (notes IS NULL OR TRIM(notes) = '') AND source = 'generated'",
+            (user_id, calendar_today().isoformat())).rowcount
+    return {"reset": bool(profile), "calendar_days_cleared": days}

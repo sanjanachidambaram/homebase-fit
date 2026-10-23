@@ -94,7 +94,7 @@ export default function AboutPage() {
             actually find a workout app that works for your body.
           </li>
           <li>
-            I'm also broke now, and these pilates studios will deadass look you in the eye with and tell you that their
+            I'm also broke now, and these pilates studios will deadass look you in the eye and tell you that their
             classes are $55/session. In this economy????
           </li>
           <li>
