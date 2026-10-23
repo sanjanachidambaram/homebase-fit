@@ -1,5 +1,6 @@
 // About: Sanjana's essay, verbatim (her voice, her caps, her typos; please don't "clean it up"), with her own
-// "HUGE disclaimer" paragraph styled as the page's disclaimer box, then the team photos.
+// "HUGE disclaimer" paragraph styled as the page's disclaimer box. The team photos come first, by design; the
+// site-wide footer disclaimer and /legal carry the full medical disclaimer regardless of this page's layout.
 // The live data and sources section lives on its own page now: /about/data (AboutDataPage.tsx).
 import { useState } from 'react'
 import Link from '../components/Link'
@@ -42,6 +43,18 @@ export default function AboutPage() {
   return (
     <article className="about">
       <h2 className="page-title">About HomeBase Fit</h2>
+
+      <section className="about-section about-team" aria-label="The team">
+        <ul className="team-grid">
+          {TEAM.map((t) => (
+            <li key={t.file} className="team-card">
+              <TeamPhoto file={t.file} name={t.name} />
+              <strong className="team-name">{t.caption}</strong>
+            </li>
+          ))}
+        </ul>
+      </section>
+
 
       <div className="about-essay">
         <p>
@@ -135,16 +148,6 @@ export default function AboutPage() {
         <Link to="/about/data">Curious where our data comes from? See the live numbers and every source we use →</Link>
       </p>
 
-      <section className="about-section" aria-label="The team">
-        <ul className="team-grid">
-          {TEAM.map((t) => (
-            <li key={t.file} className="team-card">
-              <TeamPhoto file={t.file} name={t.name} />
-              <strong className="team-name">{t.caption}</strong>
-            </li>
-          ))}
-        </ul>
-      </section>
     </article>
   )
 }

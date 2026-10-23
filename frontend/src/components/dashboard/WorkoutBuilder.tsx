@@ -11,6 +11,7 @@ import {
   type WorkoutSession,
 } from '../../api'
 import { agentError } from '../../agentCalls'
+import { useEquipmentOptions } from '../../equipment'
 import { useFavorites } from '../../favorites'
 import ExerciseDetail from '../ExerciseDetail'
 import ReviewWorkout from '../WorkoutReview'
@@ -18,14 +19,6 @@ import Loading from './Loading'
 
 const MAX_PER_GROUP = 6
 const MAX_TOTAL = 12
-const EQUIPMENT: { value: string; label: string }[] = [
-  { value: 'mat', label: 'Mat' },
-  { value: 'dumbbells', label: 'Dumbbells' },
-  { value: 'resistance_band', label: 'Resistance band' },
-  { value: 'chair', label: 'Sturdy chair' },
-  { value: 'bench', label: 'Bench' },
-  { value: 'kettlebells', label: 'Kettlebell' },
-]
 const GROUPS = Object.keys(MUSCLE_GROUP_LABELS) as MuscleGroup[]
 
 export default function WorkoutBuilder({
@@ -47,10 +40,13 @@ export default function WorkoutBuilder({
   const favorites = useFavorites()
   const titleId = useId()
   const [picks, setPicks] = useState<Record<MuscleGroup, number>>(
-    () => Object.fromEntries(GROUPS.map((g) => [g, g === 'legs' || g === 'core' ? 2 : 0])) as Record<MuscleGroup, number>,
+    // Every muscle group starts at 0 (legs and core used to start at 2, a leftover sample default).
+    () => Object.fromEntries(GROUPS.map((g) => [g, 0])) as Record<MuscleGroup, number>,
   )
   const [minutes, setMinutes] = useState(25)
-  const [equipment, setEquipment] = useState<string[]>(['mat'])
+  const [equipment, setEquipment] = useState<string[]>([])
+  // The equipment chips come from the exercises themselves (GET /api/exercises/equipment), never a typed list.
+  const equipmentOptions = useEquipmentOptions()
   const [session, setSession] = useState<WorkoutSession | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -127,21 +123,31 @@ export default function WorkoutBuilder({
 
           <fieldset className="equipment">
             <legend>What do you have at home?</legend>
-            <div className="chip-row">
-              {EQUIPMENT.map((eq) => (
-                <label key={eq.value} className={`chip-check${equipment.includes(eq.value) ? ' chip-on' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={equipment.includes(eq.value)}
-                    onChange={(e) =>
-                      setEquipment((cur) => (e.target.checked ? [...cur, eq.value] : cur.filter((x) => x !== eq.value)))
-                    }
-                  />
-                  {eq.label}
-                </label>
-              ))}
+            {equipmentOptions === null && <p className="hint">Loading equipment…</p>}
+            {equipmentOptions?.length === 0 && <p className="hint">Couldn't load the equipment list. Try reloading.</p>}
+            <div className="chip-row" data-testid="equipment-picker">
+              {equipmentOptions?.map((eq) =>
+                eq.always_included ? (
+                  <label key={eq.value} className="chip-check chip-on chip-locked" title="Bodyweight moves are always included">
+                    <input type="checkbox" checked disabled value={eq.value} />
+                    {eq.label} (always)
+                  </label>
+                ) : (
+                  <label key={eq.value} className={`chip-check${equipment.includes(eq.value) ? ' chip-on' : ''}`}>
+                    <input
+                      type="checkbox"
+                      value={eq.value}
+                      checked={equipment.includes(eq.value)}
+                      onChange={(e) =>
+                        setEquipment((cur) => (e.target.checked ? [...cur, eq.value] : cur.filter((x) => x !== eq.value)))
+                      }
+                    />
+                    {eq.label}
+                  </label>
+                ),
+              )}
             </div>
-            <p className="hint">Bodyweight moves are always included.</p>
+            <p className="hint">Bodyweight moves are always included. The list is every piece of equipment our exercises use.</p>
           </fieldset>
 
           <button type="submit" className="btn btn-big" disabled={loading || total === 0}>

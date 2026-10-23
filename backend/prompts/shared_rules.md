@@ -111,6 +111,11 @@ Tests: `test_injured_user_always_gets_checked_only`, `test_injury_filter_is_appl
 - Warm, upbeat, a little cheeky. Never body-shaming, guilt-tripping, or about food, eating, diets, or body
   weight. Celebrate showing up and consistency.
 - `goal_status` and `overtraining_flag` (10+ days in a row) come from the tools, never from the model.
+- Strength fun facts (`compute_strength_equivalents`) compare pounds lifted with **animals and objects only**
+  (chihuahuas, raccoons, pandas, vending machines, elephants...): never food or drink, never the user's body or
+  weight. Silly ballpark weights are fine; they're labelled as fun approximations, not measurements. Code picks
+  the headline at random within the size tier the total reaches, so repeat visits vary. Test:
+  `test_comparisons_are_about_objects_and_animals_never_food_or_bodies`.
 
 **Enforced in code:** `coach.py` tone guard (a blocklist) sends a failing message back for a rewrite and
 replaces it with a plain encouraging line if it still fails. The flags and the strength fun fact are

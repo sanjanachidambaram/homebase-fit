@@ -89,6 +89,16 @@ export function fetchExercises(filters: ExerciseFilters): Promise<Exercise[]> {
   return getJson<Exercise[]>(`/api/exercises${exerciseQuery(filters)}`)
 }
 
+/** Every equipment value used by any exercise (GET /api/exercises/equipment), so pickers never drift from the data. */
+export interface EquipmentOption {
+  value: string
+  label: string
+  exercises: number
+  always_included: boolean // bodyweight ("none"): always in, nothing to pick
+}
+
+export const fetchEquipment = () => getJson<EquipmentOption[]>('/api/exercises/equipment')
+
 export const fetchExercise = (id: string) => getJson<Exercise>(`/api/exercises/${encodeURIComponent(id)}`)
 
 /** Live counts for the About page (GET /api/data-summary), so its numbers never go stale. */

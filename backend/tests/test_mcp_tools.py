@@ -280,8 +280,9 @@ def test_streak_rules(test_db):
 def test_strength_equivalents(test_db):
     zero = call("compute_strength_equivalents", total_weight_lifted_lbs=0)
     assert zero["headline"] is None and zero["comparisons"] == []
-    assert call("compute_strength_equivalents", total_weight_lifted_lbs=8)["headline"].startswith(
-        "You've lifted 0.50 of a bowling ball")
+    # below the smallest comparison (2026-10-23: a 5 lb chihuahua, previously a 16 lb bowling ball): a fraction of one
+    assert call("compute_strength_equivalents", total_weight_lifted_lbs=3)["headline"].startswith(
+        "You've lifted 0.60 of a chihuahua")
     cars = call("compute_strength_equivalents", total_weight_lifted_lbs=4354 * 3)
     by_name = {c["name"]: c for c in cars["comparisons"]}
     assert by_name["full-size cars"]["count"] == 3.0

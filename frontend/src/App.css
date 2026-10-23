@@ -2405,3 +2405,360 @@ fieldset.question {
 .team-card .team-name {
   margin-top: 0.4rem;
 }
+
+/* ================================================================ Landing page (signed-out "/")
+   The most animated page (design.md 6). Every animation here is stilled by the global prefers-reduced-motion rule
+   in index.css, and the Reveal component shows content at once when motion is reduced. */
+.landing {
+  display: grid;
+  gap: 2rem;
+}
+
+.landing-hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(2.5rem, 7vw, 5rem) clamp(1.25rem, 5vw, 3.5rem);
+  border-radius: 32px;
+  background: linear-gradient(135deg, var(--pink-tint), var(--lavender-tint) 55%, var(--mint-tint));
+  text-align: center;
+  isolation: isolate;
+}
+
+.landing-kicker {
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--pink-deep);
+  animation: rise-in 0.7s ease-out both;
+}
+
+.landing-title {
+  margin: 0.4rem 0 0.6rem;
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 10vw, 6rem);
+  line-height: 1;
+  animation: rise-in 0.8s 0.1s ease-out both;
+}
+
+.landing-title-pop {
+  display: inline-block;
+  color: var(--pink);
+  animation: wiggle 3.5s 1.2s ease-in-out infinite;
+}
+
+.landing-pitch {
+  max-width: 34rem;
+  margin: 0 auto 1.6rem;
+  font-size: clamp(1.2rem, 3vw, 1.6rem);
+  font-weight: 700;
+  animation: rise-in 0.8s 0.25s ease-out both;
+}
+
+.landing-cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  animation: rise-in 0.8s 0.4s ease-out both;
+}
+
+.landing-shapes {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.shape {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.55;
+  animation: float 9s ease-in-out infinite;
+}
+
+.shape-1 { width: 220px; height: 220px; left: -60px; top: -70px; background: var(--pink); }
+.shape-2 { width: 140px; height: 140px; right: -30px; bottom: -40px; background: var(--mint); animation-delay: -3s; }
+.shape-3 { width: 80px; height: 80px; right: 12%; top: 14%; background: var(--yellow); animation-delay: -5s; }
+.shape-4 { width: 110px; height: 110px; left: 10%; bottom: -30px; background: var(--lavender); animation-delay: -7s; }
+
+.sparkle {
+  position: absolute;
+  color: #fff;
+  font-size: 1.6rem;
+  animation: twinkle 2.8s ease-in-out infinite;
+}
+
+.sparkle-1 { left: 18%; top: 22%; }
+.sparkle-2 { right: 22%; top: 48%; animation-delay: -1s; }
+.sparkle-3 { left: 42%; bottom: 12%; animation-delay: -2s; }
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(14px, -18px) scale(1.06); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.8) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.15) rotate(20deg); }
+}
+
+@keyframes wiggle {
+  0%, 85%, 100% { transform: rotate(0deg); }
+  90% { transform: rotate(-6deg); }
+  95% { transform: rotate(5deg); }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes slide-day {
+  0%, 15% { left: calc(0 * 100% / 7); }
+  35%, 55% { left: calc(2 * 100% / 7); }
+  75%, 100% { left: calc(4 * 100% / 7); }
+}
+
+/* Scroll reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.landing-video .video-slot,
+.video-slot {
+  display: block;
+  width: 100%;
+  max-width: 52rem;
+  margin: 0 auto;
+  aspect-ratio: 16 / 9;
+  border-radius: 24px;
+  background: #000;
+}
+
+.landing-video .video-placeholder,
+.video-slot.video-placeholder {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.4rem;
+  background: var(--lavender-tint);
+  border: 2px dashed var(--lavender-deep);
+}
+
+.video-slot.video-placeholder span {
+  font-size: 2.6rem;
+}
+
+.video-slot.video-placeholder p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.landing-highlights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));   /* four highlights: a tidy 2 x 2 */
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .landing-highlights {
+    grid-template-columns: 1fr;
+  }
+}
+
+.highlight {
+  padding: 1.2rem 1.2rem 1rem;
+  border-radius: 24px;
+  background: #fff;
+  border: 2px solid var(--lavender);
+  box-shadow: 0 10px 26px rgba(58, 33, 71, 0.07);
+}
+
+.highlight:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(58, 33, 71, 0.12);
+}
+
+.highlight h3 {
+  margin: 0 0 0.8rem;
+  font-size: 1.2rem;
+}
+
+.preview-caption {
+  margin: 0.8rem 0 0;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.preview-caption a {
+  color: var(--pink-deep);
+  font-weight: 800;
+}
+
+.preview-skeleton {
+  height: 5.5rem;
+  border-radius: 16px;
+  background: linear-gradient(90deg, var(--lavender-tint), #fff, var(--lavender-tint));
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes shimmer {
+  to { background-position: -200% 0; }
+}
+
+.mini-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mini-week li {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  padding: 0.5rem 0.1rem;
+  border-radius: 12px;
+  font-weight: 800;
+  animation: pop-in 0.45s ease-out both;
+}
+
+.mini-week small {
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.mini-train {
+  background: var(--mint-tint);
+  border: 2px solid var(--mint-deep);
+}
+
+.mini-rest {
+  background: var(--lavender-tint);
+}
+
+.mini-cal {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.3rem;
+  height: 5.5rem;
+}
+
+.mini-cal-day {
+  border-radius: 12px;
+  background: var(--lavender-tint);
+  border: 2px dashed var(--lavender);
+  padding: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.mini-cal-card {
+  position: absolute;
+  bottom: 0.4rem;
+  width: calc(100% / 7 * 1.6);
+  padding: 0.35rem 0.4rem;
+  border-radius: 10px;
+  background: var(--pink);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-align: center;
+  box-shadow: 0 6px 14px rgba(224, 0, 107, 0.3);
+  animation: slide-day 6s ease-in-out infinite;
+}
+
+.mini-funnel {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mini-funnel li {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.mini-funnel-bar {
+  display: block;
+  height: 0.6rem;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--pink), var(--lavender-deep));
+  transform-origin: left;
+  animation: grow 0.9s ease-out both;
+}
+
+.mini-funnel small {
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.mini-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+  text-align: center;
+}
+
+.mini-stats div {
+  padding: 0.6rem 0.2rem;
+  border-radius: 14px;
+  background: var(--pink-tint);
+}
+
+.mini-stats strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+}
+
+.mini-stats small {
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.landing-join {
+  max-width: 36rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+  border-radius: 28px;
+  background: #fff;
+  border: 3px solid var(--pink);
+  scroll-margin-top: 6rem;
+}
+
+.landing-join h3 {
+  margin-top: 0;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+/* Build Your Own: bodyweight is always on */
+.chip-locked {
+  opacity: 0.85;
+  cursor: default;
+}

@@ -13,7 +13,7 @@ import LegalPage from './pages/LegalPage'
 import PregnancySupportPage from './pages/PregnancySupportPage'
 import QuizPage from './pages/QuizPage'
 import SettingsPage from './pages/SettingsPage'
-import { usePath } from './router'
+import { usePath, useScrollToTopOnRouteChange } from './router'
 import './App.css'
 
 const PAGES: Record<string, () => JSX.Element> = {
@@ -33,19 +33,21 @@ const PAGES: Record<string, () => JSX.Element> = {
 }
 
 // Only pages that exist get a nav link.
-const NAV: { path: string; label: string }[] = [
+// About sits right after Dashboard. My Faves lives inside the Exercise Library (a subtab), not in the nav.
+const NAV: { path: string; label: string; also?: (path: string) => boolean }[] = [
   { path: '/', label: 'Dashboard' },
+  { path: '/about', label: 'About', also: (p) => p.startsWith('/about/') },
   { path: '/content', label: 'Your Plan & Basics' },
   { path: '/calendar', label: 'Calendar' },
   { path: '/build', label: 'Build Your Own' },
-  { path: '/faves', label: 'My Faves' },
-  { path: '/exercises', label: 'Exercise Library' },
+  { path: '/exercises', label: 'Exercise Library', also: (p) => p === '/faves' },
   { path: '/settings', label: 'Settings' },
-  { path: '/about', label: 'About' },
 ]
+
 
 export default function App() {
   const path = usePath()
+  useScrollToTopOnRouteChange(path)
 
   const Page = PAGES[path]
 
@@ -66,7 +68,7 @@ export default function App() {
               <Link
                 key={p.path}
                 to={p.path}
-                className={p.path === path || (p.path === '/about' && path.startsWith('/about/')) ? 'nav-link active' : 'nav-link'}
+                className={p.path === path || p.also?.(path) ? 'nav-link active' : 'nav-link'}
               >
                 {p.label}
               </Link>

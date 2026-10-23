@@ -10,6 +10,7 @@ import DemoMedia from '../components/DemoMedia'
 import ExerciseDetail from '../components/ExerciseDetail'
 import FavoriteButton from '../components/FavoriteButton'
 import Link from '../components/Link'
+import { useEquipmentOptions } from '../equipment'
 import { useFavorites, type Favorites } from '../favorites'
 import { INJURY_STATUS_OPTIONS, injuryStatusLabel } from '../injurySafety'
 
@@ -17,23 +18,6 @@ function label(value: string): string {
   return value.replace(/_/g, ' ')
 }
 
-// Home equipment first; gym equipment after (the imported library has lots of it).
-const EQUIPMENT_OPTIONS: { value: string; label: string }[] = [
-  { value: 'none', label: 'Bodyweight' },
-  { value: 'mat', label: 'Mat' },
-  { value: 'chair', label: 'Chair' },
-  { value: 'resistance_band', label: 'Resistance band' },
-  { value: 'dumbbells', label: 'Dumbbells' },
-  { value: 'kettlebells', label: 'Kettlebells' },
-  { value: 'exercise_ball', label: 'Exercise ball' },
-  { value: 'medicine_ball', label: 'Medicine ball' },
-  { value: 'foam_roller', label: 'Foam roller' },
-  { value: 'barbell', label: 'Barbell' },
-  { value: 'ez_curl_bar', label: 'EZ curl bar' },
-  { value: 'cable', label: 'Cable' },
-  { value: 'machine', label: 'Machine' },
-  { value: 'other', label: 'Other' },
-]
 const LEVEL_OPTIONS: { value: Exercise['difficulty']; label: string }[] = [
   { value: 'beginner', label: 'Beginner' },
   { value: 'intermediate', label: 'Intermediate' },
@@ -119,7 +103,13 @@ function ExerciseCard({ ex, favorites, onOpen }: { ex: Exercise; favorites: Favo
 
 export default function ExercisesPage({ initialTab = 'all' }: { initialTab?: 'all' | 'faves' }) {
   const favorites = useFavorites()
-  const [tab, setTab] = useState<'all' | 'faves'>(initialTab)
+  const [tab, setTabState] = useState<'all' | 'faves'>(initialTab)
+  const equipmentOptions = useEquipmentOptions()
+  // My Faves is a subtab of the library; the address follows it so /faves still links straight to it.
+  function setTab(next: 'all' | 'faves') {
+    setTabState(next)
+    window.history.replaceState({}, '', next === 'faves' ? '/faves' : '/exercises')
+  }
   const [filters, setFilters] = useState<ExerciseFilters>(NO_FILTERS)
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [loading, setLoading] = useState(true)
@@ -160,11 +150,11 @@ export default function ExercisesPage({ initialTab = 'all' }: { initialTab?: 'al
 
   return (
     <>
-      <h2 className="page-title">{tab === 'faves' ? 'My Faves' : 'Exercise library'}</h2>
+      <h2 className="page-title">Exercise Library</h2>
 
       <div className="tabs" role="group" aria-label="Exercise view">
         <button type="button" className={tab === 'all' ? 'tab tab-on' : 'tab'} aria-pressed={tab === 'all'} onClick={() => setTab('all')}>
-          All exercises
+          All Exercises
         </button>
         <button type="button" className={tab === 'faves' ? 'tab tab-on' : 'tab'} aria-pressed={tab === 'faves'} onClick={() => setTab('faves')}>
           My Faves ({favorites.favorites.length})
@@ -194,7 +184,7 @@ export default function ExercisesPage({ initialTab = 'all' }: { initialTab?: 'al
         </div>
         <ChipFilter
           legend="Equipment it uses"
-          options={EQUIPMENT_OPTIONS}
+          options={(equipmentOptions ?? []).map((o) => ({ value: o.value, label: o.label }))}
           selected={filters.equipment}
           onChange={(equipment) => update({ equipment })}
         />

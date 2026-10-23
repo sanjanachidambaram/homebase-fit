@@ -1,7 +1,6 @@
-// Home page. Signed in: the dashboard that ties the four agents together. Signed out: a welcome + sign-up.
+// Home page. Signed in: the dashboard that ties the agents together. Signed out: the landing page (WelcomePage).
 import { useEffect, useState } from 'react'
 import { fetchAccount, isSignInGone, type Account } from '../api'
-import AccountForm from '../components/AccountForm'
 import ClinicalSupportCard from '../components/ClinicalSupport'
 import AskBasics from '../components/dashboard/AskBasics'
 import CoachCard from '../components/dashboard/CoachCard'
@@ -9,28 +8,7 @@ import PlanCard from '../components/dashboard/PlanCard'
 import WorkoutBuilder from '../components/dashboard/WorkoutBuilder'
 import Link from '../components/Link'
 import { setSession, useSession, type Session } from '../session'
-
-function Welcome() {
-  return (
-    <div className="welcome">
-      <section className="hero">
-        <h2>
-          Home workouts that fit <span className="hl">your</span> body.
-        </h2>
-        <p>
-          Programs and custom sessions for bodyweight and basic home equipment, shaped around your goals and any
-          injuries you're working around. Plus a coach who's always in your corner.
-        </p>
-        <div className="hero-blobs" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </div>
-      </section>
-      <AccountForm />
-    </div>
-  )
-}
+import WelcomePage from './WelcomePage'
 
 function Dashboard({ session }: { session: Session }) {
   const [account, setAccount] = useState<Account | null>(null)
@@ -88,5 +66,5 @@ function Dashboard({ session }: { session: Session }) {
 
 export default function DashboardPage() {
   const session = useSession()
-  return session ? <Dashboard key={session.userId} session={session} /> : <Welcome />
+  return session ? <Dashboard key={session.userId} session={session} /> : <WelcomePage />
 }

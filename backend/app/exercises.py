@@ -7,6 +7,9 @@ Routes:
                                                 &difficulty=intermediate); values within one filter are ORed,
                                                 different filters are ANDed. equipment matches exercises that
                                                 USE any of the chosen items (none = bodyweight).
+  GET    /api/exercises/equipment              every equipment value used by any exercise (live, from the data);
+                                                what Build Your Own and the library filter offer, so the pickers
+                                                can never drift from the exercises themselves
   GET    /api/exercises/{id}                    one exercise in full detail
   GET    /api/favorites                         the signed-in user's faved exercises, in full detail
   POST   /api/favorites {exercise_id}           fave an exercise (idempotent)
@@ -28,8 +31,12 @@ from app.users import db
 router = APIRouter(prefix="/api")
 
 MuscleGroup = Literal["legs", "arms", "chest", "shoulders", "back", "core", "full_body"]
-Equipment = Literal["none", "mat", "chair", "bench", "dumbbells", "resistance_band", "kettlebells", "barbell",
-                    "ez_curl_bar", "medicine_ball", "exercise_ball", "foam_roller", "cable", "machine", "other"]
+# Friendlier names for a few equipment values; any other value is shown as itself ("dumbbells" -> "Dumbbells").
+EQUIPMENT_LABELS = {
+    "none": "Bodyweight", "resistance_band": "Resistance band", "ez_curl_bar": "EZ curl bar",
+    "exercise_ball": "Exercise ball", "medicine_ball": "Medicine ball", "foam_roller": "Foam roller",
+    "kettlebells": "Kettlebell", "chair": "Sturdy chair", "other": "Other equipment",
+}
 Difficulty = Literal["beginner", "intermediate", "advanced"]
 # untagged = nobody has checked it; draft = cautions drafted, not PT-reviewed; pt_reviewed = confirmed by a PT
 InjuryStatus = Literal["untagged", "draft", "pt_reviewed"]
@@ -74,7 +81,8 @@ def exercise_dict(r: sqlite3.Row) -> dict:
 def list_exercises(
     muscle_group: MuscleGroup | None = None,
     source: str | None = Query(None, description="source_dataset id, e.g. free-exercise-db"),
-    equipment: list[Equipment] = Query([], description="exercises that use any of these (none = bodyweight)"),
+    equipment: list[str] = Query([], description="exercises that use any of these (none = bodyweight); "
+                                                 "valid values: GET /api/exercises/equipment"),
     difficulty: list[Difficulty] = Query([]),
     injury_status: list[InjuryStatus] = Query([], description="untagged | draft | pt_reviewed"),
     conn: sqlite3.Connection = Depends(db),
@@ -87,6 +95,10 @@ def list_exercises(
         sql += " AND e.source_dataset = ?"
         args.append(source)
     if equipment:
+        known = set(equipment_values(conn))
+        unknown = sorted(set(equipment) - known)
+        if unknown:
+            raise HTTPException(422, f"Unknown equipment {unknown}. Valid: {sorted(known)}.")
         sql += (" AND EXISTS (SELECT 1 FROM json_each(e.equipment_needed) n"
                 " WHERE n.value IN (SELECT value FROM json_each(?)))")
         args.append(json.dumps(sorted(set(equipment))))
@@ -98,6 +110,22 @@ def list_exercises(
         args.append(json.dumps(sorted(set(injury_status))))
     sql += " ORDER BY e.source_dataset = 'free-exercise-db', e.name"
     return [exercise_dict(r) for r in conn.execute(sql, args).fetchall()]
+
+
+def equipment_values(conn: sqlite3.Connection) -> list[str]:
+    return [r[0] for r in conn.execute(
+        "SELECT DISTINCT n.value FROM exercises e, json_each(e.equipment_needed) n ORDER BY n.value")]
+
+
+@router.get("/exercises/equipment")
+def equipment_options(conn: sqlite3.Connection = Depends(db)) -> list[dict]:
+    """Every equipment value that appears on any exercise, with how many exercises use it. Bodyweight ("none")
+    comes first and is flagged always_included: bodyweight moves never need equipment, so they're always in."""
+    rows = conn.execute(
+        "SELECT n.value AS value, COUNT(DISTINCT e.id) AS exercises FROM exercises e, json_each(e.equipment_needed) n "
+        "GROUP BY n.value ORDER BY n.value = 'none' DESC, COUNT(DISTINCT e.id) DESC, n.value").fetchall()
+    return [{"value": r["value"], "label": EQUIPMENT_LABELS.get(r["value"], r["value"].replace("_", " ").capitalize()),
+             "exercises": r["exercises"], "always_included": r["value"] == "none"} for r in rows]
 
 
 @router.get("/exercises/{exercise_id}")
