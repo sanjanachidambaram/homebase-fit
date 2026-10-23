@@ -33,7 +33,10 @@ from app.users import router as users_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    ensure_working_db()
+    # Builds the working DB on a brand-new disk, leaves it alone on a normal redeploy, and refreshes it (keeping
+    # accounts, with a backup) when a deploy ships new content or schema. See app.db.ensure_working_db.
+    what = ensure_working_db()
+    print(f"Working database {config.WORKING_DB}: {what}.", flush=True)
     yield
 
 

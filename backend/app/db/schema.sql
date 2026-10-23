@@ -170,6 +170,16 @@ CREATE TABLE basics_articles (
     status      TEXT NOT NULL DEFAULT 'placeholder' CHECK (status IN ('placeholder', 'pt_reviewed'))
 );
 
+-- ---------------------------------------------------------------- bookkeeping
+
+-- Which homebase_original.db the working copy was last built or refreshed from (key 'original_sha256'). On a
+-- persistent disk the working copy outlives deploys; when a deploy ships a new original (new content or schema),
+-- startup sees the mismatch and refreshes the working copy, keeping every account (app/db/__init__.py).
+CREATE TABLE app_meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 -- ---------------------------------------------------------------- user activity
 
 -- Workout Builder sessions as the server built them, so "Save to calendar" can only ever save a session that went

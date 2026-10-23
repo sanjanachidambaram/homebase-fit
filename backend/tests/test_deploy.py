@@ -45,8 +45,9 @@ def test_working_db_is_not_in_git():
 
 
 def test_startup_builds_the_working_db_from_the_original(fresh_instance):
-    ensure_working_db()
+    assert ensure_working_db() == "created"
     got, want = tables(fresh_instance), tables(config.ORIGINAL_DB)
+    assert got.pop("app_meta") == 1 and want.pop("app_meta") == 0      # the copy records which original it came from
     assert got == want                                                  # same tables, same seeded content
     for t in ("calendar_entries", "goal_protocols", "exercises", "sources", "basics_articles", "agent_runs"):
         assert t in got, t
@@ -127,3 +128,106 @@ def test_no_files_outside_the_built_app(client):
     for path in ("/..%2Fbackend%2Fapp%2Fconfig.py", "/../backend/app/config.py", "/%2e%2e/%2e%2e/.env"):
         r = client.get(path)
         assert "get_secret" not in r.text and "PORTKEY" not in r.text, path
+
+
+# ---------------------------------------------------------------- the persistent disk (paid Render instance)
+
+import yaml  # noqa: E402
+
+from app.db import copy_db, original_fingerprint, working_db_stamp  # noqa: E402
+
+
+@pytest.fixture
+def disk(tmp_path, monkeypatch):
+    """A brand-new, empty persistent disk, with HOMEBASE_DB_PATH pointing at a file on it (like /var/data)."""
+    mount = tmp_path / "var" / "data"
+    monkeypatch.setattr(config, "WORKING_DB", mount / "homebase.db")
+    monkeypatch.setenv("APP_SECRET_KEY", "disk-test-secret")
+    return mount
+
+
+def add_user(email):
+    conn = sqlite3.connect(config.WORKING_DB)
+    with conn:
+        conn.execute("INSERT INTO users (email, password_hash) VALUES (?, 'x')", (email,))
+    conn.close()
+
+
+def users():
+    conn = sqlite3.connect(config.WORKING_DB)
+    try:
+        return [r[0] for r in conn.execute("SELECT email FROM users ORDER BY id")]
+    finally:
+        conn.close()
+
+
+def test_first_use_of_an_empty_disk_builds_the_db_there(disk):
+    assert not disk.exists()                                            # not even the folder yet
+    assert ensure_working_db() == "created"
+    assert (disk / "homebase.db").exists() and working_db_stamp() == original_fingerprint()
+    assert tables(disk / "homebase.db")["exercises"] == 903
+
+
+def test_a_normal_redeploy_leaves_the_data_alone(disk):
+    ensure_working_db()
+    add_user("survivor@example.com")
+    before = (disk / "homebase.db").read_bytes()
+    for _ in range(3):                                                  # three restarts / redeploys, same content
+        assert ensure_working_db() == "unchanged"
+    assert (disk / "homebase.db").read_bytes() == before and users() == ["survivor@example.com"]
+    assert not list(disk.glob("*before-refresh*"))                      # nothing to back up, nothing touched
+
+
+def test_a_deploy_with_new_content_refreshes_but_keeps_accounts_and_a_backup(disk, tmp_path, monkeypatch):
+    ensure_working_db()
+    add_user("keepme@example.com")
+    new_original = tmp_path / "new_original.db"                         # this deploy ships new content
+    copy_db(config.ORIGINAL_DB, new_original)
+    conn = sqlite3.connect(new_original)
+    with conn:
+        conn.execute("UPDATE sources SET name = 'Renamed in a new deploy' WHERE id = 'free-exercise-db'")
+    conn.close()
+    monkeypatch.setattr(config, "ORIGINAL_DB", new_original)
+
+    assert ensure_working_db() == "refreshed"
+    assert users() == ["keepme@example.com"]                            # the account survived
+    conn = sqlite3.connect(config.WORKING_DB)
+    assert conn.execute("SELECT name FROM sources WHERE id = 'free-exercise-db'").fetchone()[0] == "Renamed in a new deploy"
+    conn.close()
+    backups = list(disk.glob("homebase.before-refresh-*.db"))
+    assert len(backups) == 1 and "keepme@example.com" in [r[0] for r in sqlite3.connect(backups[0]).execute("SELECT email FROM users")]
+    assert ensure_working_db() == "unchanged"                           # and the next restart leaves it alone
+
+
+def test_a_working_db_from_before_this_change_is_upgraded_not_wiped(disk):
+    ensure_working_db()
+    add_user("old-timer@example.com")
+    conn = sqlite3.connect(config.WORKING_DB)
+    with conn:
+        conn.execute("DROP TABLE app_meta")                             # what the live DB looked like before
+    conn.close()
+    assert ensure_working_db() == "refreshed" and users() == ["old-timer@example.com"]
+    assert working_db_stamp() == original_fingerprint()
+
+
+def test_render_yaml_puts_the_database_on_a_persistent_disk():
+    spec = yaml.safe_load((config.PROJECT_ROOT / "render.yaml").read_text(encoding="utf-8"))
+    web = spec["services"][0]
+    assert web["plan"] == "starter"                                     # paid: disks aren't available on free
+    assert web["disk"] == {"name": "homebase-data", "mountPath": "/var/data", "sizeGB": 1}
+    env = {e["key"]: e for e in web["envVars"]}
+    assert env["HOMEBASE_DB_PATH"]["value"] == "/var/data/homebase.db"  # on the disk, so it survives deploys
+    assert env["HOMEBASE_DB_PATH"]["value"].startswith(web["disk"]["mountPath"] + "/")
+    for secret in ("APP_ENV", "APP_SECRET_KEY", "PORTKEY_API_KEY"):
+        assert env[secret] == {"key": secret, "sync": False}              # still set in the dashboard, never here
+
+
+def test_local_dev_still_uses_the_normal_local_path():
+    """Without HOMEBASE_DB_PATH (local dev), the working DB is backend/app/db/homebase.db, as it always was."""
+    import os
+    import subprocess
+    import sys
+    env = {k: v for k, v in os.environ.items() if k not in ("HOMEBASE_DB_PATH", "APP_ENV")}   # plain local dev
+    out = subprocess.run([sys.executable, "-c", "from app import config; print(config.WORKING_DB)"],
+                         cwd=config.BACKEND_DIR, env=env, capture_output=True, text=True, check=True).stdout.strip()
+    assert out == str(config.DB_DIR / "homebase.db")

@@ -24,7 +24,7 @@ import sqlite3
 import sys
 
 from app import config
-from app.db import connect, copy_db, table_counts
+from app.db import connect, copy_db, stamp_working_db, table_counts
 
 # Parents first, so ids line up. (app/users.py USER_DATA_TABLES lists the same tables for account deletion.)
 USER_TABLES = ("users", "quiz_profiles", "exercise_favorites", "measurements", "calendar_entries", "cardio_logs",
@@ -86,6 +86,7 @@ def _restore(keep_users: bool) -> dict:
         conn.execute("PRAGMA foreign_keys = ON")
     finally:
         conn.close()
+    stamp_working_db()   # the working copy now matches this original (see app.db.ensure_working_db)
     return summary
 
 
