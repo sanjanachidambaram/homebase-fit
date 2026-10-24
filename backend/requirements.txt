@@ -11,6 +11,7 @@ pyyaml
 fastapi==0.143.0
 uvicorn[standard]==0.54.0
 httpx
+openpyxl==3.1.5   # backend/scripts/export_exercise_review.py (the Excel review export)
 
 # Tests (python -m pytest)
 pytest

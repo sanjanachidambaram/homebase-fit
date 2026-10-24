@@ -29,3 +29,6 @@ Thumbs.db
 # The working database (accounts, logs, calendars) is created at startup from the committed, clean
 # backend/app/db/homebase_original.db. Never commit it: it can hold real people's data.
 backend/app/db/homebase.db
+
+# Review export: rebuilt any time by backend/scripts/export_exercise_review.py
+content/exercise_review_export.xlsx
