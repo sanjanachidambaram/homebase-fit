@@ -292,14 +292,13 @@ def test_injured_user_always_gets_checked_only(client, use_script, mcp_calls):
                ("final", {"items": [{"exercise_id": "glute_bridge", "sets": 3, "reps": "12", "rest_seconds": 45},
                                     {"exercise_id": "side_lying_leg_raise", "sets": 2, "reps": "10 each side",
                                      "rest_seconds": 30}], "balance_note": "Lower body only, so not balanced."}))
-    r = client.post("/api/workouts/build", headers=ha, json={"picks": {"legs": 3}, "time_budget_minutes": 30})
+    r = client.post("/api/workouts/build", headers=ha, json={"picks": {"legs": 2}, "time_budget_minutes": 30})
     assert r.status_code == 200, r.text
     searches = [args for tool, args in mcp_calls if tool == "search_exercises"]
     assert searches and all(s["checked_only"] is True and s["injury_flags"] == ["knee"] for s in searches)
     res = r.json()["result"]
     assert [e["exercise_id"] for e in res["exercises"]] == ["glute_bridge", "side_lying_leg_raise"]
     assert all(e["injury_check"] != "not_yet_checked" for e in res["exercises"])
-    assert any("Only 2 legs" in n for n in res["notes"])     # only 2 knee-safe, tagged legs exercises exist
 
 
 def test_uninjured_user_gets_checked_only_false(client, use_script, mcp_calls):

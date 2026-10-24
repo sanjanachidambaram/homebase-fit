@@ -70,6 +70,17 @@ def weigh(uid, days_ago, body_weight, **other):
     conn.close()
 
 
+def untag_imported(where: str = "1 = 1"):
+    """Put imported exercises back to 'untagged' in this test's throwaway database. Since the bulk drafting every
+    exercise has drafted data, but the rules for unchecked ones still matter (a draft that fails the rules, or a newly
+    imported exercise, stays untagged), so these tests recreate them."""
+    conn = connect()
+    with conn:
+        conn.execute("UPDATE exercises SET contraindication_status = 'untagged', injury_contraindications = '[]', "
+                     f"injury_rationale = '{{}}' WHERE source_dataset = 'free-exercise-db' AND {where}")
+    conn.close()
+
+
 def tag(exercise_id, contraindications, status="draft"):
     conn = connect()
     with conn:
@@ -165,7 +176,12 @@ def test_injury_filter_excludes_tagged_exercises(test_db):
     ids = {e["id"] for e in filtered["exercises"]}
     assert "Adductor" not in ids
     assert {"bodyweight_squat", "reverse_lunge", "wall_sit", "goblet_squat"}.isdisjoint(ids)   # drafted knee tags
-    assert filtered["injury_filter"]["excluded_as_contraindicated"] == plain["total_matching"] - filtered["total_matching"] == 5
+    conn = connect()
+    knee_legs = conn.execute("SELECT COUNT(*) FROM exercises WHERE muscle_group = 'legs' AND EXISTS "
+                             "(SELECT 1 FROM json_each(injury_contraindications) WHERE value = 'knee')").fetchone()[0]
+    conn.close()
+    assert filtered["injury_filter"]["excluded_as_contraindicated"] == plain["total_matching"] - filtered["total_matching"] \
+        == knee_legs > 5                                       # every legs exercise tagged knee, imported ones included
     for e in filtered["exercises"]:
         assert "knee" not in e["injury_contraindications"]
 
@@ -178,6 +194,7 @@ def test_any_matching_flag_excludes(test_db):
 
 
 def test_unchecked_exercises_are_flagged_not_called_safe(test_db):
+    untag_imported("muscle_group = 'chest'")
     res = call("search_exercises", muscle_group="chest", injury_flags=["shoulder"], limit=10)
     assert res["exercises"], "imported exercises should still be returned"
     for e in res["exercises"]:
@@ -190,6 +207,7 @@ def test_unchecked_exercises_are_flagged_not_called_safe(test_db):
 
 
 def test_checked_exercises_come_first_and_checked_only_works(test_db):
+    untag_imported()                                            # the library as it was before the bulk drafting
     res = call("search_exercises", muscle_group="legs", injury_flags=["knee"], limit=50)
     flags = [e["injury_unchecked"] for e in res["exercises"]]
     assert flags == sorted(flags), "checked (False) exercises must come before unchecked (True)"

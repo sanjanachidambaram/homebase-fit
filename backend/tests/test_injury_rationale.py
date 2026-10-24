@@ -32,7 +32,8 @@ def library(client, **params) -> list[dict]:
 
 def test_every_injury_tag_has_an_ai_drafted_reason(client):
     tagged = [e for e in library(client) if e["injury_contraindications"]]
-    assert len(tagged) == 18 and sum(len(e["injury_contraindications"]) for e in tagged) == 44
+    # 27 hand-authored + 876 imported (AI-drafted in bulk, 2026-10-24); the guard below now covers all 2,265 reasons
+    assert len(tagged) == 860 and sum(len(e["injury_contraindications"]) for e in tagged) == 2265
     for e in library(client):
         assert set(e["injury_rationale"]) == set(e["injury_contraindications"]), e["id"]
         for injury, r in e["injury_rationale"].items():
@@ -80,7 +81,11 @@ def test_pt_template_has_the_rationale_for_review():
     assert {"rationale", "rationale_tier", "reviewed_by"} <= set(next(iter(rows.values())))
     climber = rows["mountain_climber"]
     assert climber["rationale"].splitlines()[0].startswith("shoulder: ") and climber["rationale_tier"] == "ai_drafted"
-    assert rows["dead_bug"]["rationale"] == "" and rows["3_4_Sit-Up"]["rationale"] == ""
+    assert len(rows) == 903 and all(r["contraindication_status"] == "draft" for r in rows.values())
+    assert rows["dead_bug"]["rationale"] == "" and rows["Alternate_Hammer_Curl"]["rationale"] == ""   # none needed
+    situp = rows["3_4_Sit-Up"]                                                  # an imported exercise, drafted in bulk
+    assert situp["rationale"].splitlines()[0].startswith("neck: ") and situp["rationale_tier"] == "ai_drafted"
+    assert (situp["neck"], situp["lower_back"], situp["knee"]) == ("Y", "Y", "N")
 
 
 # ---------------------------------------------------------------- filters (in SQL, via query params)
@@ -100,16 +105,22 @@ def test_level_and_injury_status_filters(client):
     assert {e["difficulty"] for e in two} == {"beginner", "advanced"}
 
     drafted = library(client, injury_status="draft")
-    assert {e["contraindication_status"] for e in drafted} == {"draft"} and len(drafted) == 27
+    assert {e["contraindication_status"] for e in drafted} == {"draft"} and len(drafted) == 903
     untagged = library(client, injury_status="untagged")
-    assert {e["contraindication_status"] for e in untagged} == {"untagged"}
+    assert untagged == []                                               # every exercise has drafted data now
     assert len(drafted) + len(untagged) == len(library(client))
     assert library(client, injury_status="pt_reviewed") == []          # nobody has reviewed anything yet
 
 
 def test_filters_combine(client):
     got = library(client, muscle_group="legs", equipment="none", difficulty="beginner", injury_status="draft")
-    assert {e["id"] for e in got} == {"bodyweight_squat", "reverse_lunge", "wall_sit"}
+    assert {"bodyweight_squat", "reverse_lunge", "wall_sit"} <= {e["id"] for e in got}
+    assert got and all(e["muscle_group"] == "legs" and e["equipment_needed"] == ["none"] and e["difficulty"] == "beginner"
+                       and e["contraindication_status"] == "draft" for e in got)
+    from tests.test_agents import rows
+    want = rows("SELECT id FROM exercises WHERE muscle_group = 'legs' AND equipment_needed = '[\"none\"]' "
+                "AND difficulty = 'beginner' AND contraindication_status = 'draft'")
+    assert {e["id"] for e in got} == {r["id"] for r in want}           # exactly what all four filters together allow
 
 
 @pytest.mark.parametrize("params", [{"equipment": "jetpack"}, {"difficulty": "expert"}, {"injury_status": "safe"}])
@@ -128,8 +139,9 @@ def test_plan_lists_what_the_injury_filter_left_out(test_db):
         assert x.exercise_id not in planned
         assert [c.injury for c in x.cautions] == ["lower_back"]          # only the user's own flag
         assert x.cautions[0].reasoning and x.cautions[0].tier == "ai_drafted"
-    # every hand-authored exercise tagged lower_back that fits mat / band / bodyweight in this plan's groups
-    assert {x.exercise_id for x in left_out} == {"burpee", "crunch", "mountain_climber", "superman_hold"}
+    # the hand-authored ones tagged lower_back that fit mat / band / bodyweight in this plan's groups are among them
+    # (since the bulk drafting, imported exercises tagged lower_back are listed too)
+    assert {"burpee", "crunch", "mountain_climber", "superman_hold"} <= {x.exercise_id for x in left_out}
 
 
 def test_no_injury_means_nothing_left_out(test_db):
@@ -145,7 +157,7 @@ def test_the_model_never_sees_the_injury_reasoning(client, explainer):
     assert left_out, "the person sees what was left out and why"
     shown = " ".join(e.prompts)
     for x in left_out:
-        assert x["name"] not in shown
+        assert json.dumps(x["name"]) not in shown    # as a whole name: "Plank" left out, "Forearm Plank" planned
         for c in x["cautions"]:
             assert c["reasoning"] not in shown
     assert "lower_back" not in shown and "left_out" not in shown and json.dumps(RATIONALE_PENDING_SOURCE)[1:-1] not in shown

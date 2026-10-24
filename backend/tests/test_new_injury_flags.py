@@ -17,7 +17,8 @@ from tests.test_agents import mcp_calls, use_script  # noqa: F401  (fixtures)
 from tests.test_mcp_tools import call
 
 NEW_FLAGS = ("neck", "upper_back", "hip")
-# The hand-authored exercises with a drafted caution for each new flag (content/exercises/*/exercises.yaml).
+# The HAND-AUTHORED exercises with a drafted caution for each new flag (content/exercises/*/exercises.yaml). Since
+# the bulk drafting, many imported exercises carry these flags too; the checks below cover both.
 TAGGED = {
     "neck": {"squat_to_press", "superman_hold", "crunch", "cat_cow"},
     "upper_back": {"superman_hold", "dumbbell_bent_over_row"},
@@ -54,8 +55,11 @@ def test_the_quiz_offers_every_flag_head_to_toe(client):
 
 def test_each_new_flag_has_drafted_tags_with_reasons(test_db):
     t = tags()
+    from tests.test_agents import rows
+    authored = {r["id"] for r in rows("SELECT id FROM exercises WHERE source_dataset = 'placeholder-authored'")}
     for flag, ids in TAGGED.items():
-        assert {i for i, (contra, _, _) in t.items() if flag in contra} == ids, flag
+        assert {i for i, (contra, _, _) in t.items() if flag in contra and i in authored} == ids, flag
+        assert len([i for i, (contra, _, _) in t.items() if flag in contra]) > len(ids), flag   # imported ones too
         for i in ids:
             r = t[i][1][flag]
             assert r["tier"] == "ai_drafted" and r["source"] == "Pending review by a licensed physical therapist" and r["reasoning"]
@@ -63,11 +67,11 @@ def test_each_new_flag_has_drafted_tags_with_reasons(test_db):
 
 @pytest.mark.parametrize("flag", NEW_FLAGS)
 def test_the_mcp_search_removes_tagged_exercises(test_db, flag):
-    plain = {e["id"] for e in call("search_exercises", limit=50, checked_only=True)["exercises"]}
     strict = call("search_exercises", injury_flags=[flag], limit=50, checked_only=True)
-    ids = {e["id"] for e in strict["exercises"]}
-    assert TAGGED[flag] <= plain and TAGGED[flag].isdisjoint(ids), flag
-    assert strict["injury_filter"]["applied"] is True and strict["injury_filter"]["excluded_as_contraindicated"] == len(TAGGED[flag])
+    t = tags()
+    assert strict["exercises"] and all(flag not in t[e["id"]][0] for e in strict["exercises"]), flag
+    flagged = sum(1 for contra, _, _ in t.values() if flag in contra)
+    assert strict["injury_filter"]["applied"] is True and strict["injury_filter"]["excluded_as_contraindicated"] == flagged
 
 
 @pytest.mark.parametrize("flag", NEW_FLAGS)
@@ -81,7 +85,7 @@ def test_a_plan_for_the_new_flag_leaves_tagged_exercises_out(client, flag):
     t = tags()
     assert all(flag not in t[i][0] and t[i][2] != "untagged" for i in used), flag   # nothing tagged, nothing unchecked
     left_out = {x["exercise_id"] for x in plan["safety"]["left_out_for_injury"]}
-    assert left_out and left_out <= TAGGED[flag]
+    assert left_out and all(flag in t[i][0] for i in left_out)
 
 
 def test_the_workout_builder_searches_with_the_new_flag(client, use_script, mcp_calls):

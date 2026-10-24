@@ -82,16 +82,22 @@ function AboutTheData() {
         about it, and important to be honest about: it was not written or reviewed by medical or fitness
         professionals. It's crowdsourced, so quality and consistency vary from exercise to exercise, and critically, it
         contains no information at all about which exercises are unsafe for which injuries. That part, the
-        safety-critical part, had to come from somewhere else: we hand-authored and drafted injury-safety reasoning for
-        a starting set of exercises ourselves, clearly labeled everywhere as "AI-drafted, not yet reviewed by a physical
-        therapist" until a real PT confirms or corrects it. As of today,{' '}
+        safety-critical part, had to come from somewhere else: we drafted the injury-safety reasoning ourselves, first by
+        hand for a starting set of exercises and then with an AI model for the rest of the library, and it's clearly
+        labeled everywhere as "AI-drafted, not yet reviewed by a physical therapist" until a real PT confirms or
+        corrects it. As of today,{' '}
         <strong>
           {n(ex.injury_checked)} of {n(ex.total)} exercises
         </strong>{' '}
         have any injury-safety information at all: {n(ex.with_cautions)} carry drafted cautions ({n(ex.cautions)} in
         all, each with its own AI-drafted reason)
-        {checkedNoCaution > 0 && <>, and {n(checkedNoCaution)} were checked and given none</>}. The other{' '}
-        {n(ex.injury_unchecked)} are honestly labeled "not yet checked" rather than assumed safe.
+        {checkedNoCaution > 0 && <>, and {n(checkedNoCaution)} were drafted with none</>}.
+        {ex.injury_unchecked > 0 && (
+          <>
+            {' '}
+            The other {n(ex.injury_unchecked)} are honestly labeled "not yet checked" rather than assumed safe.
+          </>
+        )}
       </p>
       <p>
         The same honesty applies to the science behind the workout protocols themselves (sessions per week, and sets,

@@ -2,9 +2,11 @@
 See backend/prompts/shared_rules.md, rule 4.
 """
 
-# Head to toe. Every hand-authored exercise has been considered for every flag here (its tags are drafted, then
-# PT-reviewed), so adding a flag means drafting it across content/exercises/*/exercises.yaml too.
-# neck, upper_back and hip were added 2026-10-23.
+import re
+
+# Head to toe. Every exercise with drafted tags has been considered for every flag here (its tags are drafted, then
+# PT-reviewed), so adding a flag means drafting it across content/exercises/*/exercises.yaml AND the imported
+# library's injury_tags_ai_drafted.json (app/db/draft_injury_tags.py). neck, upper_back and hip were added 2026-10-23.
 INJURY_FLAGS = ("neck", "shoulder", "upper_back", "lower_back", "wrist", "hip", "knee", "ankle")
 CLINICAL_REVIEW_STATUSES = ("pregnant", "postpartum")
 
@@ -13,6 +15,10 @@ CLINICAL_REVIEW_STATUSES = ("pregnant", "postpartum")
 # The reasoning is general exercise science, never an invented citation.
 RATIONALE_TIERS = ("ai_drafted", "pt_reviewed")
 RATIONALE_PENDING_SOURCE = "Pending review by a licensed physical therapist"
+# A reason must read as general exercise science, never as a citation: no years, "et al", DOIs, journals,
+# "research", or "studies show/found". The seed refuses data that matches, the one-time generator
+# (app/db/draft_injury_tags.py) sends such drafts back, and tests/test_injury_rationale.py checks every stored reason.
+RATIONALE_CITATION_LIKE = re.compile(r"\b(19|20)\d\d\b|et al|doi|journal|stud(y|ies) (show|found)|research", re.I)
 
 
 def checked_only_for(injury_flags: list[str] | None) -> bool:

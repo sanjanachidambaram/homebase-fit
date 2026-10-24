@@ -5,13 +5,22 @@ Two sources feed the `exercises` table (see `content/sources.yaml`):
 | Folder | `source_dataset` | Injury tags |
 |---|---|---|
 | `legs/`, `arms/`, `chest/`, `shoulders/`, `back/`, `core/`, `full_body/` (`exercises.yaml` in each) | `placeholder-authored` | drafted, not yet PT-reviewed (`draft`) |
-| `source_free_exercise_db/` (see its `ATTRIBUTION.md`) | `free-exercise-db` | none yet (`untagged`) |
+| `source_free_exercise_db/` (see its `ATTRIBUTION.md`) | `free-exercise-db` | AI-drafted in bulk, not yet PT-reviewed (`draft`; see below) |
 
-For anyone with an injury flag, generated plans and custom workouts only use exercises that have injury tags
-(today, the hand-authored ones). The tags cover neck, shoulder, upper_back, lower_back, wrist, hip, knee and ankle;
-the wrist and ankle tags were drafted 2026-10-22, neck, upper_back and hip on 2026-10-23, and like the rest they are
-waiting on PT review. Every hand-authored exercise has been considered for every one of these, so a new injury flag
-has to be drafted across all of them (not just added to the quiz).
+> **Heads-up for PT review: the workload just went from 27 exercises to 903.** On 2026-10-24 all 876 imported
+> free-exercise-db exercises were given AI-drafted injury cautions in one batch. Together with the 27 hand-authored
+> ones, all 903 exercises now carry drafted injury data: 860 have at least one caution (2,265 cautions in all, each
+> with its own reason) and 43 were judged to need none. **Every one of them is `ai_drafted` and still needs a
+> licensed physical therapist's review.** It's fine to review in batches (for example, the exercises the plans
+> actually use first); the template below lists them all.
+
+For anyone with an injury flag, generated plans and custom workouts only use exercises that have drafted injury
+tags. Since the bulk drafting, that is the whole library, so injured users' plans can now include imported exercises
+whose cautions are AI drafts (before, only the 27 hand-authored ones qualified). The tags cover neck, shoulder,
+upper_back, lower_back, wrist, hip, knee and ankle; the wrist and ankle tags were drafted 2026-10-22, neck, upper_back
+and hip on 2026-10-23, the imported library on 2026-10-24, and like the rest they are waiting on PT review. Every
+drafted exercise has been considered for every one of these, so a new injury flag has to be drafted across all of
+them (the hand-authored YAML and the bulk drafts), not just added to the quiz.
 
 Every exercise starts as `status: placeholder` with no citations, so the app shows "Content pending expert review" on it. For hand-authored exercises you can add `status: pt_reviewed` and a `citations:` list (each `{claim, source}`) in `exercises.yaml`; `pt_reviewed` requires at least one citation. Demo media type (image, gif, or video) is picked from the file extension when you rerun the seed.
 
@@ -44,6 +53,20 @@ injury_rationale:
 The seed refuses to build if a tag has no rationale (or a rationale has no tag), if `tier` is anything else, or if
 a `pt_reviewed` entry still says "Pending review". The app shows this reasoning in the exercise detail view and,
 for people with an injury flag, in the "left out for your injury" list on their plan, always with its review tier.
+
+### The bulk AI drafts (`source_free_exercise_db/injury_tags_ai_drafted.json`)
+
+Written once by `backend/app/db/draft_injury_tags.py` with gpt-6-luna (prompt: `backend/prompts/injury_tag_drafter.md`),
+6 exercises and all 8 injury areas per call. Same rules as the hand-authored drafts: tier `ai_drafted`, source
+"Pending review by a licensed physical therapist", general biomechanical reasoning with nothing that looks like a
+citation (checked by the generator, the seed and the tests), and a caution only where one is plausible. To correct
+one, edit its entry in that file (or move the exercise's review into the CSV as below) and rerun the seed. The token
+cost of the run is in `injury_tags_generation_log.csv` (one row per call) and the file's `generation` block:
+546,613 tokens over 153 calls (349,598 in, 197,015 out): 146 batch calls, 3 retries (two drafts had used wording
+the citation guard rejects, one exercise was missing from its batch's answer; all three passed on the retry), and 4
+re-checks of moves that bring the bar behind or to the neck (6,292 tokens; the first pass had missed a neck caution on
+"Push Press - Behind the Neck"). It is a one-time content cost, kept apart from `agent_runs` (live, user-facing agent
+calls).
 
 Regenerate the template after changing exercises (from `backend/`):
 

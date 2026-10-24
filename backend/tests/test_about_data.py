@@ -23,19 +23,20 @@ def test_summary_matches_the_database(client):
     assert {s["id"]: s["count"] for s in ex["by_source"]} == {"free-exercise-db": 876, "placeholder-authored": 27}
     assert sum(s["count"] for s in ex["by_source"]) == ex["total"]
     assert ex["injury_checked"] + ex["injury_unchecked"] == ex["total"]
-    assert (ex["injury_checked"], ex["with_cautions"], ex["cautions"]) == (27, 18, 44)
-    assert (ex["reasons_ai_drafted"], ex["reasons_pt_reviewed"], ex["injury_pt_reviewed"]) == (44, 0, 0)
+    # since the one-time AI drafting (2026-10-24) every exercise has drafted injury data
+    assert (ex["injury_checked"], ex["with_cautions"], ex["cautions"]) == (903, 860, 2265)
+    assert (ex["reasons_ai_drafted"], ex["reasons_pt_reviewed"], ex["injury_pt_reviewed"]) == (2265, 0, 0)
     assert d["protocols"] == {"total": 15, "placeholder": 15, "with_citations": 0}
     assert d["basics_articles"] == {"total": 5, "placeholder": 5}
 
 
 def test_summary_follows_the_data(client):
-    """No hardcoded numbers: tag one more imported exercise and the counts move."""
+    """No hardcoded numbers: un-check one exercise (2 cautions) and the counts move."""
     conn = connect()
     with conn:
-        conn.execute("UPDATE exercises SET contraindication_status = 'draft', injury_contraindications = '[\"knee\"]', "
-                     "injury_rationale = '{\"knee\": {\"reasoning\": \"x\", \"tier\": \"ai_drafted\", \"source\": \"y\"}}' "
-                     "WHERE id = '3_4_Sit-Up'")
+        conn.execute("UPDATE exercises SET contraindication_status = 'untagged', injury_contraindications = '[]', "
+                     "injury_rationale = '{}' WHERE id = '3_4_Sit-Up'")
     conn.close()
     ex = client.get("/api/data-summary").json()["exercises"]
-    assert (ex["injury_checked"], ex["with_cautions"], ex["cautions"], ex["reasons_ai_drafted"]) == (28, 19, 45, 45)
+    assert (ex["injury_checked"], ex["injury_unchecked"], ex["with_cautions"], ex["cautions"], ex["reasons_ai_drafted"]) \
+        == (902, 1, 859, 2263, 2263)

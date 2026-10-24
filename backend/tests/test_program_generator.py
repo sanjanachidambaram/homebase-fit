@@ -170,6 +170,8 @@ def test_every_injury_flag_forces_checked_only(test_db, search_spy):
 
 
 def test_no_injury_means_the_full_library(test_db, search_spy):
+    from tests.test_mcp_tools import untag_imported
+    untag_imported()            # so "the full library" includes unchecked exercises again, as it would for new imports
     plan = generate({**LOWER_BACK_REHAB, "goals": ["tone"], "injury_flags": [], "equipment": ["dumbbells", "mat"]})
     assert all(c["checked_only"] is False for c in search_spy) and plan.safety.checked_only is False
     assert any(e.injury_check == "not_yet_checked" for e in exercises_in(plan))   # imported moves allowed, flagged

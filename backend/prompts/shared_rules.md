@@ -105,6 +105,16 @@ There is no AI call either way. Test: `test_red_flag_note_is_saved_logged_and_an
   ankle) are removed by the SQL in `app/mcp_server/search.py: search_exercises`, which both the MCP tool and the
   plan generator use. The one list lives in `app/safety_rules.py: INJURY_FLAGS`; the quiz, the seed, the MCP tool
   and the PT's tagging template all follow it.
+- **Bulk AI drafting of the imported library (decided 2026-10-24).** Every free-exercise-db exercise got drafted
+  cautions in a one-time content run (`app/db/draft_injury_tags.py`, gpt-6-luna, not a live agent), under exactly the
+  same rules as the hand-authored drafts: tier `ai_drafted`, source "Pending review by a licensed physical
+  therapist", no citation-like text (`safety_rules.RATIONALE_CITATION_LIKE`, enforced by the generator, the seed and
+  the tests, never loosened for generated content), and a caution only where one is plausible (no forced coverage).
+  Anything that fails the rules after one retry stays `untagged`. Consequence, accepted on purpose: `checked_only`
+  now admits almost the whole library for injured users, so their plans can include imported exercises whose
+  cautions are AI drafts; the plan already labels every caution as an unreviewed draft. The token cost is logged in
+  `content/exercises/source_free_exercise_db/injury_tags_generation_log.csv`, separate from `agent_runs`.
+  Tests: `tests/test_bulk_injury_drafts.py`.
 - **neck, upper_back and hip were added 2026-10-23, and drafted across every hand-authored exercise**, not just
   added as checkboxes: an exercise marked `draft` has been considered for every flag on the list, so adding a flag
   means drafting its tags (and their `ai_drafted` reasons) on all of them. Twelve exercises got new cautions (for

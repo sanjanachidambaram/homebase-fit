@@ -25,7 +25,7 @@ from app import config
 from app.config import CONTENT_DIR, DB_DIR, PROJECT_ROOT
 from app.db import connect, table_counts
 from app.db.reset import refresh_content, reset
-from app.safety_rules import INJURY_FLAGS, RATIONALE_PENDING_SOURCE, RATIONALE_TIERS
+from app.safety_rules import INJURY_FLAGS, RATIONALE_CITATION_LIKE, RATIONALE_PENDING_SOURCE, RATIONALE_TIERS
 
 MUSCLE_GROUPS = ("legs", "arms", "chest", "shoulders", "back", "core", "full_body")
 FORCES = {"push", "pull", "static", None}   # movement direction; None = no single direction
@@ -202,6 +202,9 @@ def injury_rationale(ex: dict, contra: list[str], where: str, errors: list[str])
             errors.append(f"{where} {injury}: pt_reviewed needs the reviewing PT's name and credentials as source")
         if r["tier"] == "ai_drafted" and r["source"] != RATIONALE_PENDING_SOURCE:
             errors.append(f"{where} {injury}: ai_drafted rationale must have source '{RATIONALE_PENDING_SOURCE}'")
+        if RATIONALE_CITATION_LIKE.search(str(r["reasoning"])):
+            errors.append(f"{where} {injury}: reasoning must not look like a citation (years, journals, 'research', "
+                          "'studies show')")
     return {i: {k: str(rationale[i][k]).strip() for k in ("reasoning", "tier", "source")}
             for i in contra if isinstance(rationale.get(i), dict) and set(rationale[i]) == {"reasoning", "tier", "source"}}
 
@@ -258,10 +261,14 @@ def fedb_muscle_group(ex: dict) -> str:
 
 def seed_free_exercise_db(conn: sqlite3.Connection, taken_ids: set[str], errors: list[str]) -> None:
     """Imported library from content/exercises/source_free_exercise_db/ (see ATTRIBUTION.md).
-    No injury info in the dataset, so every row starts 'untagged'."""
+    The dataset has no injury info. Exercises with an entry in injury_tags_ai_drafted.json (the one-time AI drafting,
+    app/db/draft_injury_tags.py) get those drafted tags and reasons, status 'draft', validated exactly like the
+    hand-authored ones; any without one stay 'untagged' (and out of injured users' plans)."""
     path = FEDB_DIR / "exercises.json"
     if not path.exists():
         return
+    drafts_path = FEDB_DIR / "injury_tags_ai_drafted.json"
+    drafts = json.loads(drafts_path.read_text(encoding="utf-8"))["drafts"] if drafts_path.exists() else {}
     for ex in json.loads(path.read_text(encoding="utf-8")):
         where = f"{rel(path)} {ex.get('id', '?')}"
         if not require(ex, ("id", "name", "level", "instructions"), where, errors):
@@ -275,11 +282,21 @@ def seed_free_exercise_db(conn: sqlite3.Connection, taken_ids: set[str], errors:
             continue
         taken_ids.add(ex["id"])
         image = FEDB_DIR / "images" / ex["images"][0] if ex.get("images") else None
+        contra, rationale, status = [], {}, "untagged"
+        if ex["id"] in drafts:
+            d, dwhere = drafts[ex["id"]], f"{rel(drafts_path)} {ex['id']}"
+            contra = d.get("injury_contraindications") or []
+            if set(contra) - INJURY_TAGS:
+                errors.append(f"{dwhere}: unknown injury tag(s) {sorted(set(contra) - INJURY_TAGS)}")
+            if any(r.get("tier") != "ai_drafted" for r in (d.get("injury_rationale") or {}).values()):
+                errors.append(f"{dwhere}: generated drafts are always tier ai_drafted")
+            rationale, status = injury_rationale(d, contra, dwhere, errors), "draft"
         insert_exercise(
             conn, id=ex["id"], name=ex["name"], muscle_group=fedb_muscle_group(ex),
             equipment_needed=json.dumps([FEDB_EQUIPMENT[ex.get("equipment")]]),
-            difficulty=FEDB_LEVEL[ex["level"]], injury_contraindications="[]", force=ex.get("force"),
-            contraindication_status="untagged", demo_media_path=rel(image) if image else None,
+            difficulty=FEDB_LEVEL[ex["level"]], injury_contraindications=json.dumps(contra), force=ex.get("force"),
+            contraindication_status=status, injury_rationale=json.dumps(rationale),
+            demo_media_path=rel(image) if image else None,
             instructions="\n".join(step.strip() for step in ex["instructions"]),
             est_time_seconds=FEDB_EST_SECONDS.get(ex.get("category"), 45), category=ex.get("category"),
             primary_muscles=json.dumps(ex.get("primaryMuscles", [])),
