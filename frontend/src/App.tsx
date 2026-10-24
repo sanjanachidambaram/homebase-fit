@@ -71,8 +71,9 @@ export default function App() {
     <div className="page">
       <header className="site-header">
         <div className="header-inner">
+          {/* The logo goes home: the Dashboard when signed in, the landing page when signed out (both live at /). */}
           <h1 className="brand">
-            <Link to="/">
+            <Link to="/" ariaLabel="HomeBase Fit home">
               <span className="brand-mark" aria-hidden="true">
                 ♥
               </span>

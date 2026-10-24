@@ -16,6 +16,7 @@ import pytest
 from app import config
 from app.db.reset import refresh_content
 from app.security import hash_password
+from tests.test_calendar import on_day  # noqa: F401  (fixture: freezes the calendar's today)
 
 PASSWORD = "correct horse 1"
 
@@ -95,7 +96,8 @@ def test_accounts_from_before_usernames_keep_signing_in_with_their_old_email(cli
 
 # ---------------------------------------------------------------- "Reset my quiz" (Settings)
 
-def test_reset_my_quiz_goes_back_to_no_plan_and_keeps_what_you_did(client):
+def test_reset_my_quiz_goes_back_to_no_plan_and_keeps_what_you_did(client, on_day):
+    """on_day freezes 'today' (a Monday), so which days are workouts doesn't depend on when the test runs."""
     from tests.helpers import quiz_answers
     r = sign_up(client, "resetter").json()
     uid, h = r["user_id"], {"Authorization": f"Bearer {r['token']}"}
@@ -105,7 +107,9 @@ def test_reset_my_quiz_goes_back_to_no_plan_and_keeps_what_you_did(client):
     stored = lambda: [r["id"] for r in rows("SELECT id FROM calendar_entries WHERE user_id = ? ORDER BY date", uid)]
     days = stored()                                                             # four weeks, from today
     assert len(days) == 28
-    done, noted = {"id": days[0]}, {"id": days[1]}
+    first_two = rows("SELECT id, day_type FROM calendar_entries WHERE user_id = ? ORDER BY date LIMIT 2", uid)
+    workout = next(d for d in first_two if d["day_type"] == "workout")         # today or tomorrow: can be ticked
+    done, noted = {"id": workout["id"]}, {"id": next(d["id"] for d in first_two if d["id"] != workout["id"])}
     assert client.patch(f"/api/calendar/{done['id']}", headers=h, json={"completed": True}).status_code == 200
     assert client.patch(f"/api/calendar/{noted['id']}", headers=h, json={"notes": "felt great"}).status_code == 200
     client.post("/api/favorites", headers=h, json={"exercise_id": "glute_bridge"})

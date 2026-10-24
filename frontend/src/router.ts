@@ -2,6 +2,10 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 
 export function navigate(to: string) {
+  if (to === window.location.pathname) {
+    window.scrollTo(0, 0) // already there (e.g. the logo on the home page): no new history entry, back to the top
+    return
+  }
   window.history.pushState({}, '', to)
   window.dispatchEvent(new PopStateEvent('popstate'))
   // Scrolling to the top happens in App (useScrollToTopOnRouteChange), after the new page renders.

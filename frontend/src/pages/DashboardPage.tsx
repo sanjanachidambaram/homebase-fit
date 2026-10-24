@@ -5,7 +5,6 @@ import ClinicalSupportCard from '../components/ClinicalSupport'
 import AskBasics from '../components/dashboard/AskBasics'
 import CoachCard from '../components/dashboard/CoachCard'
 import PlanCard from '../components/dashboard/PlanCard'
-import WorkoutBuilder from '../components/dashboard/WorkoutBuilder'
 import Link from '../components/Link'
 import { setSession, useSession, type Session } from '../session'
 import WelcomePage from './WelcomePage'
@@ -52,14 +51,12 @@ function Dashboard({ session }: { session: Session }) {
         <ClinicalSupportCard />
       ) : (
         (account || loadFailed) && (
-          <>
-            <div className="dash-grid">
-              <CoachCard token={session.token} userId={session.userId} />
-              <PlanCard token={session.token} userId={session.userId} />
-              <AskBasics token={session.token} />
-            </div>
-            <WorkoutBuilder token={session.token} compact />
-          </>
+          // Build Your Own has its own page (nav), so it isn't repeated here.
+          <div className="dash-grid">
+            <CoachCard token={session.token} userId={session.userId} />
+            <PlanCard token={session.token} userId={session.userId} />
+            <AskBasics token={session.token} />
+          </div>
         )
       )}
     </div>
