@@ -1,4 +1,8 @@
-# HomeBase Fit
+# Bee Fit 🐝
+
+(Formerly HomeBase Fit, renamed 2026-10-25. Internal names keep `homebase` on purpose: the database files
+`homebase.db` / `homebase_original.db`, `HOMEBASE_DB_PATH`, the Render service and disk, the MCP server id and the
+browser's saved sign-in key. Renaming those would detach the live database and sign everyone out.)
 
 A home workout coach for limited equipment that plans around your goals and your injuries at the same time.
 Class project: not a substitute for professional medical advice.

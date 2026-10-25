@@ -1,4 +1,5 @@
 import { useLayoutEffect, type JSX } from 'react'
+import BeeLogo from './components/BeeLogo'
 import { DisclaimerBar } from './components/Legal'
 import Link from './components/Link'
 import AboutDataPage from './pages/AboutDataPage'
@@ -46,17 +47,17 @@ const PAGES: Record<string, () => JSX.Element> = {
   '/pregnancy-support': PregnancySupportPage, // pregnant / postpartum users are sent here (quiz, Dashboard, blocks)
 }
 
-// Only pages that exist get a nav link.
-// About sits right after Dashboard, and Calendar right after Build Your Own. My Faves lives inside the Exercise
-// Library (a subtab), not in the nav.
+// Only pages that exist get a nav link. The order (2026-10-25): Dashboard, Personalized Plan, Calendar, Build Your
+// Own, Exercise Library, Workout Basics, then About and Settings last. My Faves lives inside the Exercise Library
+// (a subtab), not in the nav.
 const NAV: { path: string; label: string; also?: (path: string) => boolean }[] = [
   { path: '/', label: 'Dashboard' },
-  { path: '/about', label: 'About', also: (p) => p.startsWith('/about/') },
-  { path: '/plan', label: 'Your Personalized Plan', also: (p) => p === '/plan/review' },
-  { path: '/basics', label: 'Workout Basics' },
-  { path: '/build', label: 'Build Your Own' },
+  { path: '/plan', label: 'Personalized Plan', also: (p) => p === '/plan/review' },
   { path: '/calendar', label: 'Calendar' },
+  { path: '/build', label: 'Build Your Own' },
   { path: '/exercises', label: 'Exercise Library', also: (p) => p === '/faves' },
+  { path: '/basics', label: 'Workout Basics' },
+  { path: '/about', label: 'About', also: (p) => p.startsWith('/about/') },
   { path: '/settings', label: 'Settings' },
 ]
 
@@ -73,11 +74,11 @@ export default function App() {
         <div className="header-inner">
           {/* The logo goes home: the Dashboard when signed in, the landing page when signed out (both live at /). */}
           <h1 className="brand">
-            <Link to="/" ariaLabel="HomeBase Fit home">
+            <Link to="/" ariaLabel="Bee Fit home">
               <span className="brand-mark" aria-hidden="true">
-                ♥
+                <BeeLogo size={40} />
               </span>
-              HomeBase Fit
+              Bee Fit <span aria-hidden="true">🐝</span>
             </Link>
           </h1>
           <nav aria-label="Main">

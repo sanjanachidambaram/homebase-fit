@@ -37,7 +37,7 @@ MEDIA_EXTS = (".gif", *VIDEO_EXTS, ".jpg", ".jpeg", ".png", ".webp")
 DEFAULT_MEDIA_EXT = ".gif"
 DEFAULT_SOURCE = "placeholder-authored"   # the hand-authored drafts in content/
 
-# ---- free-exercise-db mapping onto HomeBase Fit's categories
+# ---- free-exercise-db mapping onto Bee Fit's categories
 FEDB_SOURCE = "free-exercise-db"
 FEDB_DIR = CONTENT_DIR / "exercises" / "source_free_exercise_db"
 FEDB_MUSCLE_TO_GROUP = {

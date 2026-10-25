@@ -1,4 +1,4 @@
-# HomeBase Fit MCP server
+# Bee Fit MCP server
 
 The FastMCP tool layer the AI agents call. It is separate from the REST API (`app/main.py`), which the website uses.
 Exactly **6 tools**, all **read-only**. There is no delete tool, no write tool, and nothing that returns an email.

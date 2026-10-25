@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 
-const COLORS = ['var(--pink)', 'var(--yellow)', 'var(--mint)', 'var(--lavender)', 'var(--coral)']
+const COLORS = ['var(--orange)', 'var(--yellow)', 'var(--green)', 'var(--honey)', 'var(--rust)']
 const PIECES = 18
 
 /** A quick burst of CSS confetti (~1.6s), then it removes itself. Hidden entirely for reduced motion (see App.css). */

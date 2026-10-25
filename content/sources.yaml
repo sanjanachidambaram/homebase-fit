@@ -1,4 +1,4 @@
-# SOURCE REGISTRY: the authoritative list of where HomeBase Fit's content comes from.
+# SOURCE REGISTRY: the authoritative list of where Bee Fit's content comes from.
 # Served at GET /api/sources and shown in the site's "Data & Sources" footer.
 #
 # Add an entry whenever real content arrives, then point that content at it:
@@ -25,7 +25,7 @@ sources:
     status: active
 
   - id: placeholder-authored
-    name: HomeBase Fit placeholder content (AI-drafted)
+    name: Bee Fit placeholder content (AI-drafted)
     url:
     license: Project content; not yet professionally reviewed
     used_for: 27 starter exercises (with drafted injury tags), 15 goal protocols, and 5 Workout Basics articles, all pending PT review

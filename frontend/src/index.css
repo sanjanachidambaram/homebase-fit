@@ -1,31 +1,32 @@
-/* HomeBase Fit design tokens. Source of truth: design.md (sections 2-4).
+/* Bee Fit design tokens. Source of truth: design.md (sections 2-4).
    Brand colors are for fills and accents; text uses --ink or the *-deep colors (contrast in design.md). */
 :root {
-  --pink: #ff4fa3;
-  --yellow: #ffd23f;
-  --mint: #06d6a0;
-  --lavender: #b298dc;
-  --coral: #ff6b6b;
-  --bg: #fff9f5;
-  --ink: #3a2147;
-  --ink-soft: #5e4a68;          /* secondary text; 7.6:1 on --bg */
-  --pink-deep: #e0006b;
-  --mint-deep: #048261;
-  --lavender-deep: #865dc8;
+  /* Bee Fit: yellow, orange and green. Fills and accents only; text uses --ink or a *-deep color. */
+  --orange: #ff8c1a;            /* brand: main buttons, active tab, hearts (dark ink text on it, 6.2:1) */
+  --yellow: #ffc61a;            /* highlights, stars, shoulders */
+  --green: #5cb85c;             /* success, done days, progress */
+  --honey: #f0c75e;             /* soft borders and secondary accents (was lavender) */
+  --rust: #f2703a;              /* warm accent (was coral) */
+  --bg: #fffbef;
+  --ink: #2b2a1e;               /* 14:1 on --bg */
+  --ink-soft: #5b5340;          /* secondary text; 7.4:1 on --bg */
+  --orange-deep: #b34a00;       /* links, focus rings, small icons; 5.2:1 on --bg, white text on it 5.4:1 */
+  --green-deep: #276b2b;        /* 6.3:1 on --bg, 5.7:1 on --green-tint */
+  --honey-deep: #7a5700;        /* secondary text/icons and outlines; 6.4:1 on --bg */
   --error: #b3261e;
 
-  /* light tints for backgrounds (dark ink text on all of them) */
-  --pink-tint: #ffe3f0;
-  --yellow-tint: #fff4cc;
-  --mint-tint: #d8f8ee;
-  --lavender-tint: #efe8fa;
-  --coral-tint: #ffe3e3;
+  /* light tints for backgrounds (dark ink text on all of them, 12:1 or more) */
+  --orange-tint: #ffe8cc;
+  --yellow-tint: #fff4c2;
+  --green-tint: #e2f4dc;
+  --honey-tint: #fff5dc;
+  --rust-tint: #ffe5d9;
 
   --radius-card: 24px;
   --radius-input: 16px;
   --radius-pill: 999px;
-  --shadow: 0 8px 24px rgba(255, 79, 163, 0.16);
-  --shadow-lift: 0 12px 28px rgba(255, 79, 163, 0.24);
+  --shadow: 0 8px 24px rgba(255, 140, 26, 0.18);
+  --shadow-lift: 0 12px 28px rgba(255, 140, 26, 0.26);
   --font-display: 'Fredoka Variable', 'Fredoka', 'Baloo 2', system-ui, sans-serif;
   --font-body: 'Nunito Variable', 'Nunito', 'Quicksand', system-ui, sans-serif;
 
@@ -57,7 +58,7 @@ h4 {
 }
 
 a {
-  color: var(--pink-deep);
+  color: var(--orange-deep);
   text-underline-offset: 3px;
 }
 
@@ -71,7 +72,7 @@ textarea {
 
 /* One visible focus ring for everything (design.md section 8). */
 :focus-visible {
-  outline: 3px solid var(--pink-deep);
+  outline: 3px solid var(--orange-deep);
   outline-offset: 2px;
 }
 

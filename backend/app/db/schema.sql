@@ -1,4 +1,4 @@
--- HomeBase Fit database schema (SQLite).
+-- Bee Fit database schema (SQLite).
 --
 -- Conventions:
 --   * JSON columns hold JSON text and are checked with json_valid().

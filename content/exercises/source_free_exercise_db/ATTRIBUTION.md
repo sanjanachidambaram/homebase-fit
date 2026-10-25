@@ -16,11 +16,11 @@ The exercise library and demo images in this folder come from:
 | `images/<id>/<n>.jpg` | The dataset's demo images, unmodified (1,746 files) |
 | `SOURCE_COMMIT` | The upstream commit these files were taken from |
 
-## How HomeBase Fit uses it
+## How Bee Fit uses it
 
 `backend/app/db/seed.py` imports every exercise into the `exercises` table with
 `source_dataset = 'free-exercise-db'`. It maps the dataset's muscles, equipment,
-and level onto HomeBase Fit's own categories; the original `primaryMuscles` and
+and level onto Bee Fit's own categories; the original `primaryMuscles` and
 `secondaryMuscles` are kept alongside.
 
 **Injury tags:** the dataset has no injury information. Every imported exercise starts

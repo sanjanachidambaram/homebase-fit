@@ -6,7 +6,7 @@
 export const CONSENT_VERSION = '2026-10-22'
 
 export const DISCLAIMER =
-  'HomeBase Fit is a student project and is not a substitute for professional medical advice. ' +
+  'Bee Fit is a student project and is not a substitute for professional medical advice. ' +
   'Consult a doctor or physical therapist before starting any exercise program, especially if you ' +
   'have an injury or medical condition.'
 
@@ -15,14 +15,14 @@ export const DISCLAIMER =
 export const OBGYN_NAME = 'Dr. [Name]'
 
 export const CLASS_PROJECT_NOTE =
-  'HomeBase Fit is a class project, not a commercial product. Use it at your own risk.'
+  'Bee Fit is a class project, not a commercial product. Use it at your own risk.'
 
 // Shown as the required acknowledgment step in the quiz, before any health questions.
 export const DISCLAIMER_FULL_POINTS = [
   'The workouts, programs, and tips here are general information. Even when they take the injuries you report into account, they are not personalized medical advice from a professional who has examined you.',
   'Much of the content is still pending review by a physical therapist or doctor.',
   'Stop exercising and get medical care if you feel sharp or sudden pain, numbness, tingling, chest pain, dizziness, or trouble breathing.',
-  'You use HomeBase Fit at your own risk.',
+  'You use Bee Fit at your own risk.',
 ]
 
 export const CONSENT_LABEL =

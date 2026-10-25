@@ -1,4 +1,4 @@
-# HARD RULES FOR ALL HOMEBASE FIT AGENTS
+# HARD RULES FOR ALL BEE FIT AGENTS
 
 These are the rules every agent follows. Each agent's prompt file restates the ones that apply to it,
 but **a prompt instruction alone never counts**: every rule below is also enforced by code, and the

@@ -35,7 +35,7 @@ def needs_clinical_review(pregnancy_status: str | None) -> bool:
 # Where pregnant / postpartum users are sent instead of any AI feature (frontend route).
 CLINICAL_REVIEW_PAGE = "/pregnancy-support"
 CLINICAL_REVIEW_NO_AI = (
-    "While you're pregnant or postpartum, HomeBase Fit's AI features and generated workouts are switched off, "
+    "While you're pregnant or postpartum, Bee Fit's AI features and generated workouts are switched off, "
     "because exercise in this period needs individual clearance from a clinician who knows you. Please talk with "
     "your OB-GYN or midwife."
 )

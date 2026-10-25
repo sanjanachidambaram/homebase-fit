@@ -216,7 +216,7 @@ function DayCard({
       }`}
     >
       <div className="day-card-head">
-        {/* A custom day's focus reads "Your own: ..." and gets the pink chip, so it's clear it was overridden. */}
+        {/* A custom day's focus reads "Your own: ..." and gets the orange chip, so it's clear it was overridden. */}
         <span
           className={`chip chip-small ${
             entry.day_type === 'cardio'

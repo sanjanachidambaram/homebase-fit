@@ -45,7 +45,7 @@ export default function PregnancySupportPage() {
           months, depending on your health, your pregnancy, and your recovery.
         </p>
         <p>
-          HomeBase Fit's generated plans and workout builder aren't built for pregnancy or postpartum exercise. They
+          Bee Fit's generated plans and workout builder aren't built for pregnancy or postpartum exercise. They
           can't check the things that matter most right now, so we've switched them off for you rather than guess.
         </p>
         <p>

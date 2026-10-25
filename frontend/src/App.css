@@ -1,6 +1,7 @@
-/* HomeBase Fit component styles, following design.md. Tokens live in index.css.
-   Contrast rules: text is --ink (or --ink-soft on white/tints only); never white text on yellow, mint,
-   lavender, or coral; deep-pink links only on white or --bg. */
+/* Bee Fit component styles, following design.md. Tokens live in index.css.
+   Contrast rules: text is --ink (or --ink-soft on white/tints only); never white text on orange, yellow, green,
+   honey or rust (white only on --orange-deep, --green-deep or --error); deep-orange links only on white, --bg or a
+   tint. */
 
 /* ================================================================ layout */
 
@@ -53,7 +54,7 @@ main {
 
 .success {
   font-weight: 800;
-  color: var(--mint-deep);
+  color: var(--green-deep);
 }
 
 .error {
@@ -76,7 +77,7 @@ main {
   top: 0;
   z-index: 5;
   background: #fff;
-  box-shadow: 0 4px 18px rgba(58, 33, 71, 0.08);
+  box-shadow: 0 4px 18px rgba(43, 42, 30, 0.08);
 }
 
 .header-inner {
@@ -102,16 +103,22 @@ main {
   text-decoration: none;
 }
 
+/* The bee-with-a-dumbbell logo (components/BeeLogo.tsx) in a honey-colored badge. */
 .brand-mark {
   display: inline-grid;
   place-items: center;
-  width: 2.1rem;
-  height: 2.1rem;
+  width: 2.9rem;
+  height: 2.9rem;
   border-radius: 50%;
-  background: var(--pink);
-  color: var(--ink);
-  font-size: 1.1rem;
+  background: var(--yellow-tint);
+  border: 2px solid var(--yellow);
   box-shadow: var(--shadow);
+}
+
+.brand-mark svg {
+  display: block;
+  width: 2.3rem;
+  height: 2.3rem;
 }
 
 .site-header nav {
@@ -137,11 +144,11 @@ main {
 }
 
 .nav-link:hover {
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
 }
 
 .nav-link.active {
-  background: var(--pink);
+  background: var(--orange);
   box-shadow: var(--shadow);
 }
 
@@ -175,7 +182,7 @@ main {
 }
 
 .btn {
-  background: var(--pink);
+  background: var(--orange);
   color: var(--ink);
   border: none;
   box-shadow: var(--shadow);
@@ -192,7 +199,7 @@ main {
 .btn-secondary {
   background: #fff;
   color: var(--ink);
-  border: 2px solid var(--lavender-deep);
+  border: 2px solid var(--honey-deep);
 }
 
 .btn-ghost {
@@ -204,7 +211,7 @@ main {
 }
 
 .btn-ghost:hover {
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
 }
 
 .btn-danger {
@@ -241,7 +248,7 @@ main {
   border: none;
   padding: 0.5rem 0;
   margin-left: 1rem;
-  color: var(--pink-deep);
+  color: var(--orange-deep);
   font-weight: 700;
   text-decoration: underline;
   cursor: pointer;
@@ -275,7 +282,7 @@ main {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--ink);
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
   text-transform: capitalize;
 }
 
@@ -286,7 +293,7 @@ main {
 }
 
 .chip-button {
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   background: #fff;
   min-height: 40px;
   text-transform: none;
@@ -294,7 +301,7 @@ main {
 }
 
 .chip-button:hover {
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
 }
 
 .chip-check {
@@ -304,19 +311,19 @@ main {
   min-height: 44px;
   padding: 0 1rem;
   border-radius: var(--radius-pill);
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   background: #fff;
   font-weight: 700;
   cursor: pointer;
 }
 
 .chip-check input {
-  accent-color: var(--pink-deep);
+  accent-color: var(--orange-deep);
 }
 
 .chip-check.chip-on {
-  background: var(--pink-tint);
-  border-color: var(--pink);
+  background: var(--orange-tint);
+  border-color: var(--orange);
 }
 
 .badge {
@@ -325,12 +332,12 @@ main {
 }
 
 .badge-free-exercise-db {
-  background: var(--mint-tint);
+  background: var(--green-tint);
 }
 
 .badge-placeholder-authored {
-  background: var(--lavender-tint);
-  outline: 2px dashed var(--lavender);
+  background: var(--honey-tint);
+  outline: 2px dashed var(--honey);
   outline-offset: -2px;
 }
 
@@ -339,28 +346,28 @@ main {
 }
 
 .status-active {
-  background: var(--mint);
+  background: var(--green);
 }
 
 .status-placeholder {
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
 }
 
 .status-pending {
   background: var(--yellow-tint);
 }
 
-/* "Content pending expert review": a cute lavender pill, but always visible and readable (design.md 7.5) */
+/* "Content pending expert review": a cute honey pill, but always visible and readable (design.md 7.5) */
 .review-tag {
   text-transform: none;
-  background: var(--lavender-tint);
-  border: 2px dashed var(--lavender-deep);
+  background: var(--honey-tint);
+  border: 2px dashed var(--honey-deep);
 }
 
 .review-tag-ok {
-  background: var(--mint);
+  background: var(--green);
   border-style: solid;
-  border-color: var(--mint-deep);
+  border-color: var(--green-deep);
 }
 
 .review-info {
@@ -377,7 +384,7 @@ main {
 }
 
 .pending-note {
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
   border-radius: var(--radius-input);
   padding: 0.6rem 0.9rem;
   font-size: 0.95rem;
@@ -396,14 +403,14 @@ main {
 
 /* ================================================================ muscle-group colors (design.md 5) */
 
-.group-legs { --group: var(--pink); --group-tint: var(--pink-tint); }
-.group-arms { --group: var(--lavender); --group-tint: var(--lavender-tint); }
-.group-chest { --group: var(--coral); --group-tint: var(--coral-tint); }
+.group-legs { --group: var(--orange); --group-tint: var(--orange-tint); }
+.group-arms { --group: var(--honey); --group-tint: var(--honey-tint); }
+.group-chest { --group: var(--rust); --group-tint: var(--rust-tint); }
 .group-shoulders { --group: var(--yellow); --group-tint: var(--yellow-tint); }
-.group-back { --group: var(--mint); --group-tint: var(--mint-tint); }
-.group-core { --group: linear-gradient(90deg, var(--pink), var(--lavender)); --group-tint: #f7e6f7; }
+.group-back { --group: var(--green); --group-tint: var(--green-tint); }
+.group-core { --group: linear-gradient(90deg, var(--green), var(--yellow)); --group-tint: var(--green-tint); }
 .group-full_body {
-  --group: linear-gradient(90deg, var(--pink), var(--yellow), var(--mint), var(--lavender), var(--coral));
+  --group: linear-gradient(90deg, var(--orange), var(--yellow), var(--green), var(--honey), var(--rust));
   --group-tint: var(--yellow-tint);
 }
 
@@ -420,7 +427,7 @@ main {
   min-height: 44px;
   padding: 0 1.2rem;
   border-radius: var(--radius-pill);
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   background: #fff;
   color: var(--ink);
   font-weight: 800;
@@ -428,8 +435,8 @@ main {
 }
 
 .tab-on {
-  background: var(--pink);
-  border-color: var(--pink);
+  background: var(--orange);
+  border-color: var(--orange);
   box-shadow: var(--shadow);
 }
 
@@ -453,7 +460,7 @@ main {
 .ask-form input {
   min-height: 48px;
   padding: 0.5rem 0.9rem;
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   border-radius: var(--radius-input);
   background: #fff;
 }
@@ -463,7 +470,7 @@ main {
 .question input:focus,
 .question textarea:focus,
 .ask-form input:focus {
-  border-color: var(--pink-deep);
+  border-color: var(--orange-deep);
 }
 
 .count {
@@ -490,7 +497,7 @@ main {
 .card::before {
   content: '';
   height: 8px;
-  background: var(--group, var(--lavender));
+  background: var(--group, var(--honey));
 }
 
 .card:hover {
@@ -504,7 +511,7 @@ main {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  background: var(--group-tint, var(--lavender-tint));
+  background: var(--group-tint, var(--honey-tint));
 }
 
 .no-media {
@@ -552,7 +559,7 @@ main {
 }
 
 .card:has(.card-open:focus-visible) {
-  outline: 3px solid var(--pink-deep);
+  outline: 3px solid var(--orange-deep);
   outline-offset: 3px;
 }
 
@@ -573,8 +580,8 @@ main {
   border: none;
   border-radius: var(--radius-pill);
   background: #fff;
-  color: var(--pink-deep);
-  box-shadow: 0 4px 14px rgba(58, 33, 71, 0.18);
+  color: var(--orange-deep);
+  box-shadow: 0 4px 14px rgba(43, 42, 30, 0.18);
   cursor: pointer;
   transition: transform 150ms;
 }
@@ -608,7 +615,7 @@ main {
   left: 50%;
   top: 50%;
   font-size: 0.8rem;
-  color: var(--pink);
+  color: var(--orange);
   animation: heart-float 450ms ease-out forwards;   /* same length as heart-pop, which resets the burst */
   opacity: 0;
 }
@@ -629,16 +636,16 @@ main {
   padding: 0 1.2rem 0 0.9rem;
   font-weight: 800;
   color: var(--ink);
-  background: var(--pink-tint);
+  background: var(--orange-tint);
   box-shadow: none;
 }
 
 .heart-labeled svg {
-  color: var(--pink-deep);
+  color: var(--orange-deep);
 }
 
 .heart-labeled.heart-on {
-  background: var(--pink);
+  background: var(--orange);
 }
 
 .heart-labeled.heart-on svg {
@@ -651,7 +658,7 @@ main {
   position: fixed;
   inset: 0;
   z-index: 20;
-  background: rgba(58, 33, 71, 0.55);
+  background: rgba(43, 42, 30, 0.55);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -666,7 +673,7 @@ main {
   max-width: 660px;
   padding: 1.2rem 1.4rem 1.6rem;
   margin: auto;
-  box-shadow: 0 20px 60px rgba(58, 33, 71, 0.3);
+  box-shadow: 0 20px 60px rgba(43, 42, 30, 0.3);
   animation: rise-in 220ms ease-out;
 }
 
@@ -683,8 +690,8 @@ main {
 }
 
 .modal-head .btn-secondary {
-  background: var(--pink);
-  border-color: var(--pink);
+  background: var(--orange);
+  border-color: var(--orange);
 }
 
 .detail-media img,
@@ -694,7 +701,7 @@ main {
   width: 100%;
   max-height: 420px;
   object-fit: contain;
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
   border-radius: 20px;
 }
 
@@ -725,7 +732,7 @@ main {
 }
 
 .steps-list li::marker {
-  color: var(--pink-deep);
+  color: var(--orange-deep);
   font-weight: 800;
 }
 
@@ -824,7 +831,7 @@ fieldset.question {
   min-height: 52px;
   margin: 0.45rem 0;
   padding: 0.5rem 1rem;
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   border-radius: var(--radius-input);
   background: #fff;
   font-weight: 700;
@@ -833,18 +840,18 @@ fieldset.question {
 }
 
 .choice:hover {
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
 }
 
 .choice:has(input:checked) {
-  background: var(--pink-tint);
-  border-color: var(--pink);
+  background: var(--orange-tint);
+  border-color: var(--orange);
 }
 
 .choice input {
   width: 1.2rem;
   height: 1.2rem;
-  accent-color: var(--pink-deep);
+  accent-color: var(--orange-deep);
 }
 
 .number-row {
@@ -875,13 +882,13 @@ fieldset.question {
   padding: 0.35rem 1rem;
   border-radius: var(--radius-pill);
   background: #fff;
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   font-weight: 700;
 }
 
 .steps li.current {
-  background: var(--pink);
-  border-color: var(--pink);
+  background: var(--orange);
+  border-color: var(--orange);
   box-shadow: var(--shadow);
 }
 
@@ -890,7 +897,7 @@ fieldset.question {
 .privacy-note {
   max-width: 760px;
   margin-bottom: 1.25rem;
-  border-left: 6px solid var(--lavender-deep);
+  border-left: 6px solid var(--honey-deep);
 }
 
 .consent-box h3,
@@ -909,7 +916,7 @@ fieldset.question {
   align-items: flex-start;
   margin: 1rem 0 0.25rem;
   padding: 0.9rem 1rem;
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
   border-radius: var(--radius-input);
   font-weight: 800;
   cursor: pointer;
@@ -920,7 +927,7 @@ fieldset.question {
   margin-top: 0.2rem;
   width: 1.3rem;
   height: 1.3rem;
-  accent-color: var(--pink-deep);
+  accent-color: var(--orange-deep);
 }
 
 .danger-zone {
@@ -934,7 +941,7 @@ fieldset.question {
 
 .confirm-box {
   border: 2px solid var(--error);
-  background: var(--coral-tint);
+  background: var(--rust-tint);
   border-radius: var(--radius-input);
   padding: 0.75rem 1rem;
 }
@@ -952,11 +959,11 @@ fieldset.question {
   border-radius: var(--radius-card);
   box-shadow: var(--shadow);
   padding: 1rem 1.25rem 1.2rem;
-  border-top: 8px solid var(--lavender);
+  border-top: 8px solid var(--honey);
 }
 
 .content-list:first-of-type .content-item {
-  border-top-color: var(--pink);
+  border-top-color: var(--orange);
 }
 
 .content-item h4 {
@@ -978,7 +985,7 @@ fieldset.question {
   overflow: hidden;
   padding: 2rem 1.75rem;
   border-radius: var(--radius-card);
-  background: linear-gradient(135deg, var(--pink-tint), var(--yellow-tint) 60%, var(--mint-tint));
+  background: linear-gradient(135deg, var(--orange-tint), var(--yellow-tint) 60%, var(--green-tint));
   box-shadow: var(--shadow);
 }
 
@@ -1012,8 +1019,8 @@ fieldset.question {
   opacity: 0.45;
 }
 
-.hero-blobs span:nth-child(1) { width: 140px; height: 140px; right: -40px; top: -40px; background: var(--pink); }
-.hero-blobs span:nth-child(2) { width: 90px; height: 90px; right: 70px; bottom: -30px; background: var(--mint); }
+.hero-blobs span:nth-child(1) { width: 140px; height: 140px; right: -40px; top: -40px; background: var(--orange); }
+.hero-blobs span:nth-child(2) { width: 90px; height: 90px; right: 70px; bottom: -30px; background: var(--green); }
 .hero-blobs span:nth-child(3) { width: 50px; height: 50px; right: 40px; top: 90px; background: var(--yellow); }
 
 .dash-grid {
@@ -1046,13 +1053,13 @@ fieldset.question {
 
 .quiz-prompt {
   margin-bottom: 1.25rem;
-  background: linear-gradient(135deg, var(--yellow-tint), var(--pink-tint));
+  background: linear-gradient(135deg, var(--yellow-tint), var(--orange-tint));
 }
 
 /* Coach */
 .coach-card {
   grid-column: 1 / -1;
-  background: linear-gradient(135deg, var(--pink-tint), #fff 55%, var(--lavender-tint));
+  background: linear-gradient(135deg, var(--orange-tint), #fff 55%, var(--honey-tint));
 }
 
 .coach-text {
@@ -1070,13 +1077,13 @@ fieldset.question {
   padding: 0.35rem 1rem;
   border-radius: var(--radius-pill);
   font-weight: 800;
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
 }
 
-.goal-ahead { background: var(--mint); }
-.goal-on-track { background: var(--mint-tint); }
+.goal-ahead { background: var(--green); }
+.goal-on-track { background: var(--green-tint); }
 .goal-behind { background: var(--yellow-tint); }
-.goal-early { background: var(--lavender-tint); }
+.goal-early { background: var(--honey-tint); }
 
 .goal-celebrate {
   animation: bounce 700ms cubic-bezier(0.3, 1.5, 0.5, 1) 2;
@@ -1118,7 +1125,7 @@ fieldset.question {
   background: #fff;
   border-radius: 20px;
   padding: 0.6rem 0.9rem;
-  box-shadow: 0 4px 14px rgba(58, 33, 71, 0.08);
+  box-shadow: 0 4px 14px rgba(43, 42, 30, 0.08);
 }
 
 .stat-row dt {
@@ -1138,8 +1145,8 @@ fieldset.question {
   margin-top: 1rem;
   padding: 0.9rem 1.1rem;
   border-radius: var(--radius-input);
-  background: var(--lavender-tint);
-  border-left: 6px solid var(--lavender);
+  background: var(--honey-tint);
+  border-left: 6px solid var(--honey);
 }
 
 .rest-note p {
@@ -1148,7 +1155,7 @@ fieldset.question {
 
 /* Program */
 .program-card {
-  border-top: 8px solid var(--pink);
+  border-top: 8px solid var(--orange);
 }
 
 .program-name {
@@ -1180,7 +1187,7 @@ fieldset.question {
   width: 3rem;
   height: 3rem;
   border-radius: 50%;
-  background: var(--mint-tint);
+  background: var(--green-tint);
   font-family: var(--font-display);
   font-weight: 600;
 }
@@ -1188,7 +1195,7 @@ fieldset.question {
 /* Ask Workout Basics */
 .ask-card {
   grid-column: 1 / -1; /* full width on the Dashboard, so there's room to type a real question */
-  border-top: 8px solid var(--lavender);
+  border-top: 8px solid var(--honey);
 }
 
 .ask-form {
@@ -1202,7 +1209,7 @@ fieldset.question {
   min-width: 0;
   min-height: 4.5rem;
   padding: 0.7rem 0.9rem;
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   border-radius: var(--radius-input);
   background: #fff;
   font: inherit;
@@ -1211,7 +1218,7 @@ fieldset.question {
 }
 
 .ask-form textarea:focus {
-  border-color: var(--pink-deep);
+  border-color: var(--orange-deep);
 }
 
 @media (max-width: 560px) {
@@ -1252,7 +1259,7 @@ fieldset.question {
 
 /* Workout builder */
 .builder-card {
-  border-top: 8px solid var(--mint);
+  border-top: 8px solid var(--green);
 }
 
 .builder-form {
@@ -1283,7 +1290,7 @@ fieldset.question {
   padding: 0.3rem 0.4rem 0.3rem 0.9rem;
   margin-bottom: 0.4rem;
   border-radius: var(--radius-pill);
-  background: var(--group-tint, var(--lavender-tint));
+  background: var(--group-tint, var(--honey-tint));
 }
 
 .stepper-label {
@@ -1299,7 +1306,7 @@ fieldset.question {
   font-size: 1.4rem;
   font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 3px 10px rgba(58, 33, 71, 0.12);
+  box-shadow: 0 3px 10px rgba(43, 42, 30, 0.12);
 }
 
 .stepper button:disabled {
@@ -1325,7 +1332,7 @@ fieldset.question {
 }
 
 .range-field input {
-  accent-color: var(--pink-deep);
+  accent-color: var(--orange-deep);
   height: 2rem;
 }
 
@@ -1343,7 +1350,7 @@ fieldset.question {
 .time-bar {
   height: 14px;
   border-radius: var(--radius-pill);
-  background: var(--mint-tint);
+  background: var(--green-tint);
   overflow: hidden;
 }
 
@@ -1351,7 +1358,7 @@ fieldset.question {
   display: block;
   height: 100%;
   border-radius: var(--radius-pill);
-  background: var(--mint);
+  background: var(--green);
   transition: width 500ms ease-out;
 }
 
@@ -1369,7 +1376,7 @@ fieldset.question {
   align-items: flex-start;
   padding: 0.8rem 1rem;
   border-radius: 20px;
-  background: var(--group-tint, var(--lavender-tint));
+  background: var(--group-tint, var(--honey-tint));
 }
 
 .session-num {
@@ -1394,7 +1401,7 @@ fieldset.question {
   font-weight: 600;
   text-align: left;
   text-decoration: underline;
-  text-decoration-color: var(--pink);
+  text-decoration-color: var(--orange);
   text-underline-offset: 4px;
   cursor: pointer;
 }
@@ -1407,7 +1414,7 @@ fieldset.question {
   margin-top: 1rem;
   padding: 0.75rem 1rem;
   border-radius: var(--radius-input);
-  background: var(--mint-tint);
+  background: var(--green-tint);
 }
 
 /* Loading dots */
@@ -1428,12 +1435,23 @@ fieldset.question {
   width: 0.6rem;
   height: 0.6rem;
   border-radius: 50%;
-  background: var(--pink);
+  background: var(--orange);
   animation: dot 900ms ease-in-out infinite;
 }
 
 .dots span:nth-child(2) { background: var(--yellow); animation-delay: 150ms; }
-.dots span:nth-child(3) { background: var(--mint); animation-delay: 300ms; }
+.dots span:nth-child(3) { background: var(--green); animation-delay: 300ms; }
+
+/* The bee does a little lift while things load. */
+.loading-bee {
+  flex: none;
+  animation: bee-lift 1.2s ease-in-out infinite;
+}
+
+@keyframes bee-lift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px) rotate(-4deg); }
+}
 
 @keyframes dot {
   0%, 100% { transform: translateY(0); }
@@ -1476,13 +1494,13 @@ fieldset.question {
 .disclaimer-bar {
   background: #fff;
   color: var(--ink);
-  border-top: 4px solid var(--lavender-deep);
+  border-top: 4px solid var(--honey-deep);
   padding: 1rem max(1rem, calc((100% - 1120px) / 2 + 1rem));
   font-size: 0.98rem;
 }
 
 .disclaimer-bar a {
-  color: var(--pink-deep);
+  color: var(--orange-deep);
   font-weight: 800;
 }
 
@@ -1508,18 +1526,18 @@ fieldset.question {
 .question input[type='date'] {
   min-height: 48px;
   padding: 0.5rem 0.9rem;
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   border-radius: var(--radius-input);
   background: #fff;
 }
 
-/* Gentle, never a block: a calm lavender note with its source (design.md 7: no shaming). */
+/* Gentle, never a block: a calm honey note with its source (design.md 7: no shaming). */
 .pace-note {
   margin: -0.4rem 0 1rem;
   padding: 0.8rem 1rem;
   border-radius: var(--radius-input);
-  background: var(--lavender-tint);
-  border-left: 6px solid var(--lavender);
+  background: var(--honey-tint);
+  border-left: 6px solid var(--honey);
 }
 
 .pace-note p {
@@ -1546,7 +1564,7 @@ fieldset.question {
 }
 
 .chip-safe {
-  background: var(--mint);
+  background: var(--green);
 }
 
 .week-strip {
@@ -1568,12 +1586,12 @@ fieldset.question {
 }
 
 .strip-train {
-  background: var(--pink-tint);
-  border: 2px solid var(--pink);
+  background: var(--orange-tint);
+  border: 2px solid var(--orange);
 }
 
 .strip-rest {
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
 }
 
 .strip-day {
@@ -1622,7 +1640,7 @@ fieldset.question {
   padding: 1rem 1.1rem;
   border-radius: var(--radius-input);
   background: #fff;
-  border: 2px solid var(--lavender-deep);
+  border: 2px solid var(--honey-deep);
 }
 
 .clinical-box p {
@@ -1677,7 +1695,7 @@ fieldset.question {
   height: 2.4rem;
   padding: 0 0.5rem;
   border-radius: var(--radius-pill);
-  background: var(--pink);
+  background: var(--orange);
   font-family: var(--font-display);
   font-weight: 600;
 }
@@ -1687,14 +1705,14 @@ fieldset.question {
   border-radius: var(--radius-card);
   box-shadow: var(--shadow);
   padding: 1.25rem 1.4rem;
-  border-top: 8px solid var(--mint);
+  border-top: 8px solid var(--green);
 }
 
 .example-live {
   margin-top: 0;
   padding: 0.6rem 0.9rem;
   border-radius: var(--radius-input);
-  background: var(--mint-tint);
+  background: var(--green-tint);
   font-weight: 700;
 }
 
@@ -1744,7 +1762,7 @@ fieldset.question {
   height: 14px;
   margin-top: 0.25rem;
   border-radius: var(--radius-pill);
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
   overflow: hidden;
 }
 
@@ -1752,7 +1770,7 @@ fieldset.question {
   display: block;
   height: 100%;
   border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, var(--pink), var(--lavender));
+  background: linear-gradient(90deg, var(--orange), var(--honey));
 }
 
 .example-notes li {
@@ -1761,7 +1779,7 @@ fieldset.question {
 
 /* Pregnancy support page and the card that replaces the plan / builder. Calm, plain, full contrast. */
 .clinical-card {
-  border: 2px solid var(--lavender-deep);
+  border: 2px solid var(--honey-deep);
   background: #fff;
 }
 
@@ -1784,8 +1802,8 @@ fieldset.question {
   place-content: center;
   justify-items: center;
   gap: 0.4rem;
-  background: var(--lavender-tint);
-  border: 2px dashed var(--lavender-deep);
+  background: var(--honey-tint);
+  border: 2px dashed var(--honey-deep);
   color: inherit;
 }
 
@@ -1813,7 +1831,7 @@ fieldset.question {
   padding: 1rem 1.1rem;
   border-radius: var(--radius-input);
   background: #fff;
-  border: 2px solid var(--lavender-deep);
+  border: 2px solid var(--honey-deep);
 }
 
 .support-more {
@@ -1881,7 +1899,7 @@ fieldset.question {
   margin-top: 1rem;
   padding: 0.75rem 1rem;
   border-radius: var(--radius-input);
-  border: 2px dashed var(--lavender-deep);
+  border: 2px dashed var(--honey-deep);
   background: #fff;
 }
 
@@ -1926,17 +1944,17 @@ fieldset.question {
   padding: 0.5rem;
   border-radius: var(--radius-input);
   border: 2px dashed transparent;
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
   transition: border-color 0.15s, background 0.15s;
 }
 
 .day-cell.day-today {
-  border-color: var(--pink);
+  border-color: var(--orange);
 }
 
 .day-cell.day-over {
-  border-color: var(--pink-deep);
-  background: var(--pink-tint);
+  border-color: var(--orange-deep);
+  background: var(--orange-tint);
 }
 
 .day-cell-title {
@@ -1956,7 +1974,7 @@ fieldset.question {
   margin-left: auto;
   padding: 0 0.5rem;
   border-radius: var(--radius-pill);
-  background: var(--pink);
+  background: var(--orange-deep);
   color: #fff;
 }
 
@@ -1966,21 +1984,21 @@ fieldset.question {
   padding: 0.6rem;
   border-radius: var(--radius-input);
   background: #fff;
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   font-size: 0.9rem;
 }
 
 .day-card.day-workout {
-  border-color: var(--mint-deep);
+  border-color: var(--green-deep);
 }
 
 .day-card.day-done {
-  background: var(--mint-tint);
+  background: var(--green-tint);
 }
 
 .day-card.day-dragging {
   z-index: 10;
-  box-shadow: 0 10px 24px rgba(58, 33, 71, 0.25);
+  box-shadow: 0 10px 24px rgba(43, 42, 30, 0.25);
   cursor: grabbing;
 }
 
@@ -1992,11 +2010,11 @@ fieldset.question {
 }
 
 .chip-workout {
-  background: var(--mint-tint);
+  background: var(--green-tint);
 }
 
 .chip-rest {
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
 }
 
 .drag-handle {
@@ -2006,7 +2024,7 @@ fieldset.question {
   padding: 0;
   font-size: 1.1rem;
   border-radius: var(--radius-pill);
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   background: #fff;
   font-weight: 700;
   cursor: grab;
@@ -2014,7 +2032,7 @@ fieldset.question {
 }
 
 .drag-handle:focus-visible {
-  outline: 3px solid var(--pink-deep);
+  outline: 3px solid var(--orange-deep);
 }
 
 .day-locked {
@@ -2060,7 +2078,7 @@ fieldset.question {
   width: 100%;
   box-sizing: border-box;
   padding: 0.4rem 0.5rem;
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   border-radius: var(--radius-input);
   font: inherit;
   font-weight: 400;
@@ -2086,7 +2104,7 @@ fieldset.question {
   padding: 0.5rem 0.6rem;
   border-radius: var(--radius-input);
   background: #fff;
-  border: 2px solid var(--lavender-deep);
+  border: 2px solid var(--honey-deep);
   font-size: 0.85rem;
 }
 
@@ -2107,8 +2125,8 @@ fieldset.question {
   border-radius: 24px;
   background: #fff;
   color: var(--ink);
-  border: 4px solid var(--lavender-deep);
-  box-shadow: 0 8px 24px rgba(58, 33, 71, 0.08);
+  border: 4px solid var(--honey-deep);
+  box-shadow: 0 8px 24px rgba(43, 42, 30, 0.08);
 }
 
 .class-disclaimer h2 {
@@ -2124,7 +2142,7 @@ fieldset.question {
 }
 
 .class-disclaimer a {
-  color: var(--pink-deep);
+  color: var(--orange-deep);
   font-weight: 800;
 }
 
@@ -2144,7 +2162,7 @@ fieldset.question {
 .about-data {
   padding: 1.25rem 1.4rem;
   border-radius: 24px;
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
 }
 
 .about-subhead {
@@ -2164,7 +2182,7 @@ fieldset.question {
   padding: 0.9rem 1rem;
   border-radius: 20px;
   background: #fff;
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
 }
 
 .stat-tile strong {
@@ -2184,8 +2202,8 @@ fieldset.question {
 }
 
 .stat-tile-key {
-  border-color: var(--pink);
-  background: var(--pink-tint);
+  border-color: var(--orange);
+  background: var(--orange-tint);
 }
 
 .source-list {
@@ -2234,7 +2252,7 @@ fieldset.question {
   padding: 1.25rem 1rem;
   border-radius: 24px;
   background: #fff;
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   text-align: center;
 }
 
@@ -2249,18 +2267,18 @@ fieldset.question {
   height: 140px;
   border-radius: 50%;
   object-fit: cover;
-  border: 4px solid var(--pink-tint);
+  border: 4px solid var(--orange-tint);
 }
 
 .team-avatar-empty {
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, var(--pink-tint), var(--lavender-tint));
+  background: linear-gradient(135deg, var(--orange-tint), var(--honey-tint));
 }
 
 .team-avatar-empty svg {
   width: 64%;
-  fill: var(--lavender-deep);
+  fill: var(--honey-deep);
   opacity: 0.55;
 }
 
@@ -2271,13 +2289,13 @@ fieldset.question {
 .team-role {
   font-size: 0.88rem;
   font-weight: 700;
-  color: var(--pink-deep);
+  color: var(--orange-deep);
 }
 
 /* Custom calendar days ("Build your own for this day") */
 .chip-custom {
-  background: var(--pink-tint);
-  border: 2px solid var(--pink);
+  background: var(--orange-tint);
+  border: 2px solid var(--orange);
 }
 
 .day-custom-actions {
@@ -2314,7 +2332,7 @@ fieldset.question {
 .review-panel {
   padding: 1rem 1.1rem;
   border-radius: 20px;
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
 }
 
 .review-panel h4 {
@@ -2328,18 +2346,18 @@ fieldset.question {
 }
 
 .chip-hit {
-  background: var(--mint-tint);
+  background: var(--green-tint);
 }
 
 .chip-missing {
   background: #fff;
-  border: 2px dashed var(--lavender-deep);
+  border: 2px dashed var(--honey-deep);
 }
 
 .review-suggestion {
   margin: 0.5rem 0 0;
   padding: 0.5rem 0.75rem;
-  border-left: 4px solid var(--lavender-deep);
+  border-left: 4px solid var(--honey-deep);
   background: #fff;
 }
 
@@ -2413,12 +2431,12 @@ fieldset.question {
   margin: 1.75rem 0;
   padding: 1rem 1.2rem;
   border-radius: 20px;
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
   font-weight: 800;
 }
 
 .about-data-link a {
-  color: var(--pink-deep);
+  color: var(--orange-deep);
 }
 
 .team-card .team-name {
@@ -2438,7 +2456,7 @@ fieldset.question {
   overflow: hidden;
   padding: clamp(2.5rem, 7vw, 5rem) clamp(1.25rem, 5vw, 3.5rem);
   border-radius: 32px;
-  background: linear-gradient(135deg, var(--pink-tint), var(--lavender-tint) 55%, var(--mint-tint));
+  background: linear-gradient(135deg, var(--orange-tint), var(--honey-tint) 55%, var(--green-tint));
   text-align: center;
   isolation: isolate;
 }
@@ -2447,7 +2465,7 @@ fieldset.question {
   margin: 0;
   font-weight: 800;
   letter-spacing: 0.04em;
-  color: var(--pink-deep);
+  color: var(--orange-deep);
   animation: rise-in 0.7s ease-out both;
 }
 
@@ -2461,7 +2479,7 @@ fieldset.question {
 
 .landing-title-pop {
   display: inline-block;
-  color: var(--pink);
+  color: var(--orange-deep);   /* the bright orange is too faint for text, even this big (2.3:1) */
   animation: wiggle 3.5s 1.2s ease-in-out infinite;
 }
 
@@ -2495,10 +2513,10 @@ fieldset.question {
   animation: float 9s ease-in-out infinite;
 }
 
-.shape-1 { width: 220px; height: 220px; left: -60px; top: -70px; background: var(--pink); }
-.shape-2 { width: 140px; height: 140px; right: -30px; bottom: -40px; background: var(--mint); animation-delay: -3s; }
+.shape-1 { width: 220px; height: 220px; left: -60px; top: -70px; background: var(--orange); }
+.shape-2 { width: 140px; height: 140px; right: -30px; bottom: -40px; background: var(--green); animation-delay: -3s; }
 .shape-3 { width: 80px; height: 80px; right: 12%; top: 14%; background: var(--yellow); animation-delay: -5s; }
-.shape-4 { width: 110px; height: 110px; left: 10%; bottom: -30px; background: var(--lavender); animation-delay: -7s; }
+.shape-4 { width: 110px; height: 110px; left: 10%; bottom: -30px; background: var(--honey); animation-delay: -7s; }
 
 .sparkle {
   position: absolute;
@@ -2577,8 +2595,8 @@ fieldset.question {
   place-content: center;
   justify-items: center;
   gap: 0.4rem;
-  background: var(--lavender-tint);
-  border: 2px dashed var(--lavender-deep);
+  background: var(--honey-tint);
+  border: 2px dashed var(--honey-deep);
 }
 
 .video-slot.video-placeholder span {
@@ -2606,13 +2624,13 @@ fieldset.question {
   padding: 1.2rem 1.2rem 1rem;
   border-radius: 24px;
   background: #fff;
-  border: 2px solid var(--lavender);
-  box-shadow: 0 10px 26px rgba(58, 33, 71, 0.07);
+  border: 2px solid var(--honey);
+  box-shadow: 0 10px 26px rgba(43, 42, 30, 0.07);
 }
 
 .highlight:hover {
   transform: translateY(-4px);
-  box-shadow: 0 16px 32px rgba(58, 33, 71, 0.12);
+  box-shadow: 0 16px 32px rgba(43, 42, 30, 0.12);
 }
 
 .highlight h3 {
@@ -2627,14 +2645,14 @@ fieldset.question {
 }
 
 .preview-caption a {
-  color: var(--pink-deep);
+  color: var(--orange-deep);
   font-weight: 800;
 }
 
 .preview-skeleton {
   height: 5.5rem;
   border-radius: 16px;
-  background: linear-gradient(90deg, var(--lavender-tint), #fff, var(--lavender-tint));
+  background: linear-gradient(90deg, var(--honey-tint), #fff, var(--honey-tint));
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }
@@ -2668,12 +2686,12 @@ fieldset.question {
 }
 
 .mini-train {
-  background: var(--mint-tint);
-  border: 2px solid var(--mint-deep);
+  background: var(--green-tint);
+  border: 2px solid var(--green-deep);
 }
 
 .mini-rest {
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
 }
 
 .mini-cal {
@@ -2686,8 +2704,8 @@ fieldset.question {
 
 .mini-cal-day {
   border-radius: 12px;
-  background: var(--lavender-tint);
-  border: 2px dashed var(--lavender);
+  background: var(--honey-tint);
+  border: 2px dashed var(--honey);
   padding: 0.25rem;
   font-size: 0.75rem;
   font-weight: 800;
@@ -2700,12 +2718,12 @@ fieldset.question {
   width: calc(100% / 7 * 1.6);
   padding: 0.35rem 0.4rem;
   border-radius: 10px;
-  background: var(--pink);
+  background: var(--orange-deep);
   color: #fff;
   font-size: 0.7rem;
   font-weight: 800;
   text-align: center;
-  box-shadow: 0 6px 14px rgba(224, 0, 107, 0.3);
+  box-shadow: 0 6px 14px rgba(179, 74, 0, 0.3);
   animation: slide-day 6s ease-in-out infinite;
 }
 
@@ -2726,7 +2744,7 @@ fieldset.question {
   display: block;
   height: 0.6rem;
   border-radius: 99px;
-  background: linear-gradient(90deg, var(--pink), var(--lavender-deep));
+  background: linear-gradient(90deg, var(--orange), var(--honey-deep));
   transform-origin: left;
   animation: grow 0.9s ease-out both;
 }
@@ -2746,7 +2764,7 @@ fieldset.question {
 .mini-stats div {
   padding: 0.6rem 0.2rem;
   border-radius: 14px;
-  background: var(--pink-tint);
+  background: var(--orange-tint);
 }
 
 .mini-stats strong {
@@ -2766,7 +2784,7 @@ fieldset.question {
   padding: 1.5rem;
   border-radius: 28px;
   background: #fff;
-  border: 3px solid var(--pink);
+  border: 3px solid var(--orange);
   scroll-margin-top: 6rem;
 }
 
@@ -2807,13 +2825,13 @@ fieldset.question {
   gap: 0.25rem;
   padding: 0.9rem 1rem;
   border-radius: 18px;
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   background: #fff;
   cursor: pointer;
 }
 
 .mode-option input {
-  accent-color: var(--pink-deep);
+  accent-color: var(--orange-deep);
 }
 
 .mode-option span {
@@ -2822,8 +2840,8 @@ fieldset.question {
 }
 
 .mode-option.mode-on {
-  border-color: var(--pink);
-  background: var(--pink-tint);
+  border-color: var(--orange);
+  background: var(--orange-tint);
 }
 
 /* ---------------------------------------------------------------- plan review */
@@ -2849,7 +2867,7 @@ fieldset.question {
 .review-list select {
   min-height: 40px;
   padding: 0.25rem 0.6rem;
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   border-radius: var(--radius-input);
   background: #fff;
   max-width: 100%;
@@ -2869,7 +2887,7 @@ fieldset.question {
   margin-top: 1rem;
   padding: 0.9rem 1rem;
   border-radius: 18px;
-  background: var(--mint-tint);
+  background: var(--green-tint);
 }
 
 .save-to-calendar h4 {
@@ -2879,7 +2897,7 @@ fieldset.question {
 .save-to-calendar input[type='date'] {
   min-height: 44px;
   padding: 0.3rem 0.6rem;
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   border-radius: var(--radius-input);
 }
 
@@ -2903,7 +2921,7 @@ fieldset.question {
   gap: 0.3rem;
   padding: 0.25rem 0.4rem;
   border-radius: 10px;
-  background: var(--mint-tint);
+  background: var(--green-tint);
 }
 
 .cardio-form {
@@ -2933,7 +2951,7 @@ fieldset.question {
   box-sizing: border-box;
   min-height: 36px;
   padding: 0.2rem 0.4rem;
-  border: 2px solid var(--lavender);
+  border: 2px solid var(--honey);
   border-radius: 10px;
   font: inherit;
   font-weight: 400;
@@ -2950,7 +2968,7 @@ fieldset.question {
 .activity-log .activity-days li {
   padding: 0.5rem 0.7rem;
   border-radius: 14px;
-  background: var(--lavender-tint);
+  background: var(--honey-tint);
 }
 
 /* ---------------------------------------------------------------- progression */
@@ -2958,12 +2976,12 @@ fieldset.question {
   margin-top: 1rem;
   padding: 0.8rem 1rem;
   border-radius: 18px;
-  background: var(--mint-tint);
+  background: var(--green-tint);
 }
 
 .progression.progression-paused {
-  background: var(--lavender-tint);
-  border: 2px solid var(--lavender-deep);
+  background: var(--honey-tint);
+  border: 2px solid var(--honey-deep);
 }
 
 .progression h4 {
@@ -3022,7 +3040,7 @@ fieldset.question {
 }
 
 .day-choice-btn[aria-pressed='true'] {
-  border-color: var(--pink-deep);
+  border-color: var(--orange-deep);
   background: #fff;
   color: var(--ink);
   cursor: default;
@@ -3071,7 +3089,7 @@ fieldset.question {
 /* The progress marker at the top of the calendar (code-computed). */
 .progress-marker {
   margin-bottom: 1rem;
-  border-top: 8px solid var(--mint);
+  border-top: 8px solid var(--green);
 }
 
 .progress-marker h3 {
@@ -3251,5 +3269,14 @@ fieldset.question {
 }
 
 .day-cardio-status.is-done {
-  color: var(--mint-deep);
+  color: var(--green-deep);
+}
+
+/* The bee logo above the name on the landing page. */
+.landing-logo {
+  display: block;
+  margin: 0 auto 0.4rem;
+  width: clamp(4.5rem, 12vw, 6rem);
+  height: auto;
+  filter: drop-shadow(0 6px 14px rgba(255, 140, 26, 0.3));
 }

@@ -11,7 +11,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const logo = () => screen.getByRole('link', { name: 'HomeBase Fit home' })
+const logo = () => screen.getByRole('link', { name: 'Bee Fit home' })
 
 describe('the logo', () => {
   it('goes to the landing page when signed out', async () => {

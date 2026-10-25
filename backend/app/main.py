@@ -1,4 +1,4 @@
-"""FastAPI entry point for HomeBase Fit.
+"""FastAPI entry point for Bee Fit.
 
 Run locally from backend/ (no auto-reload, so edits never spawn extra servers):
     .venv\\Scripts\\python.exe -m uvicorn app.main:app --port 8000
@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="HomeBase Fit API", lifespan=lifespan)
+app = FastAPI(title="Bee Fit API", lifespan=lifespan)
 
 # Only the Vite dev server needs CORS: in production the app and the API share one origin.
 app.add_middleware(

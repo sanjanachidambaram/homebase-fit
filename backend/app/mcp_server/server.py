@@ -1,4 +1,4 @@
-"""HomeBase Fit MCP server: the only tools the AI agents can call.
+"""Bee Fit MCP server: the only tools the AI agents can call.
 
 Run (stdio, as Claude Code and the agents launch it), from the project root:
     backend/.venv/Scripts/python.exe backend/app/mcp_server/server.py
@@ -39,7 +39,7 @@ from app.mcp_server.strength import compute_strength_equivalents as _strength
 mcp = FastMCP(
     "homebase-fit",
     instructions=(
-        "HomeBase Fit data tools. All read-only. Exercises with injury_check 'not_yet_checked' have no injury "
+        "Bee Fit data tools. All read-only. Exercises with injury_check 'not_yet_checked' have no injury "
         "tags because nobody has reviewed them; never describe them as safe. Anything with status 'placeholder' "
         "is pending expert review and must not be presented as verified or science-backed."
     ),

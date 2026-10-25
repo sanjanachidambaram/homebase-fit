@@ -1,5 +1,5 @@
 # =====================================================================
-# HomeBase Fit onboarding quiz (placeholder wording: review before launch).
+# Bee Fit onboarding quiz (placeholder wording: review before launch).
 # =====================================================================
 # After editing, rebuild the database from backend/:
 #   .venv\Scripts\python.exe -m app.db.seed

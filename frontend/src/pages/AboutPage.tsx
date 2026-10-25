@@ -42,7 +42,7 @@ function TeamPhoto({ file, name }: { file: string; name: string }) {
 export default function AboutPage() {
   return (
     <article className="about">
-      <h2 className="page-title">About HomeBase Fit</h2>
+      <h2 className="page-title">About Bee Fit</h2>
 
       <section className="about-section about-team" aria-label="The team">
         <ul className="team-grid">

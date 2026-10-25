@@ -1,4 +1,4 @@
-"""Smoke test for the HomeBase Fit MCP server.
+"""Smoke test for the Bee Fit MCP server.
 
 Starts the server exactly as .mcp.json describes it (a real stdio subprocess, the same way Claude Code
 launches it), calls all 6 tools over the MCP protocol, and checks the answers. In particular it proves

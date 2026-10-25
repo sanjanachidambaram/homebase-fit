@@ -1,4 +1,4 @@
-// About the Data: where every exercise, number and claim in HomeBase Fit comes from. Every figure is counted live
+// About the Data: where every exercise, number and claim in Bee Fit comes from. Every figure is counted live
 // (GET /api/data-summary and /api/sources, tested in tests/test_about_data.py), never typed in by hand, so it can't go
 // stale when content is added or reviewed. Moved here from the About page unchanged.
 import { useEffect, useState, type ReactNode } from 'react'
@@ -68,7 +68,7 @@ function AboutTheData() {
       <p className="hint">Counted live from the app's database every time this page loads.</p>
 
       <p>
-        Most of HomeBase Fit's exercise library, <strong>{n(fedb?.count ?? 0)} of its {n(ex.total)} exercises</strong>,
+        Most of Bee Fit's exercise library, <strong>{n(fedb?.count ?? 0)} of its {n(ex.total)} exercises</strong>,
         comes from <SourceLink source={src['free-exercise-db']}>free-exercise-db</SourceLink>, a public-domain dataset
         (released under {licenseName}, meaning anyone can use it freely, with no legal restrictions) of exercise
         names, muscles targeted, equipment needed, step-by-step instructions, and demo images. The other{' '}
@@ -146,7 +146,7 @@ export default function AboutDataPage() {
   return (
     <article className="about">
       <p className="hint">
-        <Link to="/about">← About HomeBase Fit</Link>
+        <Link to="/about">← About Bee Fit</Link>
       </p>
       <h2 className="page-title">About the data</h2>
       <p className="page-sub">Where every exercise, number and claim in the app comes from, and how much has been reviewed.</p>

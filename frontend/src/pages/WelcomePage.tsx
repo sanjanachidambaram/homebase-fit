@@ -3,6 +3,7 @@
 // library counts), never screenshots. Everything moves only when the visitor's system allows motion: the global
 // prefers-reduced-motion rule (index.css) stills the CSS, and useReveal shows everything at once.
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import BeeLogo from '../components/BeeLogo'
 import { fetchDataSummary, fetchPlanExample, type DataSummary, type PlanExample } from '../api'
 import AccountForm from '../components/AccountForm'
 import Link from '../components/Link'
@@ -160,7 +161,8 @@ export default function WelcomePage() {
         </div>
         <p className="landing-kicker">Free · home workouts · built around you</p>
         <h2 className="landing-title">
-          HomeBase <span className="landing-title-pop">Fit</span>
+          <BeeLogo size={96} className="landing-logo" />
+          Bee <span className="landing-title-pop">Fit</span> <span aria-hidden="true">🐝</span>
         </h2>
         <p className="landing-pitch">
           Your goals and your injuries, in <span className="hl">one</span> plan. Finally.
@@ -179,7 +181,7 @@ export default function WelcomePage() {
         <VideoSlot sources={INTRO_VIDEO} label="Intro video" />
       </Reveal>
 
-      <section className="landing-highlights" aria-label="What HomeBase Fit does">
+      <section className="landing-highlights" aria-label="What Bee Fit does">
         <Reveal className="highlight" delay={0}>
           <h3>A plan built around you</h3>
           <PlanPreview example={example} />

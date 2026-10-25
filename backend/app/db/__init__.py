@@ -1,4 +1,4 @@
-"""SQLite access for HomeBase Fit.
+"""SQLite access for Bee Fit.
 
 Two files, same pattern as the shop project:
   homebase_original.db  clean schema + seeded content (built by seed.py, committed to git)
