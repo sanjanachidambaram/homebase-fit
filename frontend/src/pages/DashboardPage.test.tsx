@@ -40,7 +40,7 @@ describe('Dashboard greeting', () => {
 })
 
 describe('Dashboard contents', () => {
-  it('shows only the plan for today and the streak, with no AI calls', async () => {
+  it('shows the plan for today, the streak and this week, with no AI calls', async () => {
     signIn()
     const today = localToday()
     const calls = mockFetch({
@@ -61,6 +61,10 @@ describe('Dashboard contents', () => {
         rest_day_suggested: false, next_badge: { days: 7, to_go: 3 }, definition: 'x',
         badges: [{ days: 3, earned: true }, { days: 7, earned: true }, { days: 14, earned: false }, { days: 30, earned: false }],
       },
+      '/api/progress/this-week': {
+        week_start: today, week_end: today, workouts_logged: 2, weight_lifted_lbs: 0, cardio_miles: 0, cardio_minutes: 0,
+        fun_fact: null, note: 'Log a workout or some cardio this week to unlock a fun fact.',
+      },
     })
     render(<DashboardPage />)
     expect(await screen.findByText('Glute Bridge')).toBeTruthy()
@@ -69,7 +73,9 @@ describe('Dashboard contents', () => {
     expect(screen.getByText('9 days')).toBeTruthy()                                      // the longest
     expect(screen.getByText(/3 days to go until your 7 days badge/)).toBeTruthy()
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
-    expect(headings).toEqual(['Plan for today', 'Your streak'])
+    expect(headings).toEqual(['Plan for today', 'Your streak', 'This week'])
+    expect(await screen.findByText('workouts logged this week')).toBeTruthy()
+    expect(screen.getByText('View my quiz answers')).toBeTruthy()                       // collapsed until opened
     expect(calls.some((u) => /coach|programs|basics/.test(u))).toBe(false)              // nothing reaches an agent
   })
 })

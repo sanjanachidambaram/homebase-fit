@@ -600,6 +600,21 @@ export interface StreakStats {
 
 export const fetchStreak = (token: string) => request<StreakStats>('/api/progress/streak', {}, token)
 
+/** The Dashboard's "This week" card (GET /api/progress/this-week): workouts logged Monday to today, and one fun fact
+ *  built by code from what was logged (weight moved, distance, or minutes). */
+export interface ThisWeek {
+  week_start: string
+  week_end: string
+  workouts_logged: number
+  weight_lifted_lbs: number
+  cardio_miles: number
+  cardio_minutes: number
+  fun_fact: { kind: 'lifted' | 'distance' | 'time'; text: string; basis: string } | null
+  note: string
+}
+
+export const fetchThisWeek = (token: string) => request<ThisWeek>('/api/progress/this-week', {}, token)
+
 // ---------------------------------------------------------------- Workout Reviewer
 
 /** The 4 workout groups every plan is built from; the reviewer checks a session against these. */

@@ -1,10 +1,12 @@
-// Home page. Signed in: the Dashboard, which shows only two things (2026-10-25): the plan for today, then your
-// streak. Both are computed by code, no AI. The plan's explanation lives on the Personalized Plan page.
+// Home page. Signed in: the Dashboard: the plan for today, your streak, this week (workouts logged + a fun fact), and
+// your quiz answers on request. All computed by code, no AI. The plan's explanation lives on the Personalized Plan page.
 // Signed out: the landing page (WelcomePage).
 import { useEffect, useState } from 'react'
 import { fetchAccount, isSignInGone, type Account } from '../api'
 import ClinicalSupportCard from '../components/ClinicalSupport'
+import QuizAnswers from '../components/dashboard/QuizAnswers'
 import StreakCard from '../components/dashboard/StreakCard'
+import ThisWeekCard from '../components/dashboard/ThisWeekCard'
 import TodayCard from '../components/dashboard/TodayCard'
 import { setSession, useSession, type Session } from '../session'
 import WelcomePage from './WelcomePage'
@@ -44,6 +46,8 @@ function Dashboard({ session }: { session: Session }) {
             <TodayCard token={session.token} />
           )}
           <StreakCard token={session.token} />
+          <ThisWeekCard token={session.token} />
+          {account?.quiz_profile && <QuizAnswers profile={account.quiz_profile} />}
         </div>
       )}
     </div>

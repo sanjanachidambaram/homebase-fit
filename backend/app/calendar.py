@@ -447,6 +447,14 @@ def streak(uid: int = Depends(signed_in)) -> dict:
     return streak_stats(uid, today())
 
 
+@router.get("/progress/this-week")
+def this_week(uid: int = Depends(signed_in)) -> dict:
+    """The Dashboard's "This week" card: workouts logged this week and one fun fact about them
+    (app/services/weekly_summary.py; the fun fact reuses the Coach's compute_strength_equivalents). Code only, no AI."""
+    from app.services.weekly_summary import weekly_summary
+    return weekly_summary(uid, today())
+
+
 # ---------------------------------------------------------------- calories on done days (code only)
 
 def _weight(conn: Connection, uid: int) -> float | None:

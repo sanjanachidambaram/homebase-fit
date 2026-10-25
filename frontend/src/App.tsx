@@ -16,7 +16,7 @@ import PlanReviewPage from './pages/PlanReviewPage'
 import PregnancySupportPage from './pages/PregnancySupportPage'
 import QuizPage from './pages/QuizPage'
 import SettingsPage from './pages/SettingsPage'
-import { usePath, useScrollToTopOnRouteChange } from './router'
+import { usePath, useRouteKey, useScrollToTopOnRouteChange } from './router'
 import './App.css'
 
 /** An old address that moved: swap it in the address bar, so Back doesn't bounce. */
@@ -62,6 +62,7 @@ const NAV: { path: string; label: string; also?: (path: string) => boolean }[] =
 
 export default function App() {
   const path = usePath()
+  const routeKey = useRouteKey(path)
   useScrollToTopOnRouteChange(path)
 
   const Page = PAGES[path]
@@ -70,7 +71,8 @@ export default function App() {
     <div className="page">
       <header className="site-header">
         <div className="header-inner">
-          {/* The logo goes home: the Dashboard when signed in, the landing page when signed out (both live at /). */}
+          {/* The logo goes home: the Dashboard when signed in, the landing page when signed out (both live at /).
+              From the home page itself it starts the page over at the top (router.ts navigate). */}
           <h1 className="brand">
             <Link to="/" ariaLabel="Bee Fit home">
               <span className="brand-mark" aria-hidden="true">
@@ -81,10 +83,12 @@ export default function App() {
           </h1>
           <nav aria-label="Main">
             {NAV.map((p) => {
-              // Whichever tab matches the page being viewed (or one of its sub-pages) is highlighted.
+              // Whichever tab matches the page being viewed (or one of its sub-pages) is highlighted (orange).
+              // Dashboard also always carries a green underline, whatever page is active: a fixed marker, not a state.
               const active = p.path === path || !!p.also?.(path)
+              const className = ['nav-link', p.path === '/' && 'nav-home', active && 'active'].filter(Boolean).join(' ')
               return (
-                <Link key={p.path} to={p.path} className={active ? 'nav-link active' : 'nav-link'} current={active}>
+                <Link key={p.path} to={p.path} className={className} current={active}>
                   {p.label}
                 </Link>
               )
@@ -93,7 +97,7 @@ export default function App() {
         </div>
       </header>
 
-      <main key={path} className="page-enter">
+      <main key={routeKey} className="page-enter">
         {Page ? (
           <Page />
         ) : (

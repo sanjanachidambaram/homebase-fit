@@ -1,9 +1,17 @@
 // Minimal client-side routing (a handful of pages doesn't need a router library).
 import { useEffect, useLayoutEffect, useState } from 'react'
 
+// Bumped when a link points at the page you're already on, so App can start that page over (useRouteKey).
+let visit = 0
+const REVISIT = 'beefit-revisit'
+
 export function navigate(to: string) {
   if (to === window.location.pathname) {
-    window.scrollTo(0, 0) // already there (e.g. the logo on the home page): no new history entry, back to the top
+    // Already there (e.g. the logo while on the home page, partway down the sign-up form or a scrolled Dashboard):
+    // no new history entry, but the page starts over fresh and back at the top, so the link visibly goes home.
+    visit += 1
+    window.dispatchEvent(new Event(REVISIT))
+    window.scrollTo(0, 0)
     return
   }
   window.history.pushState({}, '', to)
@@ -20,6 +28,18 @@ export function usePath(): string {
     return () => window.removeEventListener('popstate', onChange)
   }, [])
   return path
+}
+
+/** A key for the page being shown: changes on every route change AND when a link to the current page is followed,
+ *  so keying the page on it remounts the page fresh. */
+export function useRouteKey(path: string): string {
+  const [n, setN] = useState(visit)
+  useEffect(() => {
+    const onRevisit = () => setN(visit)
+    window.addEventListener(REVISIT, onRevisit)
+    return () => window.removeEventListener(REVISIT, onRevisit)
+  }, [])
+  return `${path}#${n}`
 }
 
 /** Every route change starts the new page at the top (links, back/forward, and code that navigates). */

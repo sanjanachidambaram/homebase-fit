@@ -147,16 +147,19 @@ main {
   background: var(--honey-tint);
 }
 
-/* The tab for the page you're on: orange fill, a deep-orange outline, bolder text, and a green bar under the label,
-   so it reads at a glance (and aria-current="page" says it to screen readers). */
+/* The tab for the page you're on: an orange highlight and bolder text, no underline (2026-10-25); aria-current="page"
+   says it to screen readers. */
 .nav-link.active {
-  position: relative;
   background: var(--orange);
-  box-shadow: var(--shadow), inset 0 0 0 2px var(--orange-deep);
   font-weight: 800;
 }
 
-.nav-link.active::after {
+/* Dashboard always has a green underline, on every page, whether or not it's the active tab (a fixed marker). */
+.nav-home {
+  position: relative;
+}
+
+.nav-home::after {
   content: '';
   position: absolute;
   left: 0.8rem;
@@ -1189,6 +1192,56 @@ fieldset.question {
 
 .rest-note p {
   margin: 0.3rem 0 0;
+}
+
+/* "This week" (components/dashboard/ThisWeekCard.tsx): the count, then the fun fact (the .fun-fact note above) */
+.week-count {
+  display: grid;
+  margin: 0;
+}
+
+.fun-fact-basis {
+  flex-basis: 100%;
+  margin: 0;
+  font-weight: 400;
+}
+
+/* "View my quiz answers" (components/dashboard/QuizAnswers.tsx): a card that opens in place */
+.quiz-answers summary {
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--orange-deep);
+}
+
+.quiz-answers summary:focus-visible {
+  outline: 3px solid var(--orange-deep);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.answer-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 1rem 0 0;
+}
+
+.answer-list div {
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-input);
+  background: var(--honey-tint);
+}
+
+.answer-list dt {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+.answer-list dd {
+  margin: 0.15rem 0 0;
+  font-weight: 700;
 }
 
 /* Program */
