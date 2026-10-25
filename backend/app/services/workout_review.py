@@ -1,7 +1,8 @@
 """Workout review, computed entirely in code (no LLM). The Workout Reviewer agent only narrates this result.
 
-1. Coverage: which of the six major muscle groups a session hits, and push/pull balance in the upper body
-   (exercises.force: push | pull | static | unclassified).
+1. Coverage: which of the 4 workout groups the plans are built from (Cardio, Upper body, Lower body, Mobility + core;
+   since 2026-10-25) a session includes, a suggestion naming the ones it doesn't, and push/pull balance in the
+   upper body (exercises.force: push | pull | static | unclassified).
 2. Outcome estimate, always as a wide range, never a single number:
    - Energy per session from MET values in the 2024 Adult Compendium of Physical Activities (Herrmann et al.,
      J Sport Health Sci 2024;13(1):6-12). The Compendium defines 1 MET as about 1.0 kcal per kg per hour, so
@@ -17,13 +18,22 @@
 
 import json
 import math
+import re
 import sqlite3
 from collections import Counter
 
 from app.db import connect_readonly
 
-MAJOR_GROUPS = ("legs", "back", "chest", "shoulders", "arms", "core")
+# The 4 workout groups every plan is built from (app/services/program_generator.py), in display order.
+WORKOUT_GROUPS = ("cardio", "upper", "lower", "mobility_core")
+GROUP_LABELS = {"cardio": "Cardio", "upper": "Upper body", "lower": "Lower body", "mobility_core": "Mobility + core"}
+# How each group is named inside a sentence ("doesn't include any cardio, lower-body, or mobility/core work").
+GROUP_WORDS = {"cardio": "cardio", "upper": "upper-body", "lower": "lower-body", "mobility_core": "mobility/core"}
 UPPER_BODY = ("chest", "shoulders", "arms", "back")
+# Library moves that are cardio by name although the library files them under full_body with no category.
+CARDIO_NAME = re.compile(r"jumping jack|march|step jack|high knee|mountain climber|burpee|jog|run|skip|rope", re.I)
+# Mobility and core staples the library files under back or core (e.g. Bird Dog is a "back" move).
+MOBILITY_NAME = re.compile(r"bird dog|cat.?cow|superman|dead bug|plank|pelvic tilt|hip circle", re.I)
 
 COMPENDIUM_SOURCE = "compendium-physical-activities"
 CDC_SOURCE = "cdc-losing-weight"
@@ -64,20 +74,44 @@ def _int(x: float) -> int | float:
     return int(x) if float(x).is_integer() else x
 
 
-def _words(groups: list[str]) -> str:
-    names = [g.replace("_", " ") for g in groups]
-    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
-
-
 # ---------------------------------------------------------------- 1. coverage
 
-def coverage(exercises: list[dict]) -> dict:
-    """exercises: [{exercise_id, name, muscle_group, force}] (muscle_group and force from the database)."""
-    counts = Counter(e["muscle_group"] for e in exercises)
-    hit = [{"group": g, "exercises": counts[g]} for g in MAJOR_GROUPS if counts[g]]
-    missing = [g for g in MAJOR_GROUPS if not counts[g]]
+def workout_groups(e: dict) -> tuple[str, ...]:
+    """Which of the 4 workout groups a library exercise counts toward, from its database fields.
+    Full-body strength moves (e.g. a squat to press) count toward both upper and lower body."""
+    name, group, category = e["name"], e["muscle_group"], e.get("category")
+    if category == "cardio" or (group == "full_body" and CARDIO_NAME.search(name)):
+        return ("cardio",)
+    if category == "stretching" or group == "core" or MOBILITY_NAME.search(name):
+        return ("mobility_core",)
+    if group in UPPER_BODY:
+        return ("upper",)
+    if group == "legs":
+        return ("lower",)
+    return ("upper", "lower")                    # full_body strength / lifting moves
 
-    upper = [e for e in exercises if e["muscle_group"] in UPPER_BODY]
+
+def _either(words: list[str]) -> str:
+    return words[0] if len(words) == 1 else ", ".join(words[:-1]) + (", or " if len(words) > 2 else " or ") + words[-1]
+
+
+def suggestion_for(missing: list[str]) -> str | None:
+    """The coverage suggestion, written by code: it names exactly the groups the session doesn't include."""
+    if not missing:
+        return None
+    words = [GROUP_WORDS[g] for g in missing]
+    return (f"This session doesn't include any {_either(words)} work. Consider adding "
+            f"{'some' if len(missing) == 1 else 'one of those'} next time.")
+
+
+def coverage(exercises: list[dict]) -> dict:
+    """exercises: [{exercise_id, name, muscle_group, category, force}] (all from the database)."""
+    groups = [workout_groups(e) for e in exercises]
+    counts = Counter(g for gs in groups for g in gs)
+    hit = [{"group": g, "label": GROUP_LABELS[g], "exercises": counts[g]} for g in WORKOUT_GROUPS if counts[g]]
+    missing = [g for g in WORKOUT_GROUPS if not counts[g]]
+
+    upper = [e for e, gs in zip(exercises, groups) if gs == ("upper",)]
     f = Counter(e.get("force") or "unclassified" for e in upper)
     push, pull = f["push"], f["pull"]
     if not upper:
@@ -94,15 +128,14 @@ def coverage(exercises: list[dict]) -> dict:
         balance = f"Pushing and pulling are roughly balanced ({push} push, {pull} pull)."
 
     notes = []
-    if missing:
-        notes.append(f"{_words(missing).capitalize()} {'was' if len(missing) == 1 else 'were'}n't included.")
-    if counts["full_body"]:
-        n = counts["full_body"]
-        notes.append(f"{n} full-body move{'s' if n > 1 else ''} also work{'' if n > 1 else 's'} several groups at once, "
-                     f"but {'they aren' if n > 1 else 'it isn'}'t counted toward a single group here.")
+    both = sum(1 for gs in groups if len(gs) > 1)
+    if both:
+        notes.append(f"{both} full-body strength move{'s' if both > 1 else ''} {'are' if both > 1 else 'is'} counted "
+                     "toward both upper and lower body.")
     return {
         "groups_hit": hit,
         "groups_missing": missing,
+        "suggestion": suggestion_for(missing),
         "upper_body_balance": {"push": push, "pull": pull, "static": f["static"],
                                "unclassified": f["unclassified"], "note": balance},
         "notes": notes,
@@ -167,15 +200,19 @@ def review(user_id: int, items: list[dict]) -> dict:
     try:
         ids = [i["exercise_id"] for i in items]
         db = {r["id"]: dict(r) for r in conn.execute(
-            f"SELECT id, name, muscle_group, force FROM exercises WHERE id IN ({','.join('?' for _ in ids)})", ids)}
+            f"SELECT id, name, muscle_group, category, force FROM exercises WHERE id IN ({','.join('?' for _ in ids)})",
+            ids)}
         profile = conn.execute(
             "SELECT weight, goal FROM quiz_profiles WHERE user_id = ?", (user_id,)).fetchone()
-        exercises = [{"exercise_id": i, **{k: db[i][k] for k in ("name", "muscle_group", "force")}} for i in ids if i in db]
+        exercises = [{"exercise_id": i, **{k: db[i][k] for k in ("name", "muscle_group", "category", "force")}}
+                     for i in ids if i in db]
         minutes = sum(float(i["est_minutes"]) for i in items if i["exercise_id"] in db)
         est = estimate(minutes, profile["weight"] if profile else None, PLAN_DAYS_PER_WEEK if profile else None,
                        profile["goal"] if profile else None)
         citations = _citations(conn, est.get("sources", []))
     finally:
         conn.close()
-    return {"exercises": [{k: e[k] for k in ("name", "muscle_group", "force")} for e in exercises],
-            "coverage": coverage(exercises), "estimate": est, "citations": citations}
+    cov = coverage(exercises)
+    return {"exercises": [{k: e[k] for k in ("name", "muscle_group", "force")} | {"workout_groups": list(workout_groups(e))}
+                          for e in exercises],
+            "coverage": cov, "estimate": est, "citations": citations}

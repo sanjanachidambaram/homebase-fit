@@ -15,7 +15,8 @@ it). It deliberately EXCLUDES (EXCLUDED_USER_FIELDS below, checked when this mod
 loads):
   - username, first_name, email and password_hash (identify the person)
   - user id (links model-provider logs back to our database)
-  - injury_notes (free text; people type names, doctors, diagnoses, etc.)
+  - injury_notes (free text; no longer asked since 2026-10-25, and the column is gone,
+    but kept on the list so it can't come back into a prompt unnoticed)
   - weight and goal_weight (body measurements; used only by code, for calorie math)
 The SQL below selects only the allowed columns and never joins `users`, and
 the model forbids extra fields, so PII can't slip in by accident.

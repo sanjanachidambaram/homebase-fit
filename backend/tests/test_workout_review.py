@@ -28,7 +28,7 @@ def session(*ids) -> list[dict]:
     conn = connect()
     try:
         found = {r["id"]: dict(r) for r in conn.execute(
-            f"SELECT id AS exercise_id, name, muscle_group, force, id FROM exercises WHERE id IN ({','.join('?' for _ in ids)})",
+            f"SELECT id AS exercise_id, name, muscle_group, category, force, id FROM exercises WHERE id IN ({','.join('?' for _ in ids)})",
             ids)}
     finally:
         conn.close()
@@ -63,36 +63,56 @@ def review_api(client, h, items=ITEMS):
     return client.post("/api/workouts/review", headers=h, json={"items": items})
 
 
-# ================================================================ 1. coverage (pure code)
+# ================================================================ 1. coverage of the 4 workout groups (pure code)
 
-def test_coverage_all_pushing_and_missing_groups(test_db):
+def test_coverage_names_the_one_missing_group(test_db):
     c = wr.coverage(session("bodyweight_squat", "incline_pushup", "chair_triceps_dip", "dead_bug"))
-    assert c["groups_hit"] == [{"group": "legs", "exercises": 1}, {"group": "arms", "exercises": 2},
-                               {"group": "core", "exercises": 1}]
-    assert c["groups_missing"] == ["back", "chest", "shoulders"]
+    assert c["groups_hit"] == [{"group": "upper", "label": "Upper body", "exercises": 2},
+                               {"group": "lower", "label": "Lower body", "exercises": 1},
+                               {"group": "mobility_core", "label": "Mobility + core", "exercises": 1}]
+    assert c["groups_missing"] == ["cardio"]
+    assert c["suggestion"] == "This session doesn't include any cardio work. Consider adding some next time."
     assert c["upper_body_balance"] == {"push": 2, "pull": 0, "static": 0, "unclassified": 0,
                                        "note": "No pull exercises: the upper-body work is all pushing (2 push)."}
-    assert c["notes"] == ["Back, chest and shoulders weren't included."]
+    assert c["notes"] == []
 
 
-def test_coverage_mostly_pulling_balanced_and_no_upper_body(test_db):
-    mostly = wr.coverage(session("band_pull_apart", "band_biceps_curl", "knee_pushup", "forearm_plank", "glute_bridge"))
-    assert mostly["upper_body_balance"]["note"] == "Mostly pulling (1 push, 2 pull)."
-    assert mostly["groups_missing"] == ["chest", "shoulders"]
+def test_coverage_names_every_missing_group(test_db):
+    legs = wr.coverage(session("bodyweight_squat", "glute_bridge"))
+    assert legs["groups_missing"] == ["cardio", "upper", "mobility_core"]
+    assert legs["suggestion"] == ("This session doesn't include any cardio, upper-body, or mobility/core work. "
+                                  "Consider adding one of those next time.")
+    assert legs["upper_body_balance"]["note"] == "No upper-body exercises, so there's no push/pull balance to check."
 
-    even = wr.coverage(session("band_seated_row", "incline_pushup", "bird_dog"))
-    assert even["upper_body_balance"]["note"] == "Pushing and pulling are roughly balanced (1 push, 1 pull)."
-    assert (even["upper_body_balance"]["push"], even["upper_body_balance"]["pull"],
-            even["upper_body_balance"]["static"]) == (1, 1, 1)                       # Bird Dog is a static back move
+    upper = wr.coverage(session("band_seated_row", "incline_pushup", "band_pull_apart"))
+    assert upper["groups_missing"] == ["cardio", "lower", "mobility_core"]
+    assert upper["upper_body_balance"]["note"] == "Mostly pulling (1 push, 2 pull)."
 
-    lower = wr.coverage(session("bodyweight_squat", "glute_bridge", "dead_bug"))
-    assert lower["upper_body_balance"]["note"] == "No upper-body exercises, so there's no push/pull balance to check."
-    assert lower["notes"] == ["Back, chest, shoulders and arms weren't included."]
+    two = wr.coverage(session("jumping_jacks", "bodyweight_squat"))
+    assert two["suggestion"] == ("This session doesn't include any upper-body or mobility/core work. "
+                                 "Consider adding one of those next time.")
 
-    core_missing = wr.coverage(session("bodyweight_squat", "band_seated_row", "incline_pushup", "burpee"))
-    assert core_missing["notes"] == [
-        "Chest, shoulders and core weren't included.",
-        "1 full-body move also works several groups at once, but it isn't counted toward a single group here."]
+
+def test_coverage_with_all_four_groups_has_no_suggestion(test_db):
+    c = wr.coverage(session("jumping_jacks", "incline_pushup", "band_seated_row", "bodyweight_squat", "dead_bug"))
+    assert c["groups_missing"] == [] and c["suggestion"] is None
+    assert c["upper_body_balance"]["note"] == "Pushing and pulling are roughly balanced (1 push, 1 pull)."
+
+
+def test_each_exercise_lands_in_the_right_group(test_db):
+    def group(i):
+        return wr.workout_groups(session(i)[0])
+    assert group("jumping_jacks") == group("burpee") == ("cardio",)          # full-body, cardio by name
+    assert group("dead_bug") == group("forearm_plank") == ("mobility_core",)
+    assert group("bird_dog") == ("mobility_core",)                           # filed under back, but a mobility staple
+    assert group("90_90_Hamstring") == ("mobility_core",)                    # any stretch counts as mobility
+    assert group("incline_pushup") == group("band_seated_row") == ("upper",)
+    assert group("glute_bridge") == ("lower",)
+    assert group("squat_to_press") == ("upper", "lower")                     # full-body strength: both
+    c = wr.coverage(session("squat_to_press", "dead_bug"))
+    assert [g["group"] for g in c["groups_hit"]] == ["upper", "lower", "mobility_core"]
+    assert c["notes"] == ["1 full-body strength move is counted toward both upper and lower body."]
+    assert c["upper_body_balance"]["note"].startswith("No upper-body exercises")   # balance: upper-only moves
 
 
 # ================================================================ 2. the estimate, against hand-worked numbers
@@ -161,6 +181,27 @@ def test_model_narration_is_kept_when_it_only_uses_the_codes_numbers(client, nar
     assert (res["summary"], res["summary_by"], n.calls) == (good, "model", 1)
 
 
+@pytest.mark.parametrize("claim", [
+    "This session has no upper-body work, so add a push-up next time.",           # it does have upper body
+    "Nice work! It skips core and cardio entirely.",                               # it does have core
+])
+def test_model_cannot_claim_a_group_is_missing_when_it_isnt(client, narrator, claim):
+    n = narrator(claim)
+    uid, h = account(client, "claims")
+    res = review_api(client, h).json()["result"]                                   # dead bug, push-up, squat
+    assert res["summary_by"] == "code" and res["summary"] == plain_summary(res) and n.calls == 3
+    assert res["summary"].startswith("This session includes upper body, lower body and mobility + core work. "
+                                     "This session doesn't include any cardio work.")
+
+
+def test_model_naming_the_real_missing_group_is_kept(client, narrator):
+    good = "A good mix of upper body, legs and core. It doesn't include any cardio, so consider adding some next time."
+    n = narrator(good)
+    uid, h = account(client, "rightclaim")
+    res = review_api(client, h).json()["result"]
+    assert (res["summary"], res["summary_by"], n.calls) == (good, "model", 1)
+
+
 @pytest.mark.parametrize("attempt", [
     "You will lose 2.7 pounds by your deadline!",                                  # allowed number, but a promise
     "Great job, no excuses, burn off that dessert!",                               # tone guard
@@ -180,7 +221,9 @@ def test_review_route_returns_coverage_estimate_and_citations(client, narrator):
     r = review_api(client, h).json()
     res = r["result"]
     assert [e["name"] for e in res["exercises"]] == ["Dead Bug", "Incline Push-Up", "Bodyweight Squat"]
-    assert res["coverage"]["groups_missing"] == ["back", "chest", "shoulders"]
+    assert res["coverage"]["groups_missing"] == ["cardio"]
+    assert res["coverage"]["suggestion"] == "This session doesn't include any cardio work. Consider adding some next time."
+    assert [e["workout_groups"] for e in res["exercises"]] == [["mobility_core"], ["upper"], ["lower"]]
     assert res["estimate"]["available"] and res["estimate"]["weight_change"]["weeks"] == 4
     assert {c["id"] for c in res["citations"]} == {"compendium-physical-activities", "cdc-losing-weight"}
     assert all(c["url"].startswith("https://") for c in res["citations"])

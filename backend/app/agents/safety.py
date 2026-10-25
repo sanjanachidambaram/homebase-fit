@@ -1,6 +1,6 @@
 """Red-flag pre-filter: plain code, no LLM. Runs BEFORE any agent sees a free-text question.
 
-If a question mentions pain/injury warning signs or describes the user's own injury, the Basics
+If a question mentions pain/injury warning signs or describes the user's own injury, the Workout Basics
 agent is never called. Instead we log a safety_events row and return a fixed message that points
 the user to a doctor or physical therapist. Being deterministic makes it cheap, predictable, and
 fully testable (tests/test_agents.py). It errs on the side of redirecting.

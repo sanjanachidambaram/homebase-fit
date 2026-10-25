@@ -7,13 +7,13 @@
   POST /api/workouts/review      Workout Reviewer: a Build Your Own session (the review itself is computed by code)
   POST /api/calendar/{id}/review Workout Reviewer: a custom calendar day
   GET  /api/coach/summary        Coach (dashboard load)
-  POST /api/basics/ask           Fitness Basics (red-flag pre-filter runs first)
+  POST /api/basics/ask           Workout Basics (red-flag pre-filter runs first)
 
 Security: the user is ALWAYS the one in the sign-in token (token_user_id). No route accepts a user_id
 from the URL, query, or body, and the request bodies forbid extra fields, so nothing the user types (or a
 model outputs) can point an agent at someone else's data.
 
-Pregnant / postpartum users (needs_clinical_review) never reach a model: the Program Architect and Basics
+Pregnant / postpartum users (needs_clinical_review) never reach a model: the Program Architect and Workout Basics
 answer from code, and the Workout Builder and Coach return 403 pointing to /pregnancy-support.
 
 Every agent call is logged to agent_runs with measured token counts (app/agents/harness.py: run_logged).

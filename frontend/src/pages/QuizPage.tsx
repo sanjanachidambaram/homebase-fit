@@ -166,7 +166,6 @@ export default function QuizPage() {
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [step, setStep] = useState<Step>('general')
   const [answers, setAnswers] = useState<Record<string, Answer>>({})
-  const [injuryNotes, setInjuryNotes] = useState('')
   const [consent, setConsent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -230,7 +229,6 @@ export default function QuizPage() {
         consent_accepted: consent,
         consent_version: CONSENT_VERSION,
         answers: filled,
-        injury_notes: injuryNotes.trim() || undefined,
       })
       // Pregnant / postpartum: straight to the support page, not the Dashboard (no plan or AI for them).
       if (profile.needs_clinical_review) {
@@ -313,13 +311,6 @@ export default function QuizPage() {
           {health.map((q) => (
             <div key={q.id}>
               <QuestionField q={q} value={answers[q.id]} onChange={set(q.id)} />
-              {q.allow_free_text && (
-                <label className="question">
-                  <span className="legend">{q.free_text_prompt ?? 'Anything else?'}</span>
-                  <textarea rows={3} maxLength={1000} value={injuryNotes} onChange={(e) => setInjuryNotes(e.target.value)} />
-                  <span className="hint">This stays in our database and is never sent to the AI model.</span>
-                </label>
-              )}
               {q.pace_note && <PaceNote q={q} answers={answers} />}
             </div>
           ))}
@@ -357,12 +348,6 @@ export default function QuizPage() {
                     <dd>{shown(q, answers[q.id])}</dd>
                   </div>
                 ))}
-                {group.back === 'health' && injuryNotes.trim() && (
-                  <div className="review-row">
-                    <dt>Anything else we should know?</dt>
-                    <dd>{injuryNotes.trim()}</dd>
-                  </div>
-                )}
               </dl>
             </section>
           ))}

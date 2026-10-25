@@ -31,7 +31,7 @@ describe('the logo', () => {
     fireEvent.click(logo())
     await waitFor(() => expect(window.location.pathname).toBe('/'))
     expect(await screen.findByRole('heading', { level: 2, name: 'Hi Sarah' })).toBeTruthy()
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Ask the Basics' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Ask Workout Basics' })).toBeTruthy())
     expect(screen.queryByRole('heading', { name: /build your own workout/i })).toBeNull()
     expect(screen.getByRole('link', { name: 'Build Your Own' }).getAttribute('href')).toBe('/build')   // still in the nav
   })

@@ -1185,7 +1185,7 @@ fieldset.question {
   font-weight: 600;
 }
 
-/* Ask the Basics */
+/* Ask Workout Basics */
 .ask-card {
   grid-column: 1 / -1; /* full width on the Dashboard, so there's room to type a real question */
   border-top: 8px solid var(--lavender);
@@ -2332,6 +2332,13 @@ fieldset.question {
 .chip-missing {
   background: #fff;
   border: 2px dashed var(--lavender-deep);
+}
+
+.review-suggestion {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 4px solid var(--lavender-deep);
+  background: #fff;
 }
 
 .estimate-list {

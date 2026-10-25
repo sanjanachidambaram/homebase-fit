@@ -102,7 +102,7 @@ def rows(sql, *args):
 
 def test_red_flag_question_never_reaches_the_agent(client, use_script, monkeypatch):
     script = use_script(("final", {"answered": True, "answer": "x", "source_slugs": []}))
-    agent_run = AsyncMock(side_effect=AssertionError("the Basics agent must not be called"))
+    agent_run = AsyncMock(side_effect=AssertionError("the Workout Basics agent must not be called"))
     monkeypatch.setattr(basics.basics_agent, "run", agent_run)
     uid, h = account(client, "safety")
 

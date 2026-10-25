@@ -1,4 +1,4 @@
-// "Fitness Basics": the Basics articles (GET /api/basics, from content/basics/*.md) and Ask the Basics.
+// "Workout Basics": the Workout Basics articles (GET /api/basics, from content/basics/*.md) and Ask Workout Basics.
 // Split out of the old "Your Plan & Basics" page on 2026-10-23, so the plan and the articles each have their own page.
 import { useEffect, useState, type ReactNode } from 'react'
 import { fetchArticles, type Article } from '../api'
@@ -50,7 +50,7 @@ export default function BasicsPage() {
 
   return (
     <>
-      <h2 className="page-title">Fitness Basics</h2>
+      <h2 className="page-title">Workout Basics</h2>
       <p className="page-sub">Short, plain-language guides. They're placeholder drafts until a professional reviews them.</p>
 
       {session ? (

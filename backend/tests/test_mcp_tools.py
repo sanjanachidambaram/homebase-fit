@@ -40,16 +40,16 @@ def day(n: int) -> str:
 
 
 def make_user(username="private.person", first_name="Zenobia", goal="lose_weight", injuries=("lower_back",),
-              quiz_days_ago=20, notes="Dr. Smith said L4 disc issue") -> int:
+              quiz_days_ago=20) -> int:
     conn = connect()
     with conn:
         uid = conn.execute("INSERT INTO users (username, first_name, password_hash) VALUES (?, ?, 'x')", (username, first_name)).lastrowid
         stamp = (datetime.now(timezone.utc) - timedelta(days=quiz_days_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
         conn.execute(
-            "INSERT INTO quiz_profiles (user_id, goal, injury_flags, injury_notes, weight, "
+            "INSERT INTO quiz_profiles (user_id, goal, injury_flags, weight, "
             "consent_accepted, consent_accepted_at, consent_version, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, 1, ?, 'v1', ?, ?)",
-            (uid, goal, json.dumps(list(injuries)), notes, 165 if goal == "lose_weight" else None, stamp, stamp, stamp))
+            "VALUES (?, ?, ?, ?, 1, ?, 'v1', ?, ?)",
+            (uid, goal, json.dumps(list(injuries)), 165 if goal == "lose_weight" else None, stamp, stamp, stamp))
     conn.close()
     return uid
 
@@ -147,7 +147,7 @@ def test_profile_not_found_cases(test_db):
     assert call("get_user_profile", user_id=uid)["found"] is False
 
 
-def test_no_tool_ever_returns_username_name_or_notes(test_db):
+def test_no_tool_ever_returns_username_or_name(test_db):
     uid = make_user()
     log(uid, 0)
     weigh(uid, 5, 170.0)
@@ -159,7 +159,7 @@ def test_no_tool_ever_returns_username_name_or_notes(test_db):
         call("compute_strength_equivalents", total_weight_lifted_lbs=5000),
     ]
     text = json.dumps(outputs).lower()
-    for secret in ("private.person", "zenobia", "dr. smith", "l4 disc", "password"):
+    for secret in ("private.person", "zenobia", "password"):
         assert secret not in text
 
 

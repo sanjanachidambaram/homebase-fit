@@ -5,7 +5,7 @@ Run from backend/:
 
 Every route that can call the model is tried with a pregnant and a postpartum profile, with a fake model that
 counts its calls. The answer must come from code (or a 403 pointing at /pregnancy-support), with zero model calls
-and no agent_runs row. The red-flag safety check still runs first for Basics questions.
+and no agent_runs row. The red-flag safety check still runs first for Workout Basics questions.
 """
 
 import pytest
@@ -14,7 +14,7 @@ from app.safety_rules import CLINICAL_REVIEW_NO_AI, CLINICAL_REVIEW_PAGE
 from tests.helpers import quiz_answers
 from tests.test_agents import RED_FLAG_QUESTION, rows, use_script  # noqa: F401  (use_script is a fixture)
 
-ANSWERABLE = "How long should I rest between sets?"   # has a Basics article, so only the clinical block can stop it
+ANSWERABLE = "How long should I rest between sets?"   # has a Workout Basics article, so only the clinical block can stop it
 
 
 def account(client, username, pregnancy_status) -> tuple[int, dict]:

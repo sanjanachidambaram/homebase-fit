@@ -30,7 +30,7 @@ function Moved({ to }: { to: string }) {
 const PAGES: Record<string, () => JSX.Element> = {
   '/': DashboardPage,
   '/plan': PlanPage, // "Your Personalized Plan": the generated week only
-  '/basics': BasicsPage, // the Fitness Basics articles and Ask the Basics
+  '/basics': BasicsPage, // the Workout Basics articles and Ask Workout Basics
   '/content': () => <Moved to="/plan" />, // the old combined "Your Plan & Basics" page (2026-10-23)
   '/build': BuildPage,
   '/calendar': CalendarPage,
@@ -53,7 +53,7 @@ const NAV: { path: string; label: string; also?: (path: string) => boolean }[] =
   { path: '/', label: 'Dashboard' },
   { path: '/about', label: 'About', also: (p) => p.startsWith('/about/') },
   { path: '/plan', label: 'Your Personalized Plan', also: (p) => p === '/plan/review' },
-  { path: '/basics', label: 'Basics' },
+  { path: '/basics', label: 'Workout Basics' },
   { path: '/build', label: 'Build Your Own' },
   { path: '/calendar', label: 'Calendar' },
   { path: '/exercises', label: 'Exercise Library', also: (p) => p === '/faves' },

@@ -167,3 +167,23 @@ def test_agent_profile_contains_no_pii(client):
     for secret in ("private.person", "Zenobia", "Dr. Smith", "L4", str(uid) + ",", "165", "155", '"weight', "goal_weight"):
         assert secret not in prompt
     assert json.loads(prompt)["injury_flags"] == ["lower_back"]
+
+
+def test_the_free_text_box_is_gone_and_nothing_is_stored(client):
+    """The "Anything else we should know?" box was removed (2026-10-25): no question, no column. An old client that
+    still sends injury_notes is ignored, and the text is stored nowhere."""
+    from app.db import connect
+    qs = client.get("/api/quiz/questions").json()
+    assert not any(q.get("allow_free_text") or q.get("free_text_prompt") for q in qs)
+    uid, h = sign_up(client, "notes.person")
+    r = client.put(f"/api/users/{uid}/quiz-profile", headers=h, json={
+        "consent_accepted": True, "consent_version": "2026-10-22", "answers": ANSWERS,
+        "injury_notes": "SENT-ANYWAY Dr. Smith"})
+    assert r.status_code == 200 and "injury_notes" not in r.json()
+    conn = connect()
+    try:
+        assert "injury_notes" not in {c["name"] for c in conn.execute("PRAGMA table_info(quiz_profiles)")}
+        row = dict(conn.execute("SELECT * FROM quiz_profiles WHERE user_id = ?", (uid,)).fetchone())
+    finally:
+        conn.close()
+    assert "SENT-ANYWAY" not in json.dumps(row)

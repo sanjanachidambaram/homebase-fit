@@ -13,7 +13,6 @@
 #   help_text        (optional) a line shown under the question
 #   exclusive        (multi_select, optional) a value that clears all others, e.g. "none"
 #   always_included  (multi_select, optional) a value that is always on and can't be unticked
-#   allow_free_text  (optional) also show a text box under the options (stored, never sent to the AI)
 #   unit, min, max   (number types, optional)
 #   ask_if           (optional) {question: <id>, equals: <value>}: only asked (and only stored) when that answer
 #                    matches. Otherwise it's skipped, never required, and saved as empty.
@@ -70,8 +69,6 @@ questions:
     type: multi_select
     required: true
     exclusive: none
-    allow_free_text: true
-    free_text_prompt: Anything else we should know? (optional)
     options:
       - { value: neck,       label: Neck }
       - { value: shoulder,   label: Shoulder }

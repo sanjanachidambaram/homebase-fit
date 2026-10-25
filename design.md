@@ -163,7 +163,7 @@ Examples:
 | Quiz | One question per screen, big tappable answer cards with emoji-style SVG icons, springy progress bar. The consent step is calm and clear (rule 1) |
 | Dashboard | A warm greeting (no name needed; we don't collect one), today's workout as one big pink card, streak star, a fun strength fact |
 | Programs | Cards with a colored goal ribbon, weekly strip of rounded day circles |
-| Basics hub | Lavender-tinted article cards with a friendly icon; review tag visible |
+| Workout Basics hub | Lavender-tinted article cards with a friendly icon; review tag visible |
 | Exercise library + faves | Candy-colored cards per muscle group, hearts, bottom-sheet detail |
 | Calendar | Rounded day cells, mint check for done days, yellow star for goal days |
 | Progress | Rings and thick bars, the "3 full-size trees" style fun stats, confetti on milestones |

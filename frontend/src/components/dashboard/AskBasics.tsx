@@ -1,4 +1,4 @@
-// "Ask the Basics": POST /api/basics/ask. Pain/injury questions get a plain "see a professional" reply (no AI involved).
+// "Ask Workout Basics": POST /api/basics/ask. Pain/injury questions get a plain "see a professional" reply (no AI involved).
 import { useState, type FormEvent } from 'react'
 import { askBasics, type BasicsAnswer } from '../../api'
 import { agentError } from '../../agentCalls'
@@ -36,7 +36,7 @@ export default function AskBasics({ token }: { token: string }) {
     <section className="dash-card ask-card" aria-labelledby="ask-title">
       <div className="dash-card-head">
         <h3 id="ask-title">
-          Ask the Basics
+          Ask Workout Basics
         </h3>
       </div>
       <form onSubmit={submit} className="ask-form">
@@ -77,7 +77,7 @@ export default function AskBasics({ token }: { token: string }) {
           </button>
         ))}
       </div>
-      <p className="hint">Answers come only from our Fitness Basics guide.</p>
+      <p className="hint">Answers come only from our Workout Basics guide.</p>
 
       {loading && <Loading text="Looking it up in our guide…" />}
       {error && <p className="error">{error}</p>}

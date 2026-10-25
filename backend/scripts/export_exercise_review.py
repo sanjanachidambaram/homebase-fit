@@ -116,20 +116,12 @@ QUIZ_LOGIC: dict[str, dict] = {
         "safety": "checked_only is set by code and the model can't loosen it. The flags (never the reasons) are "
                   + AGENT_PROFILE + "; the Program Architect sees only a yes/no 'low-impact injury-safe'.",
     },
-    "injuries:free_text": {
-        "label": "Anything else we should know? (free text under the injury question)",
-        "format": "Free text, optional, up to 1,000 characters",
-        "db": "quiz_profiles.injury_notes",
-        "used": "Stored only. No code reads it after saving.",
-        "safety": "Never sent to any model (on the excluded list in app/agents/context.py, with username, first name "
-                  "and email). Deleted with the account.",
-    },
     "pregnancy_status": {
         "db": "quiz_profiles.pregnancy_status, plus quiz_profiles.needs_clinical_review (computed by the database: "
               "1 for pregnant or postpartum)",
         "used": "Pregnant or postpartum: no plan is generated, the quiz sends them to /pregnancy-support, the "
                 "calendar stays empty, Build Your Own and the calendar's day choices are blocked, and every AI route "
-                "refuses (403, or a code-only reply for Ask the Basics after the red-flag check). They can still log "
+                "refuses (403, or a code-only reply for Ask Workout Basics after the red-flag check). They can still log "
                 "cardio in their own words (no library picker), with no calorie estimates and no progress marker.",
         "safety": "Triggers needs_clinical_review, which blocks every AI feature, so no model is ever called for "
                   "them. Not in the agent profile; never sent to any model.",
@@ -232,10 +224,6 @@ def quiz_rows() -> list[list[str]]:
         logic = QUIZ_LOGIC[q["id"]]
         stage = " [health question: shown after the disclaimer]" if settings.get("health") else ""
         rows.append([q["prompt"] + stage, _format(q, settings), logic["db"], logic["used"], logic["safety"]])
-        if settings.get("allow_free_text"):
-            extra = QUIZ_LOGIC[f"{q['id']}:free_text"]
-            rows.append([f"{settings.get('free_text_prompt') or extra['label']} (free text under \"{q['prompt']}\")",
-                         extra["format"], extra["db"], extra["used"], extra["safety"]])
     rows += [[r["label"], r["format"], r["db"], r["used"], r["safety"]] for r in QUIZ_EXTRA_ROWS]
     return rows
 

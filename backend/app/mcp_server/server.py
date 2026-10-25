@@ -12,7 +12,7 @@ There is no delete tool and no tool that returns a username, first name or email
 
 Privacy: get_user_profile is the only tool that returns profile data, and it goes through
 app.agents.context.agent_profile_for, so nothing in app.agents.context.EXCLUDED_USER_FIELDS (username,
-first name, email, user id, free-text injury notes) ever comes out of this server. No tool reads the users table.
+first name, email, user id, weight) ever comes out of this server. No tool reads the users table.
 
 NOTE FOR THE AGENT HARNESS (next step): three tools take a user_id. This server cannot tell WHO is
 asking, so the code that calls these tools must set user_id from the signed-in session and must not
@@ -98,7 +98,7 @@ def search_exercises(
 
 @mcp.tool(annotations=READ_ONLY)
 def search_basics_kb(query: str) -> dict:
-    """Keyword search of the Fitness Basics articles. This is the ONLY source for answering Fitness Basics questions.
+    """Keyword search of the Workout Basics articles. This is the ONLY source for answering Workout Basics questions.
 
     Returns the matching articles (full text) with status, review_notice, and citations. If answerable is false,
     nothing matches: say "I don't have verified information on that. Please consult a doctor or physical

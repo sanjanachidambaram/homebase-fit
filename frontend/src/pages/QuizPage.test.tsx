@@ -102,12 +102,12 @@ describe('the quiz', () => {
 })
 
 describe('the nav', () => {
-  it('has the plan and Basics as separate pages, with Calendar right after Build Your Own', async () => {
+  it('has the plan and Workout Basics as separate pages, with Calendar right after Build Your Own', async () => {
     window.history.replaceState({}, '', '/about')
     render(<App />)
     const nav = screen.getByRole('navigation', { name: 'Main' })
     const labels = Array.from(nav.querySelectorAll('a')).map((a) => a.textContent)
-    expect(labels).toEqual(['Dashboard', 'About', 'Your Personalized Plan', 'Basics', 'Build Your Own', 'Calendar',
+    expect(labels).toEqual(['Dashboard', 'About', 'Your Personalized Plan', 'Workout Basics', 'Build Your Own', 'Calendar',
       'Exercise Library', 'Settings'])
   })
 

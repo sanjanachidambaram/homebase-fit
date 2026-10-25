@@ -1,4 +1,4 @@
-"""Read-only searches over exercises and Fitness Basics articles.
+"""Read-only searches over exercises and Workout Basics articles.
 
 Everything here opens the database read-only (see app.db.connect_readonly). The injury filters are
 SQL, not prompt text: a contraindicated exercise is never returned, whatever the caller asks for.
@@ -223,7 +223,7 @@ def contraindicated_exercises(injury_flags: list[str], muscle_groups: list[str],
     return out
 
 
-# ---------------------------------------------------------------- Fitness Basics knowledge base
+# ---------------------------------------------------------------- Workout Basics knowledge base
 
 STOPWORDS = {
     "a", "an", "the", "is", "are", "was", "do", "does", "did", "to", "of", "in", "on", "for", "and", "or", "it",
@@ -235,7 +235,7 @@ STOPWORDS = {
     "over", "under", "again", "too", "not", "no", "yes", "one", "make", "ok", "okay", "normal", "thing", "things",
 }
 MAX_ARTICLES = 3
-NO_MATCH_MESSAGE = ("No article in the Fitness Basics knowledge base matches this question. Do not answer from "
+NO_MATCH_MESSAGE = ("No article in the Workout Basics knowledge base matches this question. Do not answer from "
                     "general knowledge. Reply: \"I don't have verified information on that. Please consult a "
                     "doctor or physical therapist.\"")
 

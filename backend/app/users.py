@@ -162,7 +162,6 @@ class QuizSubmission(BaseModel):
     consent_accepted: bool                                     # the medical disclaimer checkbox
     consent_version: str = Field(min_length=1, max_length=40)  # which disclaimer text was shown
     answers: dict[str, Any]                                    # question id -> answer
-    injury_notes: str | None = Field(None, max_length=1000)    # optional free text under "injuries"
 
 
 def validate_answer(q: sqlite3.Row, value: Any) -> Any:
@@ -238,8 +237,7 @@ def save_quiz(user_id: int, body: QuizSubmission, uid: int = Depends(token_user_
 
     # Every quiz column is written on every save, so a retake clears answers that were left blank.
     row = {col: values.get(col) for col in QUIZ_COLUMNS.values()}
-    row.update(user_id=user_id, injury_notes=(body.injury_notes or "").strip() or None,
-               consent_accepted=1, consent_accepted_at=now_utc(), consent_version=body.consent_version)
+    row.update(user_id=user_id, consent_accepted=1, consent_accepted_at=now_utc(), consent_version=body.consent_version)
     row["updated_at"] = row["consent_accepted_at"]
     # A (re)taken quiz is a new plan: progression starts again at week 1 today, and review-mode swaps from the old
     # plan no longer apply (the user reviews the new plan). The calendar mode itself is kept.

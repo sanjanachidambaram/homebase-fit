@@ -40,15 +40,15 @@ CREATE TABLE quiz_questions (
 );
 
 -- One row per user: their quiz answers (structured intake; no LLM involved).
--- Free text (injury_notes, other_activity_notes) and pregnancy_status are never sent to the AI model
--- (the PII boundary in app/agents/context.py only exposes goals, timeline, injury flags, age, weight, height).
+-- No free text is asked any more (the "Anything else we should know?" box was removed 2026-10-25). pregnancy_status
+-- and weight are never sent to the AI model (the PII boundary in app/agents/context.py exposes only the goal and
+-- the injury flags).
 CREATE TABLE quiz_profiles (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id      INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     -- One goal (2026-10-25 rewrite). It picks the week structure, the protocol and how weights go up.
     goal         TEXT NOT NULL CHECK (goal IN ('stronger', 'lose_weight', 'feel_good')),
     injury_flags TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(injury_flags)),  -- ["lower_back"]
-    injury_notes TEXT,                                                         -- free text from the quiz
     experience_level       TEXT CHECK (experience_level IN ('beginner', 'intermediate', 'advanced')),
     equipment              TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(equipment)),  -- ["dumbbells", "mat"]
     pregnancy_status       TEXT CHECK (pregnancy_status IN ('none', 'pregnant', 'postpartum')),
@@ -282,7 +282,7 @@ CREATE INDEX idx_measurements_user_date ON measurements(user_id, date);
 
 -- ---------------------------------------------------------------- safety
 
--- Every time the red-flag / injury-language check fires (Basics questions, calendar notes).
+-- Every time the red-flag / injury-language check fires (Workout Basics questions, calendar notes).
 -- Deleting a user deletes their events too (trigger_text is their own words).
 CREATE TABLE safety_events (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,

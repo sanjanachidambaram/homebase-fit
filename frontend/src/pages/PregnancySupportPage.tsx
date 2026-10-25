@@ -75,7 +75,7 @@ export default function PregnancySupportPage() {
       <section className="support-more">
         <h3>Want some general reading?</h3>
         <p>
-          Our <Link to="/content">Fitness Basics articles</Link> are general background (like how rest between sets
+          Our <Link to="/basics">Workout Basics articles</Link> are general background (like how rest between sets
           works), not a plan or advice for pregnancy. They're also still pending expert review.
         </p>
       </section>

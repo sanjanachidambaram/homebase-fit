@@ -1,8 +1,8 @@
-// "Review this workout": muscle coverage, push/pull balance and a caveated estimate range, all computed by the
+// "Review this workout": which of the 4 workout groups it includes, push/pull balance and a caveated estimate range, all computed by the
 // server's code (app/services/workout_review.py). The AI only writes the short summary, and the server swaps in
 // a plain one if the AI uses any number the code didn't compute. Every estimate is a range, never one number.
 import { useState } from 'react'
-import { MUSCLE_GROUP_LABELS, type WorkoutReview } from '../api'
+import { WORKOUT_GROUP_LABELS, type WorkoutReview } from '../api'
 import { agentError } from '../agentCalls'
 import Loading from './dashboard/Loading'
 
@@ -19,19 +19,20 @@ export function ReviewPanel({ review }: { review: WorkoutReview }) {
           : 'Summary written from the numbers below.'}
       </p>
 
-      <h4>Muscle coverage</h4>
+      <h4>Workout groups</h4>
       <div className="chip-row">
         {c.groups_hit.map((g) => (
           <span key={g.group} className="chip chip-small chip-hit">
-            ✓ {MUSCLE_GROUP_LABELS[g.group]} ({g.exercises})
+            ✓ {g.label} ({g.exercises})
           </span>
         ))}
         {c.groups_missing.map((g) => (
           <span key={g} className="chip chip-small chip-missing">
-            {MUSCLE_GROUP_LABELS[g]}: not included
+            {WORKOUT_GROUP_LABELS[g]}: not included
           </span>
         ))}
       </div>
+      {c.suggestion && <p className="review-suggestion">{c.suggestion}</p>}
       <p>
         <strong>Push / pull:</strong> {c.upper_body_balance.note}
       </p>

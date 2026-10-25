@@ -7,7 +7,7 @@ Run from backend/:
 What it does, against the working database:
   1. Signs up a demo account and takes the quiz (goals: weight loss + rehab; injury: lower back).
   2. Adds 11 straight days of demo workout logs and two weigh-ins (there's no logging page yet).
-  3. Calls each agent route as that user, plus one red-flag Basics question, and prints what happened.
+  3. Calls each agent route as that user, plus one red-flag Workout Basics question, and prints what happened.
   4. Prints the agent_runs rows (real token counts) and writes the transcript to output/agent_demo_run.json.
   5. Deletes the demo account through DELETE /api/users/{id}. Its agent_runs rows are kept, unlinked.
 This spends real tokens (a few cents at most).
@@ -30,8 +30,8 @@ CALLS = [
     ("Workout Builder", "POST", "/api/workouts/build",
      {"picks": {"legs": 2, "core": 2}, "time_budget_minutes": 25, "equipment": ["mat", "resistance_band"]}),
     ("Coach", "GET", "/api/coach/summary", None),
-    ("Fitness Basics", "POST", "/api/basics/ask", {"question": "How long should I rest between sets?"}),
-    ("Fitness Basics (red flag)", "POST", "/api/basics/ask",
+    ("Workout Basics", "POST", "/api/basics/ask", {"question": "How long should I rest between sets?"}),
+    ("Workout Basics (red flag)", "POST", "/api/basics/ask",
      {"question": "I get a sharp pain in my lower back when I do glute bridges. Should I push through?"}),
 ]
 

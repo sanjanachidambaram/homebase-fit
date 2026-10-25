@@ -208,7 +208,7 @@ def log_cardio(body: CardioIn, uid: int = Depends(signed_in)) -> dict:
     finally:
         conn.close()
 
-    # Same code-only red-flag check as calendar notes and the Basics Q&A. The log stays saved either way.
+    # Same code-only red-flag check as calendar notes and the Workout Basics Q&A. The log stays saved either way.
     safety = {"flagged": False}
     flags = red_flags_in(body.activity or "")
     if flags:

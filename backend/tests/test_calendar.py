@@ -251,7 +251,7 @@ class Recorder:
 
 
 def test_calendar_notes_never_reach_any_model(client, on_day, monkeypatch):
-    """Same boundary as injury_notes: the user's own words stay in the database. We write a unique note on
+    """The same boundary as all free text: the user's own words stay in the database. We write a unique note on
     several days (one of them completed), then run every agent with a fake model that records everything it
     is sent, and call the MCP tools that read user activity directly."""
     uid, h = account(client, "private.notes")

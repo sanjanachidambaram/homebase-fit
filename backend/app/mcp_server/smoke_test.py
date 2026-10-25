@@ -55,9 +55,9 @@ def build_throwaway_db(path: Path) -> int:
                      "WHERE id = ?", (TEST_EXERCISE,))
         uid = conn.execute("INSERT INTO users (username, first_name, password_hash) VALUES ('smoke.test', 'Smokey', 'x')").lastrowid
         conn.execute(
-            "INSERT INTO quiz_profiles (user_id, goal, injury_flags, injury_notes, weight, "
+            "INSERT INTO quiz_profiles (user_id, goal, injury_flags, weight, "
             "consent_accepted, consent_accepted_at, consent_version, created_at, updated_at) "
-            "VALUES (?, 'lose_weight', '[\"lower_back\"]', 'SMOKE-TEST-PRIVATE-NOTE', "
+            "VALUES (?, 'lose_weight', '[\"lower_back\"]', "
             "165, 1, ?, 'smoke', ?, ?)", (uid, stamp, stamp, stamp))
         for d in range(0, 18, 2):
             when = (today - timedelta(days=d)).date().isoformat()
@@ -97,8 +97,7 @@ async def main() -> None:
         p = (await c.call_tool("get_user_profile", {"user_id": uid})).data
         print("   ", json.dumps(p))
         check(set(p) == {"found", "goal", "injury_flags"}, "only the goal and injury flags returned (no weight)")
-        check("SMOKE-TEST-PRIVATE-NOTE" not in json.dumps(p) and "smoke.test" not in json.dumps(p),
-              "no email and no free-text injury note")
+        check("smoke.test" not in json.dumps(p) and "Smokey" not in json.dumps(p), "no username and no first name")
 
         show("2. search_exercises: THE INJURY FILTER (legs, with and without injury_flags=['knee'])")
         plain = (await c.call_tool("search_exercises", {"muscle_group": "legs", "limit": 50})).data

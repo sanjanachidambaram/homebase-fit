@@ -1,4 +1,4 @@
-"""Fitness Basics agent: answers questions from the Basics hub, ONLY from the knowledge base.
+"""Workout Basics agent: answers questions from the Workout Basics hub, ONLY from the knowledge base.
 
 Triggered by POST /api/basics/ask. Model-visible tool: search_basics_kb (nothing else).
 
@@ -20,7 +20,7 @@ from app.agents.safety import REDIRECT_MESSAGE, log_safety_event, red_flags_in
 from app.safety_rules import CLINICAL_REVIEW_NO_AI, CLINICAL_REVIEW_PAGE
 
 NO_INFO_MESSAGE = "I don't have verified information on that. Please consult a doctor or physical therapist."
-PENDING_NOTE = "This comes from our Fitness Basics guide, which is still pending expert review."
+PENDING_NOTE = "This comes from our Workout Basics guide, which is still pending expert review."
 
 
 class BasicsQuestion(BaseModel):
@@ -53,7 +53,7 @@ basics_agent = Agent(
 
 @basics_agent.tool
 async def search_basics_kb(ctx: RunContext[AgentDeps], query: str) -> dict:
-    """Keyword search of the Fitness Basics articles. The only source you may answer from."""
+    """Keyword search of the Workout Basics articles. The only source you may answer from."""
     result = await ctx.deps.gateway.call("search_basics_kb", {"query": query})
     ctx.deps.seen.setdefault("articles", {}).update({a["slug"]: a for a in result["matches"]})
     return result

@@ -13,7 +13,7 @@ Exactly four LLM agents, each started by one user action. They never call each o
 | Program Architect | `POST /api/programs/recommend` | none: it explains a plan the code already built | `app/agents/program_architect.py` |
 | Workout Builder | `POST /api/workouts/build` | get_user_profile, search_exercises | `app/agents/workout_builder.py` |
 | Coach | `GET /api/coach/summary` | get_progress_summary, check_goal_achievement, compute_strength_equivalents | `app/agents/coach.py` |
-| Fitness Basics | `POST /api/basics/ask` | search_basics_kb | `app/agents/basics.py` |
+| Workout Basics | `POST /api/basics/ask` | search_basics_kb | `app/agents/basics.py` |
 
 Deliberately NOT LLM agents: onboarding (the quiz is structured intake, `app/users.py`), the safety
 check (a code-level red-flag filter, `app/agents/safety.py`, rule 3), and **plan building** (a deterministic
@@ -22,7 +22,7 @@ generator, `app/services/program_generator.py`, rule 6). Cheaper, more reliable,
 All data access goes through the MCP tool server (`app/mcp_server/server.py`) via `McpGateway` in
 `app/agents/harness.py`. Every agent call is logged with measured tokens in `agent_runs`.
 
-## 1. Citation integrity (Program Architect and Fitness Basics)
+## 1. Citation integrity (Program Architect and Workout Basics)
 
 - Never state anything as scientific fact ("research shows", "science says", "proven", "studies",
   "evidence-based", "backed by science") unless the goal protocol or article it comes from has a citation
@@ -37,13 +37,13 @@ All data access goes through the MCP tool server (`app/mcp_server/server.py`) vi
   as science-backed.
 
 **Enforced in code:**
-1. Basics sources must be articles the tool returned in this run (output validator in `basics.py`). Status,
+1. Workout Basics sources must be articles the tool returned in this run (output validator in `basics.py`). Status,
    review notice and citations are copied by code; the model can't write or upgrade them. The Program
    Architect gets the plan's protocol status and citations in its prompt and has no tools at all.
 2. A science-claim check (`harness.makes_science_claim`) runs on every rationale and answer whose sources
-   have no citations. The Basics agent is asked to rewrite, then falls back to the "no verified
+   have no citations. The Workout Basics agent is asked to rewrite, then falls back to the "no verified
    information" reply. The Program Architect's explanation is replaced with a plain one.
-3. The Fitness Basics agent's ONLY tool is `search_basics_kb`. When the knowledge base has nothing for the
+3. The Workout Basics agent's ONLY tool is `search_basics_kb`. When the knowledge base has nothing for the
    question (`answerable: false`), the code replies "I don't have verified information..." itself
    **without calling the model**. Same for the Program Architect when no plan can be generated (pregnant or
    postpartum, rule 6): the code explains why without calling the model.
@@ -66,7 +66,7 @@ All data access goes through the MCP tool server (`app/mcp_server/server.py`) vi
 - The user is always the one in the sign-in token. Nothing the user types and nothing the model outputs
   can choose which user's data is read.
 - **Calendar notes never reach any model, for any purpose.** They are the user's own words, on the same
-  footing as `injury_notes`: stored in `calendar_entries.notes`, shown only to that
+  footing as the old quiz free-text box (removed 2026-10-25): stored in `calendar_entries.notes`, shown only to that
   user, and never read by `agent_profile_for`, any MCP tool, or any agent (not the Coach, not anything else).
   Marking a calendar day done writes `workout_logs` rows, and the note is **not** copied into them.
   Test: `test_calendar_notes_never_reach_any_model` runs every agent with a fake model that records everything
@@ -88,7 +88,7 @@ All data access goes through the MCP tool server (`app/mcp_server/server.py`) vi
   "chest pain", "dizzy", "I think I tore my...", "my knee hurts") gets a fixed message pointing to a
   doctor or physical therapist. No exercise advice.
 
-**Enforced in code:** `app/agents/safety.py` runs a regex check **before** the Basics agent. On a match the
+**Enforced in code:** `app/agents/safety.py` runs a regex check **before** the Workout Basics agent. On a match the
 agent is never called (no tokens are spent), a `safety_events` row is written (`source = 'basics_qa'`,
 `action_taken = 'redirected_to_professional'`), and the fixed message is returned.
 Test: `test_red_flag_question_never_reaches_the_agent` (spies on the agent and checks the row).
@@ -147,7 +147,7 @@ Tests: `test_injured_user_always_gets_checked_only`, `test_injury_filter_is_appl
   `test_comparisons_are_about_objects_and_animals_never_food_or_bodies`.
 - **No emoji (decided 2026-10-23).** The site's copy uses no decorative emoji, and neither may anything a model
   writes. The prompts ask for none, and `harness.no_emoji` strips any from every model-written text the user sees
-  (Coach encouragement, Basics answers, plan explanations, Workout Builder balance notes, Workout Reviewer
+  (Coach encouragement, Workout Basics answers, plan explanations, Workout Builder balance notes, Workout Reviewer
   summaries). Test: `test_model_written_text_never_shows_emoji`.
 
 **Enforced in code:** `coach.py` tone guard (a blocklist) sends a failing message back for a rewrite and
@@ -163,8 +163,8 @@ level, 9 rows, PT-reviewable); the generator never invents them. The old multi-g
 
 - **Safety first.** Pregnant or postpartum (`needs_clinical_review`): no plan is generated until
   OB-GYN-reviewed guidance exists; the user is pointed to their OB-GYN or midwife. They also never reach
-  ANY AI agent: the Workout Builder and Coach routes return 403, the Program Architect and Basics answer
-  from code (the Basics red-flag check still runs and still logs), and the frontend sends them to
+  ANY AI agent: the Workout Builder and Coach routes return 403, the Program Architect and Workout Basics answer
+  from code (the Workout Basics red-flag check still runs and still logs), and the frontend sends them to
   `/pregnancy-support`. One check, `app/safety_rules.py: profile_needs_clinical_review`, decides it. Any injury flag:
   `checked_only=true` on every exercise search, no exceptions (rule 4). The injury filter applies on top of
   whichever goal is picked, unchanged: every candidate comes from the same tested SQL as the MCP tool.
@@ -200,8 +200,15 @@ pregnancy), `tests/test_calendar_push_pull.py` (the calendar lays out exactly th
 ## 7. Numbers come from code (the Workout Reviewer, and any agent that narrates a calculation)
 
 - The Workout Reviewer reviews a session someone built (Build Your Own, or a custom calendar day). Code computes
-  everything: muscle-group coverage, push/pull balance (exercises.force), and the outcome estimate
+  everything: which of the 4 workout groups the plans are built from (Cardio, Upper body, Lower body,
+  Mobility + core) the session includes, push/pull balance (exercises.force), and the outcome estimate
   (`app/services/workout_review.py`). The agent only puts that result into words.
+- **Coverage is a code fact, like a number (since 2026-10-25, replacing the old six-muscle-group check).** Code
+  sorts each exercise into a group from its database fields (`workout_groups`) and writes the suggestion naming
+  exactly the groups missing ("This session doesn't include any cardio or mobility/core work. Consider adding one of
+  those next time."). The model may say a group is missing only if code says so: a draft claiming a group the session
+  does include is missing is sent back, then replaced by the code-written summary (`false_absences` in
+  `app/agents/workout_reviewer.py`; tests in `tests/test_workout_review.py`).
 - **The model never produces a number.** Every number in its reply must appear in the data code gave it,
   written the same way. It may not compute, round, convert, add, or turn a range into a single figure.
 - Estimates are always ranges, rounded outward, never a single number. Calories come from MET values in the

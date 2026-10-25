@@ -148,8 +148,6 @@ export interface QuizQuestion {
   help_text?: string
   health?: boolean
   exclusive?: string
-  allow_free_text?: boolean
-  free_text_prompt?: string
   unit?: string
   min?: number
   max?: number
@@ -166,7 +164,6 @@ export type Goal = 'stronger' | 'lose_weight' | 'feel_good'
 export interface QuizProfile {
   goal: Goal
   injury_flags: string[]
-  injury_notes: string | null
   experience_level: string | null
   equipment: string[]
   weight: number | null // only on the losing-weight path
@@ -253,7 +250,7 @@ export const fetchAccount = (userId: number, token: string) => request<Account>(
 export function submitQuiz(
   userId: number,
   token: string,
-  body: { consent_accepted: boolean; consent_version: string; answers: Record<string, unknown>; injury_notes?: string },
+  body: { consent_accepted: boolean; consent_version: string; answers: Record<string, unknown> },
 ) {
   return request<QuizProfile>(`/api/users/${userId}/quiz-profile`, { method: 'PUT', body: JSON.stringify(body) }, token)
 }
@@ -590,13 +587,28 @@ export const fetchCalendarProgress = (token: string, weekStart: string) =>
 
 // ---------------------------------------------------------------- Workout Reviewer
 
+/** The 4 workout groups every plan is built from; the reviewer checks a session against these. */
+export type WorkoutGroup = 'cardio' | 'upper' | 'lower' | 'mobility_core'
+export const WORKOUT_GROUP_LABELS: Record<WorkoutGroup, string> = {
+  cardio: 'Cardio',
+  upper: 'Upper body',
+  lower: 'Lower body',
+  mobility_core: 'Mobility + core',
+}
+
 /** A review computed by code (coverage + a Compendium-based estimate range); `summary` is the AI's narration of
  *  it, or a plain code-written one (`summary_by: 'code'`) if the AI's draft used a number the code didn't give. */
 export interface WorkoutReview {
-  exercises: { name: string; muscle_group: MuscleGroup; force: 'push' | 'pull' | 'static' | null }[]
+  exercises: {
+    name: string
+    muscle_group: MuscleGroup
+    force: 'push' | 'pull' | 'static' | null
+    workout_groups: WorkoutGroup[]
+  }[]
   coverage: {
-    groups_hit: { group: MuscleGroup; exercises: number }[]
-    groups_missing: MuscleGroup[]
+    groups_hit: { group: WorkoutGroup; label: string; exercises: number }[]
+    groups_missing: WorkoutGroup[]
+    suggestion: string | null
     upper_body_balance: { push: number; pull: number; static: number; unclassified: number; note: string }
     notes: string[]
   }

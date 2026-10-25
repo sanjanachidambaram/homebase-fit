@@ -1,4 +1,4 @@
-// "Your Personalized Plan": your generated weekly plan (GET /api/plan, built by code, no AI). The Fitness Basics
+// "Your Personalized Plan": your generated weekly plan (GET /api/plan, built by code, no AI). The Workout Basics
 // articles used to share this page; they have their own page now (BasicsPage, /basics).
 import { useEffect, useState } from 'react'
 import { fetchPlan, type WeeklyProgram } from '../api'
