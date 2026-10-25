@@ -1,42 +1,48 @@
-"""The deterministic program generator: blending rules, training days, and the injury filter during generation.
+"""The plan generator (app/services/program_generator.py), rewritten 2026-10-25: one goal, a fixed 4-day week by goal,
+a repeating 2/4/8-week block, slot-based days with backbone moves, default starting weights and the goal's weight rules.
+Plain code, no AI. The injury filter is the same tested SQL as the MCP tool, applied on top of every goal.
 
 Run from backend/:
     .venv\\Scripts\\python.exe -m pytest tests/test_program_generator.py -v
 """
 
 import json
+import re
 import sqlite3
 
 import pytest
 
 from app import config
 from app.db import connect_readonly
+from app.safety_rules import INJURY_FLAGS
 from app.services import program_generator as gen
-from app.services.program_generator import Protocol, blend_protocols, generate, training_day_count
+from app.services.program_generator import (BLOCK_WEEKS, DEFAULT_WEIGHT_LB, NEEDS_BAR, generate, suggested_weight,
+                                            variant_of, weight_steps)
 
+# The profile most tests share: losing weight, a beginner with a lower-back injury, bodyweight + mat + band.
 LOWER_BACK_REHAB = {
-    "goals": ["weight_loss", "rehab"], "injury_flags": ["lower_back"], "experience_level": "beginner",
-    "days_available": 4, "session_length_minutes": 30, "equipment": ["bodyweight", "mat", "resistance_band"],
-    "other_activity_days": 0, "pregnancy_status": "none",
+    "goal": "lose_weight", "injury_flags": ["lower_back"], "experience_level": "beginner",
+    "equipment": ["bodyweight", "mat", "resistance_band"], "pregnancy_status": "none",
 }
+HOME = ["bodyweight", "dumbbells", "mat", "resistance_band"]
+UPPER_GROUPS = {"chest", "back", "shoulders", "arms"}
 
 
-def protocol(goal, sessions, length, split, sets, reps, rest, status="placeholder", citations=()):
-    return Protocol(goal=goal, experience_level="beginner", sessions_per_week=sessions, session_length_minutes=length,
-                    split_type=split, sets=sets, reps=reps, rest_seconds=rest, progression_note=f"{goal} note",
-                    status=status, citations=tuple(citations))
+def profile(goal, experience="intermediate", equipment=HOME, flags=()):
+    return {"goal": goal, "experience_level": experience, "equipment": list(equipment),
+            "injury_flags": list(flags), "pregnancy_status": "none"}
 
 
 @pytest.fixture
 def search_spy(monkeypatch):
     """Records every exercise search the generator makes (it must use the shared, tested filter)."""
     calls = []
-    real = gen.search_exercises
+    real = gen.search_all_exercises
 
     def spy(**kwargs):
         calls.append(kwargs)
         return real(**kwargs)
-    monkeypatch.setattr(gen, "search_exercises", spy)
+    monkeypatch.setattr(gen, "search_all_exercises", spy)
     return calls
 
 
@@ -49,208 +55,276 @@ def contraindications() -> dict[str, tuple[set[str], str]]:
         conn.close()
 
 
+def training(plan, week=None):
+    weeks = plan.weeks if week is None else [plan.weeks[week]]
+    return [d for w in weeks for d in w.days if d.kind == "training"]
+
+
 def exercises_in(plan):
-    return [e for d in plan.days for e in d.exercises]
+    return [x for d in training(plan) for x in d.exercises]
 
 
-# ---------------------------------------------------------------- blending rules
+# ================================================================ 1. the week, by goal
 
-def test_blend_takes_the_conservative_value_everywhere():
-    b = blend_protocols([
-        protocol("weight_loss", 3, 30, "circuit", (2, 3), (12, 15), 30),
-        protocol("rehab", 3, 20, "full_body", (1, 2), (10, 12), 60),
-    ])
-    assert b.goals == ["rehab", "weight_loss"]                  # most conservative goal first
-    assert (b.sessions_per_week, b.session_length_minutes) == (3, 20)   # fewest, shortest
-    assert b.split_type == "full_body"                          # gentlest split
-    assert b.sets == (1, 2)                                     # lower set range
-    assert b.reps == (12, 15)                                   # lighter-load (higher-rep) range
-    assert b.rest_seconds == 60                                 # longest rest
-    assert len(b.rules) == 6 and b.status == "placeholder"
-
-
-def test_blend_strength_and_tone():
-    b = blend_protocols([
-        protocol("strength", 4, 45, "upper_lower", (3, 4), (6, 8), 120),
-        protocol("tone", 4, 40, "upper_lower", (3, 3), (10, 15), 60),
-    ])
-    assert (b.sessions_per_week, b.session_length_minutes, b.split_type) == (4, 40, "upper_lower")
-    assert (b.sets, b.reps, b.rest_seconds) == ((3, 3), (10, 15), 120)
-
-
-def test_split_caution_order():
-    def split_of(*splits):
-        return blend_protocols([protocol("tone", 3, 30, s, (2, 2), (10, 10), 60) for s in splits]).split_type
-    assert split_of("push_pull_legs", "upper_lower") == "upper_lower"
-    assert split_of("upper_lower", "circuit") == "circuit"
-    assert split_of("circuit", "full_body") == "full_body"
-
-
-def test_one_goal_needs_no_blending_and_status_and_citations_combine():
-    single = blend_protocols([protocol("tone", 3, 30, "full_body", (2, 3), (10, 12), 60)])
-    assert single.rules == [] and (single.sets, single.reps) == ((2, 3), (10, 12))
-    c1, c2 = {"claim": "a", "source": "x"}, {"claim": "b", "source": "y"}
-    reviewed = blend_protocols([protocol("tone", 3, 30, "full_body", (2, 3), (10, 12), 60, "pt_reviewed", [c1]),
-                                protocol("strength", 3, 40, "full_body", (2, 3), (8, 10), 90, "pt_reviewed", [c1, c2])])
-    assert reviewed.status == "pt_reviewed" and reviewed.citations == [c1, c2]   # union, no duplicates
-    mixed = blend_protocols([protocol("tone", 3, 30, "full_body", (2, 3), (10, 12), 60, "pt_reviewed", [c1]),
-                             protocol("rehab", 3, 20, "full_body", (1, 2), (10, 12), 60)])
-    assert mixed.status == "placeholder"      # one unreviewed goal makes the whole plan unreviewed
-
-
-def test_blend_needs_a_protocol():
-    with pytest.raises(ValueError):
-        blend_protocols([])
-
-
-# ---------------------------------------------------------------- training days
-
-@pytest.mark.parametrize("available, sessions, other, expected", [
-    (4, 3, 0, 3),     # protocol asks for fewer than you have
-    (2, 5, 0, 2),     # you have fewer than the protocol asks for
-    (7, 6, 0, 6),     # never 7: a full rest day is kept
-    (7, 6, 1, 5),     # 1 day of other activity -> 5 sessions, still a full rest day
-    (5, 5, 3, 3),     # lots of other activity -> fewer sessions
-    (3, 5, 6, 1),     # always at least one session
-    (3, 5, 7, 1),
+@pytest.mark.parametrize("goal, counts, block", [
+    ("stronger", {"upper": 2, "lower": 1, "cardio": 1}, 2),    # week 1; week 2 swaps upper and lower (below)
+    ("lose_weight", {"upper": 1, "lower": 1, "cardio": 2}, 4),
+    ("feel_good", {"mobility": 2, "upper": 1, "cardio": 1}, 8),
 ])
-def test_training_day_count(available, sessions, other, expected):
-    n, notes = training_day_count(available, sessions, other)
-    assert n == expected
-    if other and n < min(available, sessions):
-        assert any("other activity" in x for x in notes)
+def test_every_goal_has_four_training_days_in_its_own_pattern(test_db, goal, counts, block):
+    plan = generate(profile(goal))
+    assert plan.generated and plan.training_days == 4 and plan.block_weeks == block == BLOCK_WEEKS[goal]
+    assert len(plan.weeks) == block and plan.days == plan.weeks[0].days
+    for w in plan.weeks:
+        days = [d for d in w.days if d.kind == "training"]
+        assert len(days) == 4 and len(w.days) == 7
+    week1 = {}
+    for d in training(plan, 0):
+        week1[d.category] = week1.get(d.category, 0) + 1
+    assert week1 == counts
 
 
-def test_every_plan_has_rest_days_in_between(test_db):
-    plan = generate(LOWER_BACK_REHAB)
-    kinds = [d.kind for d in plan.days]
-    assert len(plan.days) == 7 and kinds.count("training") == plan.training_days == 3
-    assert [d.day for d in plan.days if d.kind == "training"] == ["mon", "wed", "fri"]
-    six = generate({**LOWER_BACK_REHAB, "goals": ["weight_loss"], "experience_level": "advanced", "injury_flags": [],
-                    "days_available": 7})
-    assert [d.kind for d in six.days].count("rest") >= 2   # advanced weight loss = 5 sessions; 7 days available
+def test_getting_stronger_is_three_strength_days_and_one_cardio_every_week(test_db):
+    plan = generate(profile("stronger"))
+    for w in range(2):
+        cats = sorted(d.category for d in training(plan, w))
+        assert cats.count("cardio") == 1 and len([c for c in cats if c in ("upper", "lower")]) == 3
+    # odd weeks Upper/Lower/Upper, even weeks Lower/Upper/Lower: each strength day is one OR the other
+    assert [d.category for d in training(plan, 0)][:3] == ["upper", "lower", "upper"]
+    assert [d.category for d in training(plan, 1)][:3] == ["lower", "upper", "lower"]
 
 
-# ---------------------------------------------------------------- the injury filter during generation
+def test_feeling_good_is_two_mobility_one_strength_one_cardio_for_all_eight_weeks(test_db):
+    plan = generate(profile("feel_good"))
+    for w in range(8):
+        cats = sorted(d.category for d in training(plan, w))
+        assert cats.count("mobility") == 2 and cats.count("cardio") == 1
+        assert len([c for c in cats if c in ("upper", "lower")]) == 1
+
+
+def test_upper_and_lower_are_never_mixed_on_a_day(test_db):
+    for goal in gen.GOALS:
+        for d in training(generate(profile(goal))):
+            groups = {x.muscle_group for x in d.exercises}
+            if d.category == "upper":
+                assert groups <= UPPER_GROUPS, (goal, d.day, groups)
+            elif d.category == "lower":
+                assert groups == {"legs"}, (goal, d.day, groups)
+
+
+# ================================================================ 2. the repeating weeks
+
+def test_the_same_exercises_come_back_on_odd_weeks_and_on_even_weeks():
+    """Week 1 = week 3 = week 5 (variant 0); week 2 = week 4 (variant 1). The calendar maps dates the same way."""
+    assert [variant_of(w, 2) for w in range(1, 7)] == [0, 1, 0, 1, 0, 1]
+    assert [variant_of(w, 4) for w in range(1, 10)] == [0, 1, 2, 3, 0, 1, 2, 3, 0]     # weeks 5-8 repeat 1-4
+    assert [variant_of(w, 8) for w in (1, 8, 9, 16, 17)] == [0, 7, 0, 7, 0]           # weeks 9-16 repeat 1-8
+
+
+def test_weeks_in_a_block_differ_where_the_pool_allows(test_db):
+    plan = generate(profile("lose_weight", "advanced", equipment=["full_gym"]))
+    uppers = [tuple(x.exercise_id for x in next(d for d in training(plan, w) if d.category == "upper").exercises)
+              for w in range(4)]
+    assert len(set(uppers)) == 4                                                      # 4 different upper days
+
+
+def test_same_profile_same_plan(test_db):
+    assert generate(LOWER_BACK_REHAB) == generate(LOWER_BACK_REHAB)
+
+
+# ================================================================ 3. what goes into a day
+
+def test_every_strength_day_hits_two_muscle_groups_plus_two_accessories(test_db):
+    for goal in gen.GOALS:
+        for exp in gen.EXPERIENCE:
+            for eq in (["bodyweight"], HOME, ["full_gym"]):
+                plan = generate(profile(goal, exp, eq))
+                for d in training(plan):
+                    if d.category not in ("upper", "lower"):
+                        continue
+                    accessories = [x for x in d.exercises if "accessory" in x.slot or x.slot in ("shoulders", "arms")]
+                    assert len(accessories) >= 2, (goal, exp, eq, d.day, [x.slot for x in d.exercises])
+                    if d.category == "upper":
+                        assert len({x.muscle_group for x in d.exercises}) >= 2, (goal, exp, eq, d.day)
+                    else:   # lower: a knee-dominant and a hip-dominant move (quads AND glutes/hamstrings)
+                        assert {"knee", "hip"} <= {x.slot for x in d.exercises}, (goal, exp, eq, d.day)
+
+
+def test_backbone_moves_come_first(test_db):
+    """The "most effective, easiest at home" lists, matched against the real library (never invented)."""
+    plan = generate(profile("lose_weight", "beginner", ["bodyweight", "mat"]))
+    names = lambda cat: " ".join(x.name.lower() for d in training(plan) if d.category == cat for x in d.exercises)  # noqa: E731
+    assert re.search(r"push-?up", names("upper")) and re.search(r"squat", names("lower"))
+    assert re.search(r"bridge|butt lift", names("lower"))
+    assert re.search(r"march|step jack", names("cardio"))                            # low-impact options for beginners
+    fg = generate(profile("feel_good", "beginner", ["bodyweight", "mat"]))
+    mobility = " ".join(x.name.lower() for d in training(fg) if d.category == "mobility" for x in d.exercises)
+    assert re.search(r"plank|dead bug", mobility) and re.search(r"bird dog|cat", mobility)
+
+
+def test_days_are_15_to_60_minutes_and_never_over_the_session_length(test_db):
+    for goal in gen.GOALS:
+        for exp in gen.EXPERIENCE:
+            plan = generate(profile(goal, exp))
+            for d in training(plan):
+                assert 15 <= d.est_minutes <= 60, (goal, exp, d.day, d.category, d.est_minutes)
+                assert d.est_minutes <= plan.protocol.session_length_minutes, (goal, exp, d.day, d.est_minutes)
+
+
+def test_no_day_repeats_a_near_duplicate_move(test_db):
+    # e.g. a knee injury empties the squat/lunge slots: the fallbacks mustn't fill a day with three calf raises
+    for prof in (profile("stronger", "intermediate", ["bodyweight", "dumbbells", "kettlebells"], ["knee"]),
+                 profile("lose_weight", "advanced"), profile("feel_good", "beginner", flags=["hip"])):
+        for d in training(generate(prof)):
+            for family in gen.ONE_PER_DAY:
+                assert sum(bool(family.search(x.name)) for x in d.exercises) <= 1, (d.day, [x.name for x in d.exercises])
+
+
+def test_sets_reps_and_rest_come_from_the_protocol(test_db):
+    plan = generate(profile("stronger", "intermediate"))
+    p = plan.protocol
+    assert (p.sets_range, p.reps_range, p.rest_seconds, p.session_length_minutes) == ("3", "6-10", 120, 45)
+    for x in exercises_in(plan):
+        if x.category in ("upper", "lower"):
+            assert x.sets == "3" and x.rest_seconds == 120
+            assert x.reps_your_call is not ("hold" in x.reps)                       # stronger: reps are your call
+
+
+def test_no_jumping_for_beginners_or_injuries_and_no_bar_moves_without_a_gym(test_db):
+    for prof in (profile("stronger", "beginner"), {**profile("stronger", "advanced"), "injury_flags": ["knee"]},
+                 profile("stronger", "intermediate", ["bodyweight", "dumbbells", "kettlebells"], ["knee"])):
+        names = [x.name for x in exercises_in(generate(prof))]
+        assert not any(gen.HIGH_IMPACT.search(n) for n in names), names    # incl. cleans, snatches, jerks, thrusters
+    assert not any(NEEDS_BAR.search(x.name) for x in exercises_in(generate(profile("stronger", "advanced", HOME))))
+
+
+def test_equipment_is_respected(test_db):
+    plan = generate(profile("stronger", "advanced", ["bodyweight"]))
+    conn = connect_readonly()
+    eq = {r["id"]: set(json.loads(r["equipment_needed"])) for r in conn.execute("SELECT id, equipment_needed FROM exercises")}
+    conn.close()
+    for x in exercises_in(plan):
+        assert eq[x.exercise_id] <= {"none", "chair"}, x.name
+        assert x.weighted is False and x.default_weight_lb is None                     # nothing to put a weight on
+
+
+# ================================================================ 4. weights (shared_rules.md rule 8)
+
+def test_default_starting_weights_by_experience(test_db):
+    assert DEFAULT_WEIGHT_LB == {"beginner": None, "intermediate": {"arms": 10, "legs": 20},
+                                 "advanced": {"arms": 20, "legs": 40}}
+    for exp, arms, legs in (("beginner", None, None), ("intermediate", 10, 20), ("advanced", 20, 40)):
+        plan = generate(profile("stronger", exp, HOME))
+        weighted = [x for x in exercises_in(plan) if x.weighted]
+        assert weighted, exp
+        for x in weighted:
+            assert x.default_weight_lb == (arms if x.load == "arms" else legs), (exp, x.name)
+            assert x.load == ("arms" if x.category == "upper" else "legs")
+
+
+def test_bodyweight_moves_never_get_a_weight(test_db):
+    for x in exercises_in(generate(profile("stronger", "advanced", HOME))):
+        if not x.weighted:
+            assert x.default_weight_lb is None and x.load is None
+
+
+def test_getting_stronger_adds_weight_each_time_a_day_comes_round():
+    # an exercise on odd weeks (variant 0): weeks 1, 3, 5... From a 10 lb start in week 1:
+    steps = [weight_steps("stronger", 2, {0}, 1, w) for w in (1, 3, 5, 7)]
+    assert steps == [0, 1, 2, 3]
+    assert [suggested_weight("stronger", "arms", 10, s) for s in steps] == [10, 12.5, 15, 17.5]   # +2.5 lb arms
+    assert [suggested_weight("stronger", "legs", 20, s) for s in steps] == [20, 25, 30, 35]       # +5 lb legs
+    assert weight_steps("stronger", 2, {0, 1}, 1, 4) == 3                       # on both patterns: every week
+
+
+def test_losing_weight_adds_5_lb_every_4_weeks():
+    weights = [suggested_weight("lose_weight", "arms", 10, weight_steps("lose_weight", 4, {0}, 1, w))
+               for w in (1, 4, 5, 8, 9, 12, 13)]
+    assert weights == [10, 10, 15, 15, 20, 20, 25]                              # weeks 5-8 repeat 1-4, 5 lb heavier
+
+
+def test_feeling_good_never_raises_a_weight():
+    assert all(weight_steps("feel_good", 8, {0}, 1, w) == 0 for w in range(1, 30))
+    assert suggested_weight("feel_good", "legs", 22.5, 0) == 22.5
+
+
+def test_weights_build_on_a_logged_anchor_not_just_the_default():
+    """Calibration: a weight logged in week 3 becomes the new anchor; increases count from there."""
+    assert weight_steps("stronger", 2, {0}, 3, 7) == 2 and suggested_weight("stronger", "arms", 15, 2) == 20
+    assert suggested_weight("stronger", "arms", None, 5) is None                # no anchor (beginner, nothing logged)
+
+
+def test_the_plan_shows_the_weight_schedule(test_db):
+    plan = generate(profile("lose_weight", "intermediate", HOME))
+    w = plan.weights
+    assert w.schedule_weeks == 8 and w.defaults_lb == {"arms": 10, "legs": 20} and "5 lb every 4 weeks" in w.rule
+    row = w.schedule[0]
+    assert row.weight_lb == [row.weight_lb[0]] * len([wk for wk in row.weeks if wk <= 4]) + \
+        [row.weight_lb[0] + 5] * len([wk for wk in row.weeks if wk > 4])
+
+
+# ================================================================ 5. safety: unchanged, on top of every goal
 
 def test_injury_filter_is_applied_during_generation(test_db, search_spy):
     plan = generate(LOWER_BACK_REHAB)
     assert plan.generated and search_spy, "the generator must use the shared exercise search"
-    for call in search_spy:            # every single search was strict
-        assert call["checked_only"] is True and call["injury_flags"] == ["lower_back"]
+    assert all(c["checked_only"] is True and c["injury_flags"] == ["lower_back"] for c in search_spy)
     tags = contraindications()
-    for e in exercises_in(plan):
-        unsafe, status = tags[e.exercise_id]
-        assert "lower_back" not in unsafe, e.name                # nothing tagged unsafe for the flag
-        assert status != "untagged" and e.injury_check != "not_yet_checked", e.name   # nothing unchecked
+    for x in exercises_in(plan):
+        unsafe, status = tags[x.exercise_id]
+        assert "lower_back" not in unsafe and status != "untagged", x.name
     assert plan.safety.checked_only is True and plan.safety.excluded_as_contraindicated > 0
-    names = {e.name for e in exercises_in(plan)}
-    assert {"Crunch", "Superman Hold", "Dumbbell Goblet Squat", "Burpee", "Mountain Climber"}.isdisjoint(names)
 
 
-def test_a_newly_tagged_exercise_is_excluded_too(test_db, search_spy):
-    before = {e.exercise_id for e in exercises_in(generate(LOWER_BACK_REHAB))}
+@pytest.mark.parametrize("goal", gen.GOALS)
+def test_every_injury_flag_filters_every_goal(test_db, search_spy, goal):
+    tags = contraindications()
+    for flag in INJURY_FLAGS:
+        search_spy.clear()
+        plan = generate(profile(goal, flags=[flag]))
+        assert search_spy and all(c["checked_only"] is True and c["injury_flags"] == [flag] for c in search_spy)
+        assert all(flag not in tags[x.exercise_id][0] for x in exercises_in(plan)), (goal, flag)
+
+
+def test_a_newly_tagged_exercise_is_excluded_too(test_db):
+    before = {x.exercise_id for x in exercises_in(generate(LOWER_BACK_REHAB))}
     assert "glute_bridge" in before
     conn = sqlite3.connect(config.WORKING_DB)
     with conn:
         conn.execute("UPDATE exercises SET injury_contraindications = '[\"lower_back\"]' WHERE id = 'glute_bridge'")
     conn.close()
-    after = {e.exercise_id for e in exercises_in(generate(LOWER_BACK_REHAB))}
-    assert "glute_bridge" not in after
+    assert "glute_bridge" not in {x.exercise_id for x in exercises_in(generate(LOWER_BACK_REHAB))}
 
 
-def test_every_injury_flag_forces_checked_only(test_db, search_spy):
-    from app.safety_rules import INJURY_FLAGS
-    for flag in INJURY_FLAGS:                     # every flag the quiz offers, including any added later
-        search_spy.clear()
-        plan = generate({**LOWER_BACK_REHAB, "goals": ["tone"], "injury_flags": [flag]})
-        assert search_spy and all(c["checked_only"] is True and c["injury_flags"] == [flag] for c in search_spy)
-        tags = contraindications()
-        assert all(flag not in tags[e.exercise_id][0] for e in exercises_in(plan)), flag
-
-
-def test_no_injury_means_the_full_library(test_db, search_spy):
-    from tests.test_mcp_tools import untag_imported
-    untag_imported()            # so "the full library" includes unchecked exercises again, as it would for new imports
-    plan = generate({**LOWER_BACK_REHAB, "goals": ["tone"], "injury_flags": [], "equipment": ["dumbbells", "mat"]})
+def test_no_injury_means_no_checked_only(test_db, search_spy):
+    plan = generate(profile("stronger"))
     assert all(c["checked_only"] is False for c in search_spy) and plan.safety.checked_only is False
-    assert any(e.injury_check == "not_yet_checked" for e in exercises_in(plan))   # imported moves allowed, flagged
-    assert any("haven't been checked" in n for n in plan.notes)
-
-
-def test_rehab_plans_are_low_impact(test_db):
-    plan = generate({**LOWER_BACK_REHAB, "injury_flags": [], "goals": ["rehab"], "experience_level": "advanced"})
-    assert not any(gen.HIGH_IMPACT.search(e.name) for e in exercises_in(plan))
-
-
-# ---------------------------------------------------------------- the rest of the plan
-
-def test_equipment_is_respected(test_db):
-    plan = generate({**LOWER_BACK_REHAB, "injury_flags": [], "goals": ["strength"], "equipment": ["bodyweight"]})
-    conn = connect_readonly()
-    needs = {r["id"]: set(json.loads(r["equipment_needed"])) for r in conn.execute("SELECT id, equipment_needed FROM exercises")}
-    conn.close()
-    for e in exercises_in(plan):
-        assert needs[e.exercise_id] <= {"none", "chair"}, (e.name, needs[e.exercise_id])
-    assert plan.safety.equipment == ["chair", "none"]
-    assert gen.available_equipment(["full_gym", "mat"]) is None
-
-
-def test_sets_reps_rest_come_from_the_protocol_and_fit_the_session(test_db):
-    plan = generate(LOWER_BACK_REHAB)
-    p = plan.protocol
-    assert (p.sets_range, p.reps_range, p.rest_seconds, p.session_length_minutes) == ("1-2", "12-15", 60, 20)
-    for d in plan.days:
-        assert d.est_minutes <= p.session_length_minutes
-        for e in d.exercises:
-            assert e.sets == "1-2" and e.rest_seconds == 60
-            assert e.reps in ("12-15", "24-30s hold")
-    assert p.status == "placeholder" and p.review_notice == "Content pending expert review" and p.citations == []
-
-
-def test_users_shorter_session_wins(test_db):
-    plan = generate({**LOWER_BACK_REHAB, "goals": ["strength"], "injury_flags": [], "session_length_minutes": 15})
-    assert plan.protocol.session_length_minutes == 15
-    assert all(d.est_minutes <= 15 or len(d.exercises) <= gen.MIN_EXERCISES for d in plan.days)
-
-
-def test_same_profile_same_plan(test_db):
-    assert generate(LOWER_BACK_REHAB).model_dump() == generate(LOWER_BACK_REHAB).model_dump()
 
 
 @pytest.mark.parametrize("status", ["pregnant", "postpartum"])
 def test_pregnant_or_postpartum_gets_no_plan(test_db, search_spy, status):
     plan = generate({**LOWER_BACK_REHAB, "pregnancy_status": status})
-    assert plan.generated is False and plan.needs_clinical_review is True
-    assert "OB-GYN" in plan.blocked_reason and plan.training_days == 0
-    assert all(d.kind == "rest" and not d.exercises for d in plan.days)
-    assert search_spy == []                    # it didn't even look for exercises
+    assert not plan.generated and plan.needs_clinical_review and search_spy == []
+    assert all(d.kind == "rest" for d in plan.days)
 
 
-def test_missing_answers_use_safe_defaults(test_db):
-    plan = generate({"goals": [], "injury_flags": [], "equipment": []})
-    assert plan.generated and plan.goals == ["general_health"] and plan.experience_level == "beginner"
-    assert any("Retake the quiz" in n for n in plan.notes)
-
-
-# ---------------------------------------------------------------- the protocol content itself
+# ================================================================ 6. the protocol content
 
 def test_seeded_protocols_cover_every_goal_and_level():
     conn = sqlite3.connect(config.ORIGINAL_DB)
-    rows = conn.execute("SELECT goal, experience_level, status, citations FROM goal_protocols").fetchall()
+    rows = conn.execute("SELECT goal, experience_level, session_length_minutes, status, citations "
+                        "FROM goal_protocols").fetchall()
     conn.close()
-    assert len(rows) == 15 and {(g, e) for g, e, *_ in rows} == {(g, e) for g in gen.GOALS
-                                                                for e in ("beginner", "intermediate", "advanced")}
-    assert all(s == "placeholder" and c == "[]" for *_, s, c in rows)
+    assert len(rows) == 9 and {(g, e) for g, e, *_ in rows} == {(g, e) for g in gen.GOALS for e in gen.EXPERIENCE}
+    assert all(15 <= m <= 60 and s == "placeholder" and c == "[]" for *_, m, s, c in rows)
 
 
 def test_seed_rejects_a_missing_protocol(tmp_path, monkeypatch):
     from app.db import seed
     (tmp_path / "protocols").mkdir()
     (tmp_path / "protocols" / "goal_protocols.yaml").write_text(
-        "protocols:\n  - {goal: tone, experience_level: beginner, sessions_per_week: 3, session_length_minutes: 30,"
-        " split_type: full_body, sets_range: '2-3', reps_range: '10-12', rest_seconds: 60, progression_note: x}\n",
-        encoding="utf-8")
+        "protocols:\n  - {goal: stronger, experience_level: beginner, session_length_minutes: 40,"
+        " sets_range: '2-3', reps_range: '8-12', rest_seconds: 90, progression_note: x}\n", encoding="utf-8")
     monkeypatch.setattr(seed, "CONTENT_DIR", tmp_path)
     monkeypatch.setattr(seed, "PROJECT_ROOT", tmp_path)
     conn = sqlite3.connect(":memory:")
@@ -258,99 +332,41 @@ def test_seed_rejects_a_missing_protocol(tmp_path, monkeypatch):
     conn.execute("INSERT INTO sources VALUES ('placeholder-authored', 0, 'p', NULL, 'x', 'x', 'placeholder')")
     errors: list[str] = []
     seed.seed_goal_protocols(conn, {"placeholder-authored"}, errors)
-    assert errors and "missing protocols" in errors[0] and "strength/advanced" in errors[0]
+    assert errors and "missing protocols" in errors[0] and "feel_good/advanced" in errors[0]
 
 
-# ---------------------------------------------------------------- the public worked example
+# ================================================================ 7. review-mode swaps and the worked example
+
+def test_swaps_only_from_the_same_slot_and_filters(test_db):
+    plan = generate(LOWER_BACK_REHAB, with_swap_options=True)
+    original, options = next((k, v) for k, v in plan.swap_options.items() if v)
+    tags = contraindications()
+    assert all("lower_back" not in tags[o["id"]][0] for opts in plan.swap_options.values() for o in opts)
+    swapped = generate(LOWER_BACK_REHAB, swaps={original: options[0]["id"]})
+    ids = {x.exercise_id for x in exercises_in(swapped)}
+    assert options[0]["id"] in ids and original not in ids
+    assert generate(LOWER_BACK_REHAB, swaps={original: "superman_hold"}) == generate(LOWER_BACK_REHAB)   # unsafe: ignored
+
 
 def test_worked_example_is_a_live_run_of_the_generator(client, search_spy):
     r = client.get("/api/plan/example")                       # public: no sign-in needed
     assert r.status_code == 200
     ex = r.json()
     assert ex["profile"] == gen.EXAMPLE_PROFILE
-    assert ex["profile"]["age"] == 45 and ex["profile"]["injury_flags"] == ["lower_back"]
-    assert ex["profile"]["equipment"] == ["resistance_band"] and ex["profile"]["experience_level"] == "beginner"
+    assert ex["profile"]["goal"] == "feel_good" and ex["profile"]["injury_flags"] == ["lower_back"]
     assert ex["plan"] == generate(gen.EXAMPLE_PROFILE).model_dump()      # not hand-written: same as the generator
-    assert ex["plan"]["safety"]["checked_only"] is True
-    assert any(d["kind"] == "rest" for d in ex["plan"]["days"])
-    picks = [c for c in search_spy if c.get("muscle_group")]   # the generator's picks (not the funnel's counts)
-    assert picks and all(c["checked_only"] is True for c in picks)    # the strict filter ran for the example too
+    assert ex["plan"]["safety"]["checked_only"] is True and ex["plan"]["block_weeks"] == 8
+    picks = [c for c in search_spy if c.get("muscle_group")]
+    assert picks and all(c["checked_only"] is True for c in picks)
 
 
 def test_worked_example_funnel_matches_the_filter(client):
-    from app.mcp_server.search import search_exercises
+    from app.mcp_server.search import search_all_exercises
     funnel = client.get("/api/plan/example").json()["funnel"]
     counts = [s["exercises_left"] for s in funnel]
     assert counts == sorted(counts, reverse=True) and counts[0] == 903
-    flags, eq = ["lower_back"], gen.available_equipment(["resistance_band"])
-    assert counts[1] == search_exercises(limit=1, injury_flags=flags)["total_matching"]
-    assert counts[2] == search_exercises(limit=1, injury_flags=flags, checked_only=True)["total_matching"]
-    assert counts[3] == search_exercises(limit=1, injury_flags=flags, checked_only=True, equipment=eq)["total_matching"]
+    flags, eq = ["lower_back"], gen.available_equipment(gen.EXAMPLE_PROFILE["equipment"])
+    assert counts[1] == search_all_exercises(injury_flags=flags)["total_matching"]
+    assert counts[2] == search_all_exercises(injury_flags=flags, checked_only=True)["total_matching"]
+    assert counts[3] == search_all_exercises(injury_flags=flags, checked_only=True, equipment=eq)["total_matching"]
     assert all(s["removed"] == a["exercises_left"] - s["exercises_left"] for a, s in zip(funnel, funnel[1:]))
-
-
-def test_worked_example_follows_changes_in_the_data(client):
-    before = client.get("/api/plan/example").json()["funnel"][1]["removed"]
-    conn = sqlite3.connect(config.WORKING_DB)
-    with conn:   # a PT tags one more exercise as unsafe for lower backs
-        conn.execute("UPDATE exercises SET injury_contraindications = '[\"lower_back\"]' WHERE id = 'band_pull_apart'")
-    conn.close()
-    after = client.get("/api/plan/example").json()
-    assert after["funnel"][1]["removed"] == before + 1
-    assert "band_pull_apart" not in {e["exercise_id"] for d in after["plan"]["days"] for e in d["exercises"]}
-
-
-# ---------------------------------------------------------------- push / pull days (exercises.force)
-
-PPL = {"goals": ["strength"], "experience_level": "advanced", "days_available": 6, "session_length_minutes": 45,
-       "equipment": ["bodyweight", "mat", "resistance_band", "dumbbells"], "other_activity_days": 0,
-       "pregnancy_status": "none"}
-
-
-def forces() -> dict[str, str | None]:
-    conn = connect_readonly()
-    try:
-        return {r["id"]: r["force"] for r in conn.execute("SELECT id, force FROM exercises")}
-    finally:
-        conn.close()
-
-
-@pytest.mark.parametrize("flags", [["lower_back"], [], ["shoulder", "wrist"]])
-@pytest.mark.parametrize("equipment", [PPL["equipment"], ["bodyweight"], ["bodyweight", "dumbbells", "kettlebells"]])
-def test_push_days_never_pull_and_pull_days_never_push(test_db, flags, equipment):
-    plan = generate({**PPL, "injury_flags": flags, "equipment": equipment})
-    assert plan.protocol.split_type == "push_pull_legs"
-    force = forces()
-    for day in plan.days:
-        if day.focus not in ("Push", "Pull"):
-            continue
-        opposite = "pull" if day.focus == "Push" else "push"
-        for e in day.exercises:
-            if e.muscle_group in gen.DIRECTIONAL_GROUPS:
-                assert force[e.exercise_id] != opposite, (day.focus, e.name, force[e.exercise_id])
-
-
-def test_the_reported_pull_day_no_longer_gets_push_ups_or_dips(test_db):
-    """Bug 2026-10-22: Pull days included Incline Push-Up and Chair Triceps Dip (filed under "arms")."""
-    plan = generate({**PPL, "injury_flags": ["lower_back"]})
-    pull = [e.exercise_id for d in plan.days if d.focus == "Pull" for e in d.exercises]
-    push = [e.exercise_id for d in plan.days if d.focus == "Push" for e in d.exercises]
-    assert pull and not {"incline_pushup", "knee_pushup", "chair_triceps_dip"} & set(pull)
-    assert {"incline_pushup", "chair_triceps_dip"} <= set(push)          # they belong on Push days
-
-
-def test_hand_authored_directions_match_the_movement(test_db):
-    f = forces()
-    assert {f[i] for i in ("incline_pushup", "knee_pushup", "chair_triceps_dip", "bodyweight_squat")} == {"push"}
-    assert {f[i] for i in ("dumbbell_bicep_curl", "band_biceps_curl", "band_seated_row", "band_pull_apart",
-                           "dumbbell_bent_over_row")} == {"pull"}
-
-
-def test_other_splits_are_unaffected(test_db):
-    """Only Push/Pull days filter by direction: a full-body day can still mix push and pull moves."""
-    plan = generate({**PPL, "goals": ["general_health"], "experience_level": "beginner", "days_available": 3,
-                     "injury_flags": []})
-    assert plan.protocol.split_type != "push_pull_legs"
-    f = forces()
-    upper = {f[e.exercise_id] for d in plan.days for e in d.exercises if e.muscle_group in gen.DIRECTIONAL_GROUPS}
-    assert {"push", "pull"} <= upper

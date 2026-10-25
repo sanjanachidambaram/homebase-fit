@@ -857,10 +857,6 @@ fieldset.question {
   max-width: 10rem;
 }
 
-.number-row input.short {
-  max-width: 5.5rem;
-}
-
 .unit {
   font-weight: 700;
   color: var(--ink-soft);
@@ -3109,4 +3105,90 @@ fieldset.question {
   width: auto;
   margin: 0;
   padding: 0;
+}
+
+/* ================================================================ 2026-10-25: quiz review, plan weeks, weights, logging */
+.quiz-review .review-group {
+  margin: 1rem 0;
+  padding: 0.9rem 1.1rem;
+  border-radius: var(--radius-card);
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.review-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.review-group-head h4 {
+  margin: 0;
+}
+
+.review-row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) 1.4fr;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--bg);
+}
+
+.review-row dt {
+  color: var(--ink-soft);
+}
+
+.review-row dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.week-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.6rem 0;
+}
+
+.week-picker .day-choice-btn {
+  flex: 0 0 auto;
+  padding: 0.25rem 0.7rem;
+}
+
+.weight-table-wrap {
+  overflow-x: auto;
+}
+
+.weight-table,
+.log-table {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.weight-table th,
+.weight-table td,
+.log-table th,
+.log-table td {
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--bg);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.weight-table td {
+  text-align: center;
+}
+
+.log-form {
+  margin: 0.4rem 0;
+}
+
+.log-table input {
+  width: 5rem;
+  min-height: 34px;
+}
+
+.calibration-tag {
+  font-weight: 700;
 }

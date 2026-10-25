@@ -1,17 +1,29 @@
-"""Deterministic weekly program generator. Plain Python: there is NO LLM call anywhere in this module.
+"""Deterministic plan generator. Plain Python: there is NO LLM call anywhere in this module.
 
-Input: the user's quiz profile. Output: a WeeklyProgram (every day of the week, training or rest).
+Input: the user's quiz profile (one goal, experience level, equipment, injury flags). Output: a WeeklyProgram that
+covers a whole repeating block of weeks. Rules: backend/prompts/shared_rules.md, rules 6 and 8. Rewritten 2026-10-25.
 
-How a plan is built (each step is a named function below, and the rules are in shared_rules.md, rule 6):
-  1. Safety first. Pregnant/postpartum -> no plan (needs OB-GYN-reviewed guidance first). Any injury flag
-     -> checked_only=true for every exercise search (app/safety_rules.py), no exceptions.
-  2. Look up the goal_protocols row for each chosen goal at the user's experience level, and BLEND them
-     (blend_protocols): where they differ, take the more conservative value.
-  3. Training days = min(days the user has, protocol sessions), always leaving at least one full rest day,
-     and fewer if other regular activity would push the week past 6 active days (training_day_count).
-  4. Each training day gets muscle groups from the split type, and exercises are picked with the EXISTING,
-     tested injury filter: app.mcp_server.search.search_exercises (the same SQL the MCP tool uses).
-  5. Sets, reps, and rest come from the blended protocol, never invented per exercise.
+  1. Safety first. Pregnant / postpartum -> no plan (needs OB-GYN-reviewed guidance first). Any injury flag ->
+     checked_only for every exercise search (app/safety_rules.py), no exceptions. Every candidate comes from the
+     same tested SQL filter the MCP tool uses (app.mcp_server.search), so injury filtering applies on top of
+     whichever goal is picked, unchanged.
+  2. The goal fixes the week: always 4 training days, as categories (Upper body, Lower body, Mobility + core,
+     Cardio), and how the weeks repeat:
+        Getting stronger   3 strength days (each Upper OR Lower, never mixed) + 1 cardio; a 2-week block, so the same
+                           exercises come back on odd weeks and on even weeks (week 1 = 3 = 5...).
+        Losing weight      2 strength days (Upper, Lower) + 2 cardio; a 4-week block: weeks 1-4 each different,
+                           weeks 5-8 repeat them, and so on.
+        Feeling good       2 mobility/core days + 1 strength day + 1 cardio; an 8-week block (weeks 9-16 repeat 1-8).
+  3. Each day is filled from slots. A strength day always hits at least two different muscle groups in its category
+     (Upper: a push and a pull; Lower: a knee-dominant and a hip-dominant move) plus at least two accessories. Each
+     slot prefers a short "backbone" list of effective, easy-at-home moves (push-ups, rows, squats, glute bridges,
+     planks...) matched against the real library, never invented, and rotates through the pool so each day in the
+     block gets different exercises where the pool allows.
+  4. Sets, reps, rest and session length come from the goal_protocols row (goal x experience level).
+  5. Weights: default starting weights by experience level (beginner: bodyweight only, so no number; intermediate
+     10 lb arms / 20 lb legs; advanced 20 / 40), always shown as editable suggestions. Week 1 is a calibration week;
+     after that suggestions build on what the person actually logged (app/calendar.py) and go up by the goal's rule
+     (weight_steps / suggested_weight below).
 Same profile in, same plan out.
 """
 
@@ -24,57 +36,120 @@ from pydantic import BaseModel
 
 from app.content import REVIEW_NOTICE
 from app.db import connect_readonly
-from app.mcp_server.search import contraindicated_exercises, search_exercises
+from app.mcp_server.search import contraindicated_exercises, search_all_exercises
 from app.safety_rules import checked_only_for, needs_clinical_review
 
-GOALS = ("weight_loss", "strength", "tone", "rehab", "general_health")
-# Most to least conservative, for ordering notes and picking the "safest" goal's wording.
-GOAL_CAUTION = ("rehab", "general_health", "weight_loss", "tone", "strength")
-# Most to least conservative split: full-body spreads the load thinnest per muscle per session.
-SPLIT_CAUTION = ("full_body", "circuit", "upper_lower", "push_pull_legs")
+GOALS = ("stronger", "lose_weight", "feel_good")
+GOAL_LABELS = {"stronger": "Getting stronger", "lose_weight": "Losing weight",
+               "feel_good": "Just feeling good in my body"}
+EXPERIENCE = ("beginner", "intermediate", "advanced")
 WEEK = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
-MAX_ACTIVE_DAYS = 6          # training + other regular activity; at least one full rest day a week
-# Which weekdays to train for N sessions: spread out, with rest days between where possible.
-DAY_PATTERNS = {
-    1: ("wed",), 2: ("mon", "thu"), 3: ("mon", "wed", "fri"), 4: ("mon", "tue", "thu", "fri"),
-    5: ("mon", "tue", "wed", "fri", "sat"), 6: ("mon", "tue", "wed", "thu", "fri", "sat"),
+Category = Literal["upper", "lower", "mobility", "cardio"]
+CATEGORY_LABELS = {"upper": "Upper body", "lower": "Lower body", "mobility": "Mobility + core", "cardio": "Cardio"}
+STRENGTH = ("upper", "lower")
+
+# The week by goal: for each week of the repeating block, weekday -> category. Always 4 training days, on Monday,
+# Wednesday, Friday and Saturday for every goal, so there's a rest day between most of them.
+STRUCTURES: dict[str, list[dict[str, str]]] = {
+    "stronger": [{"mon": "upper", "wed": "lower", "fri": "upper", "sat": "cardio"},
+                 {"mon": "lower", "wed": "upper", "fri": "lower", "sat": "cardio"}],
+    "lose_weight": [{"mon": "upper", "wed": "cardio", "fri": "lower", "sat": "cardio"}] * 4,
+    "feel_good": [{"mon": "mobility", "wed": "upper" if i % 2 == 0 else "lower", "fri": "mobility", "sat": "cardio"}
+                  for i in range(8)],
 }
-# Day templates per split: (label, muscle groups in the order they're filled, movement direction or None).
-# A direction keeps the opposite one out of that day's upper-body slots: a Push day never gets a curl or a row,
-# and a Pull day never gets a push-up or a dip (exercises.force). Static and unclassified moves stay allowed.
-DAY_TEMPLATES = {
-    "full_body": [("Full body A", ["legs", "back", "chest", "core", "shoulders", "arms", "full_body", "legs"], None),
-                  ("Full body B", ["legs", "chest", "back", "core", "arms", "shoulders", "full_body", "core"], None)],
-    "circuit": [("Full-body circuit", ["full_body", "legs", "back", "core", "chest", "shoulders", "arms", "legs"],
-                 None)],
-    "upper_lower": [("Upper body", ["chest", "back", "shoulders", "arms", "core", "back", "chest", "arms"], None),
-                    ("Lower body + core", ["legs", "core", "legs", "full_body", "legs", "core", "legs", "core"], None)],
-    "push_pull_legs": [("Push", ["chest", "shoulders", "arms", "chest", "core", "shoulders", "arms", "core"], "push"),
-                       ("Pull", ["back", "arms", "back", "core", "shoulders", "back", "arms", "core"], "pull"),
-                       ("Legs", ["legs", "legs", "core", "legs", "full_body", "legs", "core", "legs"], None)],
+BLOCK_WEEKS = {g: len(s) for g, s in STRUCTURES.items()}   # 2, 4, 8
+TRAINING_DAYS = 4
+
+# ---------------------------------------------------------------- weights (shared_rules.md rule 8)
+WEIGHTED_EQUIPMENT = {"dumbbells", "kettlebells", "barbell", "ez_curl_bar", "cable", "machine", "medicine_ball"}
+DEFAULT_WEIGHT_LB = {"beginner": None, "intermediate": {"arms": 10, "legs": 20}, "advanced": {"arms": 20, "legs": 40}}
+WEIGHT_STEP_LB = {"stronger": {"arms": 2.5, "legs": 5}, "lose_weight": {"arms": 5, "legs": 5},
+                  "feel_good": {"arms": 0, "legs": 0}}
+LOSE_WEIGHT_STEP_WEEKS = 4
+WEIGHT_RULES = {
+    "stronger": "The weight goes up each time a day repeats: +2.5 lb for arm exercises and +5 lb for leg exercises. "
+                "How many reps you do is your call (going to failure is your judgment during the set, not "
+                "something the app works out).",
+    "lose_weight": "Weights go up 5 lb every 4 weeks, when the 4-week pattern starts again.",
+    "feel_good": "Weights stay wherever you set them. There are no automatic increases.",
 }
-DIRECTIONAL_GROUPS = {"chest", "shoulders", "arms", "back"}   # where push vs pull matters
-OPPOSITE = {"push": "pull", "pull": "push"}
-# Quiz equipment answers -> equipment values in the exercise library. None = no equipment filter.
-QUIZ_EQUIPMENT = {
-    "bodyweight": ["none"], "dumbbells": ["dumbbells"], "resistance_band": ["resistance_band"], "mat": ["mat"],
-    "bench": ["bench"], "kettlebells": ["kettlebells"],
-    "pull_up_bar": [],   # no exercise in the library is tagged with a bar yet
-}
+CALIBRATION_NOTE = ("Week 1 is a calibration week: the weights shown are only starting suggestions, so log what you "
+                    "actually did. From week 2, suggestions build on your week 1 numbers. You can change any weight "
+                    "any time.")
+
+# ---------------------------------------------------------------- picking
 HOUSEHOLD = ("none", "chair")   # bodyweight moves and a sturdy chair are assumed available at home
-NEVER_IN_PLANS = {"olympic weightlifting", "strongman", "powerlifting", "stretching"}
+QUIZ_EQUIPMENT = {"bodyweight": ["none"], "dumbbells": ["dumbbells"], "kettlebells": ["kettlebells"],
+                  "resistance_band": ["resistance_band"], "mat": ["mat"]}
 DIFFICULTY_ALLOWED = {"beginner": {"beginner"}, "intermediate": {"beginner", "intermediate"},
                       "advanced": {"beginner", "intermediate", "advanced"}}
-MIN_EXERCISES, MAX_EXERCISES = 2, 8
-SEARCH_LIMIT = 50
-HOLD = re.compile(r"\b(plank|hold|wall sit)\b", re.I)
-# Jumping and landing moves are left out of low-impact plans (rehab, any injury flag, or beginners).
-HIGH_IMPACT = re.compile(r"jump|burpee|\bhop|bound|skater|plyo|tuck", re.I)
+NEVER_IN_STRENGTH = {"olympic weightlifting", "strongman", "powerlifting", "stretching", "cardio", "plyometrics"}
+# Jumping and landing moves, and explosive lifts (cleans, snatches, jerks, thrusters: a fast loaded knee dip), are left
+# out of low-impact plans (beginners, or anyone with an injury flag).
+HIGH_IMPACT = re.compile(r"jump|burpee|\bhop|bound|skater|plyo|tuck|sprint|\bclean\b|snatch|\bjerk|thruster", re.I)
+# Near-duplicate moves: at most one of each family on a day (no day of three calf raises).
+ONE_PER_DAY = (re.compile(r"calf raise", re.I), re.compile(r"bridge|butt lift|hip thrust", re.I))
+HOLD = re.compile(r"\b(plank|hold|wall sit|bridge hold|superman)\b", re.I)
+# Moves that need a pull-up bar or something to hang from: only with a full gym (nobody said they have a bar).
+NEEDS_BAR = re.compile(r"pull-?ups?\b|chin-?ups?\b|muscle.?up|inverted row|hanging", re.I)
 CLINICAL_REVIEW_MESSAGE = (
     "Because you're pregnant or postpartum, we're not generating a plan yet. Exercise during and after "
     "pregnancy needs guidance from a clinician, and ours is still waiting on review by an OB-GYN. Please talk "
     "with your OB-GYN or midwife about what's right for you."
 )
+CARDIO_WORK_SECONDS, CARDIO_EASY_SECONDS = 40, 20
+MOBILITY_HOLD = "20-30s hold"
+MOBILITY_REST = 15
+
+
+LEG_ACCESSORY = r"lunge|step.?up|calf|squat|bridge|thrust|abduct|adduct|kickback|side.?lying|deadlift|leg curl|wall sit"
+
+
+@dataclass(frozen=True)
+class Slot:
+    name: str
+    groups: tuple[str, ...]                   # library muscle groups this slot draws from
+    backbone: tuple[str, ...] = ()            # name patterns, in priority order: the "most effective at home" list
+    match: str | None = None                  # the slot's movement (name or primary muscles); None = any in groups
+    accessory: bool = False
+    stretch_ok: bool = False                  # mobility slots may use stretches
+
+
+SLOTS: dict[str, list[Slot]] = {
+    # Upper: a push (chest) and a pull (back) = two muscle groups, then accessories for shoulders and arms.
+    "upper": [Slot("push", ("chest",), (r"push-?up", r"\bpress\b"), r"push-?up|press|fly|flye|dip"),
+              Slot("pull", ("back",), (r"\brow\b", r"pull.?apart"), r"row|pull|fly|flye|face"),
+              Slot("shoulders", ("shoulders",), (r"overhead press|shoulder press|military press", r"pull.?apart",
+                                                 r"raise"), None, accessory=True),
+              Slot("arms", ("arms",), (r"\bcurl", r"\bdips?\b|triceps"), None, accessory=True)],
+    # Lower: knee-dominant (quads) and hip-dominant (glutes / hamstrings) = two muscle groups, then accessories.
+    "lower": [Slot("knee", ("legs",), (r"squat", r"lunge", r"step.?up"), r"squat|lunge|step.?up|split|quadriceps"),
+              Slot("hip", ("legs",), (r"glute bridge|butt lift|hip thrust", r"romanian|stiff.?leg"),
+                   r"bridge|thrust|deadlift|good morning|glutes|hamstrings"),
+              Slot("legs accessory", ("legs",), (r"lunge", r"step.?up", r"calf raise"), LEG_ACCESSORY, accessory=True),
+              Slot("legs accessory", ("legs",), (r"calf raise", r"side.?lying|abduct|adduct"), LEG_ACCESSORY,
+                   accessory=True)],
+    "mobility": [Slot("core hold", ("core",), (r"plank", r"dead bug"), None),
+                 Slot("back and core", ("back", "core"), (r"bird dog",), r"bird dog|superman|extension|cat",
+                      stretch_ok=True),
+                 Slot("spine", ("core", "back"), (r"cat.?cow|cat stretch",),
+                      r"cat|spinal|spine|twist|rotation|back stretch|child", stretch_ok=True),
+                 Slot("hips", ("legs",), (r"hip (circle|flexor)|90/90|pigeon",), r"hip|glute|piriformis|groin",
+                      stretch_ok=True),
+                 Slot("core", ("core",), (r"dead bug", r"plank", r"pelvic tilt"), None, accessory=True)],
+    "cardio": [Slot("cardio", ("full_body", "legs"), (r"jumping jack", r"step.?up", r"march", r"step jack"),
+                    r"jumping jack|march|step.?up|step jack|high knee|jog|run|skip|rope")] * 4,
+}
+# When a required slot has nothing that fits (equipment, injury filter), try these, in order, so a strength day still
+# reaches a second muscle group: the same groups with any movement, then the category's other groups not used yet.
+CATEGORY_GROUPS = {"upper": ("chest", "back", "shoulders", "arms"), "lower": ("legs",),
+                   "mobility": ("core", "back", "legs"), "cardio": ("full_body", "legs")}
+MIN_SLOTS = {"upper": 4, "lower": 4, "mobility": 5, "cardio": 4}   # strength: 2 main + at least 2 accessories
+MAX_EXERCISES = {"upper": 6, "lower": 6, "mobility": 5, "cardio": 4}
+CIRCUIT_MIN_MINUTES = 15   # cardio and mobility days are circuits repeated to fill the session, never under 15 min
+EXTRA_SLOTS = {"upper": [SLOTS["upper"][3], SLOTS["upper"][0], SLOTS["upper"][1]],
+               "lower": [SLOTS["lower"][2], SLOTS["lower"][3]], "mobility": [SLOTS["mobility"][4]],
+               "cardio": [SLOTS["cardio"][0]]}
 
 
 class NoProfile(Exception):
@@ -87,33 +162,42 @@ class PlanExercise(BaseModel):
     exercise_id: str
     name: str
     muscle_group: str
+    category: str
+    slot: str
     sets: str
     reps: str
+    reps_your_call: bool = False         # Getting stronger: reps are the person's own call
     rest_seconds: int
     est_minutes: float
     injury_check: str
+    weighted: bool = False               # uses dumbbells, kettlebells, ...: shows a weight field (else blank)
+    load: Literal["arms", "legs"] | None = None
+    default_weight_lb: float | None = None
     swapped_from: str | None = None      # review mode: the generated exercise this one replaced
 
 
 class PlanDay(BaseModel):
     day: str
     kind: Literal["training", "rest"]
+    category: str | None = None
     focus: str | None = None
     exercises: list[PlanExercise] = []
     est_minutes: float = 0
 
 
+class PlanWeek(BaseModel):
+    week_in_block: int                   # 1..block_weeks
+    days: list[PlanDay]
+
+
 class ProtocolSummary(BaseModel):
-    goals_used: list[str]
+    goal: str
     experience_level: str
-    split_type: str
-    sessions_per_week: int
     session_length_minutes: int
     sets_range: str
     reps_range: str
     rest_seconds: int
-    progression_notes: list[str]
-    blending_rules_applied: list[str]
+    progression_note: str
     status: str
     review_notice: str | None
     citations: list[dict]
@@ -121,9 +205,9 @@ class ProtocolSummary(BaseModel):
 
 class InjuryCaution(BaseModel):
     injury: str
-    reasoning: str | None                # plain-language, AI-drafted until a PT reviews it; never a citation
-    tier: str | None                     # ai_drafted | pt_reviewed
-    source: str | None                   # "Pending review by a licensed physical therapist", or the PT
+    reasoning: str | None
+    tier: str | None
+    source: str | None
 
 
 class LeftOutExercise(BaseModel):
@@ -136,44 +220,61 @@ class LeftOutExercise(BaseModel):
 class SafetySummary(BaseModel):
     injury_flags: list[str]
     checked_only: bool
-    excluded_as_contraindicated: int     # tagged-unsafe exercises the filter removed while picking
-    # Which ones, and why. Built by code for the person's own plan view; Program Architect never sees it
-    # (shared_rules rule 2: injury details stay out of the model's prompt).
+    excluded_as_contraindicated: int
     left_out_for_injury: list[LeftOutExercise] = []
     equipment: list[str] | None          # None = any equipment (full gym)
 
 
-class ProgressionWeek(BaseModel):
-    week: int
-    sets: int
-    reps: int        # for holds, seconds = reps x 2 (the same rule the plan uses for holds)
+class WeightScheduleRow(BaseModel):
+    exercise_id: str
+    name: str
+    load: Literal["arms", "legs"]
+    weeks: list[int]                     # the weeks (of the schedule) it's on the plan
+    weight_lb: list[float | None]        # suggested weight in each of those weeks, from the defaults
 
 
-class Progression(BaseModel):
-    enabled: bool
-    every_weeks: int | None
-    reason: str
-    schedule: list[ProgressionWeek]      # weeks 1-12 at the protocol's ranges, so the plan view can show the climb
+class WeightPlan(BaseModel):
+    rule: str
+    calibration: str
+    defaults_lb: dict | None             # this experience level's starting weights (None = bodyweight only)
+    step_lb: dict
+    schedule_weeks: int
+    schedule: list[WeightScheduleRow]
 
 
 class WeeklyProgram(BaseModel):
     generated: bool
     blocked_reason: str | None = None
     needs_clinical_review: bool = False
-    goals: list[str]
+    goal: str
+    goal_label: str
     experience_level: str
     training_days: int = 0
-    days: list[PlanDay] = []
+    block_weeks: int = 0
+    weeks: list[PlanWeek] = []
+    days: list[PlanDay] = []             # week 1 (the same as weeks[0].days), for single-week views
     protocol: ProtocolSummary | None = None
     safety: SafetySummary | None = None
     notes: list[str] = []
-    progression: Progression | None = None
-    # Review mode only: for each generated exercise id, the exercises it may be swapped for (same muscle group, same
-    # injury/equipment/level filters, same Push/Pull direction).
+    weights: WeightPlan | None = None
+    # Review mode only: for each generated exercise id, what it may be swapped for (same slot, same filters).
     swap_options: dict[str, list[dict]] | None = None
 
 
-# ---------------------------------------------------------------- protocols and blending
+# ---------------------------------------------------------------- protocol
+
+@dataclass(frozen=True)
+class Protocol:
+    goal: str
+    experience_level: str
+    session_length_minutes: int
+    sets: tuple[int, int]
+    reps: tuple[int, int]
+    rest_seconds: int
+    progression_note: str
+    status: str
+    citations: tuple = ()
+
 
 def parse_range(text: str) -> tuple[int, int]:
     parts = str(text).replace(" ", "").split("-")
@@ -184,111 +285,59 @@ def fmt_range(lo: int, hi: int) -> str:
     return str(lo) if lo == hi else f"{lo}-{hi}"
 
 
-@dataclass(frozen=True)
-class Protocol:
-    goal: str
-    experience_level: str
-    sessions_per_week: int
-    session_length_minutes: int
-    split_type: str
-    sets: tuple[int, int]
-    reps: tuple[int, int]
-    rest_seconds: int
-    progression_note: str
-    status: str
-    citations: tuple = ()
-
-
-@dataclass
-class Blended:
-    goals: list[str]
-    sessions_per_week: int
-    session_length_minutes: int
-    split_type: str
-    sets: tuple[int, int]
-    reps: tuple[int, int]
-    rest_seconds: int
-    progression_notes: list[str]
-    status: str
-    citations: list[dict]
-    rules: list[str] = field(default_factory=list)
-
-
-def blend_protocols(protocols: list[Protocol]) -> Blended:
-    """Combine one protocol per goal. Where they differ, the more conservative value wins:
-    fewest sessions, shortest sessions, the gentlest split, the lower set range, the lighter-load
-    (higher-rep) range, and the longest rest. Placeholder status wins over reviewed."""
-    if not protocols:
-        raise ValueError("blend_protocols needs at least one protocol")
-    ps = sorted(protocols, key=lambda p: GOAL_CAUTION.index(p.goal))
-    rules = []
-    if len(ps) > 1:
-        rules = [
-            "sessions per week: the fewest of the goals",
-            "session length: the shortest of the goals",
-            "split: the gentlest (full body > circuit > upper/lower > push/pull/legs)",
-            "sets: the lower range",
-            "reps: the lighter-load (higher-rep) range",
-            "rest: the longest",
-        ]
-    citations, seen = [], set()
-    for p in ps:
-        for c in p.citations:
-            key = (c.get("claim"), c.get("source"))
-            if key not in seen:
-                seen.add(key)
-                citations.append(dict(c))
-    return Blended(
-        goals=[p.goal for p in ps],
-        sessions_per_week=min(p.sessions_per_week for p in ps),
-        session_length_minutes=min(p.session_length_minutes for p in ps),
-        split_type=min((p.split_type for p in ps), key=SPLIT_CAUTION.index),
-        sets=(min(p.sets[0] for p in ps), min(p.sets[1] for p in ps)),
-        reps=max((p.reps for p in ps), key=lambda r: (r[0], r[1])),
-        rest_seconds=max(p.rest_seconds for p in ps),
-        progression_notes=[f"{p.goal.replace('_', ' ')}: {p.progression_note}" for p in ps],
-        status="pt_reviewed" if all(p.status == "pt_reviewed" for p in ps) else "placeholder",
-        citations=citations,
-        rules=rules,
-    )
-
-
-def load_protocols(goals: list[str], experience_level: str) -> list[Protocol]:
+def load_protocol(goal: str, experience_level: str) -> Protocol:
     conn = connect_readonly()
     try:
-        rows = conn.execute(
-            f"SELECT * FROM goal_protocols WHERE experience_level = ? AND goal IN ({','.join('?' * len(goals))})",
-            (experience_level, *goals)).fetchall()
+        r = conn.execute("SELECT * FROM goal_protocols WHERE goal = ? AND experience_level = ?",
+                         (goal, experience_level)).fetchone()
     finally:
         conn.close()
-    return [Protocol(goal=r["goal"], experience_level=r["experience_level"], sessions_per_week=r["sessions_per_week"],
-                     session_length_minutes=r["session_length_minutes"], split_type=r["split_type"],
-                     sets=parse_range(r["sets_range"]), reps=parse_range(r["reps_range"]),
-                     rest_seconds=r["rest_seconds"], progression_note=r["progression_note"], status=r["status"],
-                     citations=tuple(json.loads(r["citations"]))) for r in rows]
+    if r is None:
+        raise ValueError(f"No goal_protocols row for {goal}/{experience_level}")
+    return Protocol(goal=r["goal"], experience_level=r["experience_level"],
+                    session_length_minutes=r["session_length_minutes"], sets=parse_range(r["sets_range"]),
+                    reps=parse_range(r["reps_range"]), rest_seconds=r["rest_seconds"],
+                    progression_note=r["progression_note"], status=r["status"],
+                    citations=tuple(json.loads(r["citations"])))
 
 
-# ---------------------------------------------------------------- days
+# ---------------------------------------------------------------- weights
 
-def training_day_count(days_available: int, sessions_per_week: int, other_activity_days: int) -> tuple[int, list[str]]:
-    """min(available days, protocol sessions), always leaving a full rest day, and fewer if other regular
-    activity would push the week past MAX_ACTIVE_DAYS active days. Never less than one session."""
-    notes = []
-    n = min(days_available, sessions_per_week, MAX_ACTIVE_DAYS)
-    if days_available > sessions_per_week:
-        notes.append(f"Your plan uses {sessions_per_week} of the {days_available} days you have: that's what "
-                     "the protocol for your goals calls for. Spare days are rest or easy movement.")
-    if days_available >= 7 and sessions_per_week >= 7:
-        notes.append("We always keep at least one full rest day.")
-    room = MAX_ACTIVE_DAYS - other_activity_days
-    if n > room:
-        n = max(1, room)
-        notes.append(f"You already do other activity {other_activity_days} day(s) a week, so we planned {n} "
-                     f"session(s) to keep at least one full rest day.")
-    return max(1, n), notes
+def variant_of(week: int, block_weeks: int) -> int:
+    """Which week of the repeating block a plan week is (0-based). Week 1 = variant 0."""
+    return (max(1, week) - 1) % block_weeks
 
 
-# ---------------------------------------------------------------- exercise picking
+def weight_steps(goal: str, block_weeks: int, appears_in: set[int], anchor_week: int, week: int) -> int:
+    """How many automatic increases between the anchor (where the weight was last set: the default in week 1, or a
+    logged weight) and `week`. Getting stronger: one per time this exercise's day comes round again. Losing weight:
+    one per new 4-week block. Feeling good: none."""
+    if week <= anchor_week:
+        return 0
+    if goal == "stronger":
+        return sum(1 for w in range(anchor_week + 1, week + 1) if variant_of(w, block_weeks) in appears_in)
+    if goal == "lose_weight":
+        return (week - 1) // LOSE_WEIGHT_STEP_WEEKS - (anchor_week - 1) // LOSE_WEIGHT_STEP_WEEKS
+    return 0
+
+
+def suggested_weight(goal: str, load: str, base: float | None, steps: int) -> float | None:
+    if base is None:
+        return None
+    w = base + steps * WEIGHT_STEP_LB[goal][load]
+    return int(w) if float(w).is_integer() else round(w, 1)
+
+
+def default_weight(experience_level: str, load: str | None) -> float | None:
+    d = DEFAULT_WEIGHT_LB.get(experience_level)
+    return d[load] if d and load else None
+
+
+def is_weighted(category: str, equipment_needed: list[str]) -> bool:
+    return category in STRENGTH and bool(WEIGHTED_EQUIPMENT & set(equipment_needed))
+
+
+# ---------------------------------------------------------------- picking
 
 def available_equipment(quiz_equipment: list[str]) -> list[str] | None:
     if "full_gym" in quiz_equipment:
@@ -299,284 +348,308 @@ def available_equipment(quiz_equipment: list[str]) -> list[str] | None:
     return sorted(have)
 
 
-def is_hold(name: str) -> bool:
-    return bool(HOLD.search(name))
+def slot_label(category: str, slot: Slot) -> str:
+    label = CATEGORY_LABELS[category].lower()
+    return label if slot.name == label else f"{label} ({slot.name})"
+
+
+def _movement(e: dict) -> str:
+    return f"{e['name']} {' '.join(e.get('primary_muscles') or [])}".lower()
 
 
 @dataclass
 class Picker:
-    """Picks exercises for slots, using the shared injury filter. Remembers what it's used this week."""
+    """Picks exercises for slots from the shared, injury-filtered search. Rotates through each slot's ranked pool."""
     equipment: list[str] | None
     injury_flags: list[str]
     checked_only: bool
     experience_level: str
     low_impact: bool
-    candidates: dict[str, list[dict]] = field(default_factory=dict)
-    week_use: dict[str, int] = field(default_factory=dict)
+    group_pool: dict[str, list[dict]] = field(default_factory=dict)
     excluded: int = 0
-    empty_groups: set[str] = field(default_factory=set)
+    turn: dict[tuple[str, str], int] = field(default_factory=dict)   # (category, slot) -> how many times used
+    empty: set[str] = field(default_factory=set)
 
-    def pool(self, group: str) -> list[dict]:
-        if group not in self.candidates:
-            # The SAME tested filter as the MCP tool: injury contraindications are removed in SQL, and
-            # checked_only (always on with an injury flag) drops exercises nobody has tagged.
-            result = search_exercises(muscle_group=group, equipment=self.equipment, injury_flags=self.injury_flags,
-                                      limit=SEARCH_LIMIT, checked_only=self.checked_only)
+    def group(self, g: str) -> list[dict]:
+        if g not in self.group_pool:
+            # The SAME tested filter as the MCP tool: injury contraindications are removed in SQL, and checked_only
+            # (always on with an injury flag) drops exercises nobody has drafted injury data for.
+            result = search_all_exercises(muscle_group=g, equipment=self.equipment, injury_flags=self.injury_flags,
+                                          checked_only=self.checked_only)
             self.excluded += result["injury_filter"]["excluded_as_contraindicated"]
             allowed = DIFFICULTY_ALLOWED[self.experience_level]
-            self.candidates[group] = [
-                e for e in result["exercises"]
-                if e["difficulty"] in allowed and e["category"] not in NEVER_IN_PLANS
-                and not (self.low_impact and (e["category"] == "plyometrics" or HIGH_IMPACT.search(e["name"])))
-            ]
-        return self.candidates[group]
+            self.group_pool[g] = [e for e in result["exercises"] if e["difficulty"] in allowed
+                                  and not (self.low_impact and (e["category"] == "plyometrics"
+                                                                or HIGH_IMPACT.search(e["name"])))]
+        return self.group_pool[g]
 
-    def pick(self, group: str, used_today: set[str], direction: str | None = None) -> dict | None:
-        allowed = self.pool(group)
-        if direction and group in DIRECTIONAL_GROUPS:   # Push/Pull days: never the opposite movement
-            allowed = [e for e in allowed if e.get("force") != OPPOSITE[direction]]
-        options = [(self.week_use.get(e["id"], 0), i, e) for i, e in enumerate(allowed) if e["id"] not in used_today]
-        if not options:
-            if not self.pool(group):
-                self.empty_groups.add(group)
-            elif not allowed:
-                self.empty_groups.add(f"{direction}ing {group}")
+    def ranked(self, category: str, slot: Slot) -> list[dict]:
+        """The slot's candidates: backbone matches first (in the backbone's order), then the rest of the slot."""
+        pool, seen = [], set()
+        for g in slot.groups:
+            for e in self.group(g):
+                if e["id"] in seen:
+                    continue
+                cat = e["category"]
+                if category == "cardio":     # the library's cardio moves, or ones that are cardio by name
+                    ok = cat == "cardio" or (cat in (None, "plyometrics", "strength")
+                                             and bool(re.search(slot.match, e["name"].lower())))
+                elif category == "mobility":   # core work, and stretches where the slot is about mobility
+                    ok = (cat in (None, "strength") or (slot.stretch_ok and cat == "stretching")) and \
+                         (slot.match is None or bool(re.search(slot.match, _movement(e))))
+                else:
+                    ok = cat not in NEVER_IN_STRENGTH and (slot.match is None or re.search(slot.match, _movement(e)))
+                if self.equipment is not None and NEEDS_BAR.search(e["name"]):
+                    ok = False
+                if category in ("cardio", "mobility") and WEIGHTED_EQUIPMENT & set(e["equipment_needed"]):
+                    ok = False
+                if ok:
+                    seen.add(e["id"])
+                    pool.append(e)
+
+        def rank(e):
+            name = e["name"].lower()
+            hits = [i for i, p in enumerate(slot.backbone) if re.search(p, name)]
+            # backbone order first; then the hand-authored home moves; then checked before unchecked; then name
+            return (min(hits) if hits else len(slot.backbone), e["source_dataset"] != "placeholder-authored",
+                    e["injury_unchecked"], e["name"])
+        return sorted(pool, key=rank)
+
+    def backbone_count(self, slot: Slot, ranked: list[dict]) -> int:
+        return sum(1 for e in ranked if any(re.search(p, e["name"].lower()) for p in slot.backbone))
+
+    def pick(self, category: str, slot: Slot, used_today: set[str], required: bool = True) -> dict | None:
+        # used_today holds ids AND lower-cased names: the library has a few same-name entries from the two sources
+        taken = [f for f in ONE_PER_DAY if any(f.search(u) for u in used_today)]
+        ranked = [e for e in self.ranked(category, slot)
+                  if e["id"] not in used_today and e["name"].lower() not in used_today
+                  and not any(f.search(e["name"]) for f in taken)]
+        if not ranked:
+            if required:
+                self.empty.add(slot_label(category, slot))
             return None
-        _, _, chosen = min(options, key=lambda t: (t[0], t[1]))   # least used this week, then search order
-        self.week_use[chosen["id"]] = self.week_use.get(chosen["id"], 0) + 1
-        return chosen
+        key = (category, slot.name)
+        n = self.turn.get(key, 0)
+        self.turn[key] = n + 1
+        # Main slots rotate through the backbone moves (the most effective, easiest-at-home ones) when there are any;
+        # accessories rotate through the whole slot for variety.
+        top = self.backbone_count(slot, ranked)
+        span = top if (top and not slot.accessory) else len(ranked)
+        return ranked[n % span]
 
 
-def exercise_seconds(est_time_seconds: int, b: Blended) -> int:
-    """Time for one exercise at the TOP of the set range (so the session fits even on a full-effort day):
-    sets x the exercise's time per set + rest between sets."""
-    return b.sets[1] * est_time_seconds + (b.sets[1] - 1) * b.rest_seconds
+def _exercise(e: dict, category: str, slot: Slot, p: Protocol, goal: str, experience: str) -> tuple[PlanExercise, int]:
+    """One planned exercise and its time in seconds."""
+    if category == "cardio":       # one round; build_day sets how many rounds fill the session
+        seconds = CARDIO_WORK_SECONDS + CARDIO_EASY_SECONDS
+        sets, reps, rest = "1", f"{CARDIO_WORK_SECONDS}s on, {CARDIO_EASY_SECONDS}s easy", CARDIO_EASY_SECONDS
+    elif category == "mobility":   # one round; build_day sets how many rounds fill the session
+        hold = bool(HOLD.search(e["name"])) or e["category"] == "stretching"
+        sets, reps, rest = "1", MOBILITY_HOLD if hold else "8-10 slow", MOBILITY_REST
+        seconds = (30 if hold else e["est_time_seconds"]) + MOBILITY_REST
+    else:
+        hold = bool(HOLD.search(e["name"]))
+        sets = fmt_range(*p.sets)
+        reps = f"{p.reps[0] * 2}-{p.reps[1] * 2}s hold" if hold else fmt_range(*p.reps)
+        rest = p.rest_seconds
+        seconds = p.sets[1] * e["est_time_seconds"] + (p.sets[1] - 1) * p.rest_seconds
+    load = ("arms" if category == "upper" else "legs") if category in STRENGTH else None
+    weighted = is_weighted(category, e["equipment_needed"])
+    return PlanExercise(
+        exercise_id=e["id"], name=e["name"], muscle_group=e["muscle_group"], category=category, slot=slot.name,
+        sets=sets, reps=reps, reps_your_call=goal == "stronger" and category in STRENGTH and not HOLD.search(e["name"]),
+        rest_seconds=rest, est_minutes=round(seconds / 60, 1), injury_check=e["injury_check"], weighted=weighted,
+        load=load if weighted else None, default_weight_lb=default_weight(experience, load) if weighted else None,
+    ), seconds
 
 
-def build_day(day: str, label: str, groups: list[str], picker: Picker, b: Blended,
-              direction: str | None = None, slots: dict | None = None) -> PlanDay:
-    """Fill the day's muscle-group slots in order (cycling through them again if there's time left)
-    until the session length or MAX_EXERCISES is reached."""
-    budget = b.session_length_minutes * 60
+def relaxed_slots(category: str, slot: Slot, groups_used: set[str]) -> list[Slot]:
+    if category == "cardio":     # cardio stays cardio: no "any movement" fallback
+        return []
+    stretch = category == "mobility"
+    others = tuple(g for g in CATEGORY_GROUPS[category] if g not in groups_used and g not in slot.groups)
+    out = [Slot(slot.name, slot.groups, slot.backbone, None, slot.accessory, stretch)]
+    if others and category != "cardio":
+        out.append(Slot(slot.name, others, (), None, slot.accessory, stretch))
+    return out
+
+
+def build_day(day: str, category: str, picker: Picker, p: Protocol, goal: str, experience: str,
+              slots_used: dict) -> PlanDay:
+    """Fill the required slots (strength: 2 main + 2 accessories), then extras while there's time."""
+    budget = p.session_length_minutes * 60
     exercises: list[PlanExercise] = []
-    used_today: set[str] = set()
+    used: set[str] = set()
     total = 0
-    for group in (groups * 2)[: MAX_EXERCISES * 2]:
-        if len(exercises) >= MAX_EXERCISES:
+    plan = SLOTS[category][: MIN_SLOTS[category]] + EXTRA_SLOTS[category] * 3
+    for i, slot in enumerate(plan):
+        if len(exercises) >= MAX_EXERCISES[category]:
             break
-        e = picker.pick(group, used_today, direction)
+        required = i < MIN_SLOTS[category]
+        e = picker.pick(category, slot, used, required=False)
+        if e is None and required:
+            for relaxed in relaxed_slots(category, slot, {x.muscle_group for x in exercises}):
+                e = picker.pick(category, relaxed, used, required=False)
+                if e is not None:
+                    slot = relaxed
+                    break
+            if e is None:
+                picker.empty.add(slot_label(category, slot))
         if e is None:
             continue
-        seconds = exercise_seconds(e["est_time_seconds"], b)
-        if total + seconds > budget and len(exercises) >= MIN_EXERCISES:
-            picker.week_use[e["id"]] -= 1   # not used after all
+        x, seconds = _exercise(e, category, slot, p, goal, experience)
+        if not required and total + seconds > budget:
+            picker.turn[(category, slot.name)] -= 1   # not used after all
             break
-        used_today.add(e["id"])
-        if slots is not None:
-            slots[(day, len(exercises))] = (group, direction)
+        used.update({e["id"], e["name"].lower()})
+        slots_used[(day, len(exercises))] = slot
+        exercises.append(x)
         total += seconds
-        reps = f"{b.reps[0] * 2}-{b.reps[1] * 2}s hold" if is_hold(e["name"]) else fmt_range(*b.reps)
-        exercises.append(PlanExercise(
-            exercise_id=e["id"], name=e["name"], muscle_group=e["muscle_group"], sets=fmt_range(*b.sets),
-            reps=reps, rest_seconds=b.rest_seconds, est_minutes=round(seconds / 60, 1),
-            injury_check=e["injury_check"]))
-    return PlanDay(day=day, kind="training", focus=label, exercises=exercises, est_minutes=round(total / 60, 1))
-
-
-# ---------------------------------------------------------------- progressive overload
-# A general training principle: do a little more over time. Capped inside the protocol's own ranges, so it never
-# goes past what the (PT-reviewable) protocol allows and the session still fits its time (exercise_seconds plans for
-# the top of the set range). Changes only sets and reps; never which exercises are picked (the injury filter alone
-# decides that), and never rest (it stays at the protocol's rest).
-#
-# Every PROGRESSION_EVERY_WEEKS weeks, one step: +1 rep until the top of the rep range, then +1 set with reps back at
-# the bottom, up to the top of the set range; after that it holds. Holds progress the same way in 2-second steps.
-#
-# SAFETY (shared_rules.md rule 8): anyone with an injury flag or a rehab goal gets NO automatic progression. They stay
-# at the starting values until a physical therapist has reviewed their case (the protocols and injury tags are
-# unreviewed drafts), and the plan says so.
-
-PROGRESSION_EVERY_WEEKS = 2
-PROGRESSION_SCHEDULE_WEEKS = 12
-PROGRESSION_ON = ("Every {n} weeks your sets and reps step up a little (one rep at a time, then one more set), "
-                  "never past the top of this plan's ranges.")
-PROGRESSION_PAUSED = ("Progression is paused: because you flagged an injury or a rehab goal, your sets and reps stay "
-                      "at the starting values until a physical therapist has reviewed your plan. Don't push through "
-                      "pain to do more.")
-
-
-def progression_enabled(injury_flags: list[str], goals: list[str]) -> bool:
-    return not injury_flags and "rehab" not in goals
-
-
-def progression_step(week: int, enabled: bool) -> int:
-    """Week 1 is step 0. Disabled = always step 0 (the starting values)."""
-    return (max(1, week) - 1) // PROGRESSION_EVERY_WEEKS if enabled else 0
-
-
-def progressed(sets: tuple[int, int], reps: tuple[int, int], step: int) -> tuple[int, int]:
-    s_lo, s_hi = sets
-    r_lo, r_hi = reps
-    cur_sets, cur_reps = s_lo, r_lo
-    for _ in range(step):
-        if cur_reps < r_hi:
-            cur_reps += 1
-        elif cur_sets < s_hi:
-            cur_sets, cur_reps = cur_sets + 1, r_lo
-        else:
-            break                      # the ceiling: the top of both ranges
-    return cur_sets, cur_reps
-
-
-def _range(text: str) -> tuple[int, int]:
-    nums = [int(n) for n in re.findall(r"\d+", text or "")]
-    return (nums[0], nums[1]) if len(nums) >= 2 else (nums[0], nums[0]) if nums else (1, 1)
-
-
-def exercise_for_week(e: dict, week: int, enabled: bool) -> dict:
-    """One plan exercise (dict) with its sets/reps for a given week of the plan. Same exercise, same rest."""
-    step = progression_step(week, enabled)
-    hold = "hold" in str(e["reps"])
-    reps_lo, reps_hi = _range(e["reps"])
-    if hold:                                  # "24-30s hold" is reps 12-15 at 2 seconds a rep
-        reps_lo, reps_hi = reps_lo // 2, reps_hi // 2
-    sets, reps = progressed(_range(e["sets"]), (reps_lo, reps_hi), step)
-    return {**e, "sets": str(sets), "reps": f"{reps * 2}s hold" if hold else str(reps)}
-
-
-def progression_for(flags: list[str], goals: list[str], b: Blended) -> Progression:
-    enabled = progression_enabled(flags, goals)
-    schedule = []
-    for week in range(1, PROGRESSION_SCHEDULE_WEEKS + 1):
-        sets, reps = progressed(b.sets, b.reps, progression_step(week, enabled))
-        schedule.append(ProgressionWeek(week=week, sets=sets, reps=reps))
-    return Progression(enabled=enabled, every_weeks=PROGRESSION_EVERY_WEEKS if enabled else None,
-                       reason=PROGRESSION_ON.format(n=PROGRESSION_EVERY_WEEKS) if enabled else PROGRESSION_PAUSED,
-                       schedule=schedule)
+    if category in ("cardio", "mobility") and exercises:
+        # A circuit: go round all the moves as many whole rounds as fit in the session, but at least 2 rounds and
+        # at least 15 minutes.
+        per_round = max(1, total)
+        rounds = max(2, budget // per_round, -(-CIRCUIT_MIN_MINUTES * 60 // per_round))
+        exercises = [x.model_copy(update={"sets": str(rounds), "est_minutes": round(x.est_minutes * rounds, 1)})
+                     for x in exercises]
+        total *= rounds
+    return PlanDay(day=day, kind="training", category=category, focus=CATEGORY_LABELS[category],
+                   exercises=exercises, est_minutes=round(total / 60, 1))
 
 
 # ---------------------------------------------------------------- review-mode swaps
 
-def _swap_pool(picker: "Picker", group: str, direction: str | None) -> list[dict]:
-    pool = picker.pool(group)
-    if direction and group in DIRECTIONAL_GROUPS:
-        pool = [e for e in pool if e.get("force") != OPPOSITE[direction]]
-    return pool
-
-
-def _apply_swaps(days: list[PlanDay], slots: dict[tuple[str, int], tuple[str, str | None]], picker: "Picker",
-                 b: Blended, swaps: dict[str, str]) -> tuple[list[PlanDay], dict[str, list[dict]]]:
-    """Options for every generated exercise, and the plan with valid swaps applied. A swap only counts if the
-    replacement is in that slot's filtered pool right now, so it can never bring in an exercise the injury filter
-    would remove (checked again on every generation, not just when the swap was saved)."""
+def _apply_swaps(weeks: list[PlanWeek], slots: dict, picker: Picker, p: Protocol, goal: str, experience: str,
+                 swaps: dict[str, str]) -> tuple[list[PlanWeek], dict[str, list[dict]]]:
+    """Options for every generated exercise, and the plan with valid swaps applied everywhere that exercise appears.
+    A swap only counts if the replacement is in that slot's filtered pool right now, so it can never bring in an
+    exercise the injury filter would remove (checked again on every generation, not just when it was saved)."""
     options: dict[str, list[dict]] = {}
-    new_days = []
-    for d in days:
-        if d.kind != "training":
-            new_days.append(d)
-            continue
-        used = {x.exercise_id for x in d.exercises}
-        exercises = []
-        for i, x in enumerate(d.exercises):
-            group, direction = slots[(d.day, i)]
-            pool = [e for e in _swap_pool(picker, group, direction) if e["id"] == x.exercise_id or e["id"] not in used]
-            options.setdefault(x.exercise_id, [])
-            known = {o["id"] for o in options[x.exercise_id]}
-            options[x.exercise_id] += [{"id": e["id"], "name": e["name"], "injury_check": e["injury_check"]}
-                                       for e in pool if e["id"] != x.exercise_id and e["id"] not in known]
-            want = swaps.get(x.exercise_id)
-            choice = next((e for e in pool if e["id"] == want and want != x.exercise_id), None)
-            if choice is None:
-                exercises.append(x)
+    out = []
+    for w in weeks:
+        days = []
+        for d in w.days:
+            if d.kind != "training":
+                days.append(d)
                 continue
-            seconds = exercise_seconds(choice["est_time_seconds"], b)
-            reps = f"{b.reps[0] * 2}-{b.reps[1] * 2}s hold" if is_hold(choice["name"]) else fmt_range(*b.reps)
-            exercises.append(PlanExercise(
-                exercise_id=choice["id"], name=choice["name"], muscle_group=choice["muscle_group"], sets=x.sets,
-                reps=reps, rest_seconds=x.rest_seconds, est_minutes=round(seconds / 60, 1),
-                injury_check=choice["injury_check"], swapped_from=x.exercise_id))
-            used.add(choice["id"])
-        total = sum(x.est_minutes for x in exercises)
-        new_days.append(d.model_copy(update={"exercises": exercises, "est_minutes": round(total, 1)}))
-    return new_days, options
+            used = {x.exercise_id for x in d.exercises}
+            exercises, changed = [], False
+            for i, x in enumerate(d.exercises):
+                slot = slots[(w.week_in_block, d.day, i)]
+                pool = [e for e in picker.ranked(d.category, slot) if e["id"] == x.exercise_id or e["id"] not in used]
+                options.setdefault(x.exercise_id, [])
+                known = {o["id"] for o in options[x.exercise_id]}
+                options[x.exercise_id] += [{"id": e["id"], "name": e["name"], "injury_check": e["injury_check"]}
+                                           for e in pool if e["id"] != x.exercise_id and e["id"] not in known]
+                want = swaps.get(x.exercise_id)
+                choice = next((e for e in pool if e["id"] == want and want != x.exercise_id), None)
+                if choice is None:
+                    exercises.append(x)
+                    continue
+                new, _ = _exercise(choice, d.category, slot, p, goal, experience)
+                if d.category in ("cardio", "mobility"):   # a circuit: keep the day's number of rounds
+                    new = new.model_copy(update={"sets": x.sets, "est_minutes": x.est_minutes})
+                exercises.append(new.model_copy(update={"swapped_from": x.exercise_id}))
+                used.add(choice["id"])
+                changed = True
+            if changed:
+                days.append(d.model_copy(update={"exercises": exercises,
+                                                 "est_minutes": round(sum(x.est_minutes for x in exercises), 1)}))
+            else:
+                days.append(d)
+        out.append(w.model_copy(update={"days": days}))
+    return out, options
+
+
+# ---------------------------------------------------------------- the weight schedule shown with the plan
+
+def weight_plan(goal: str, experience: str, weeks: list[PlanWeek]) -> WeightPlan:
+    """Suggested weights week by week from the defaults (before anything is logged), so the plan can show the climb.
+    Covers two full blocks, at least 8 weeks."""
+    block = len(weeks)
+    n_weeks = max(8, 2 * block)
+    appears: dict[str, tuple[PlanExercise, set[int]]] = {}
+    for w in weeks:
+        for d in w.days:
+            for x in d.exercises:
+                if x.weighted:
+                    appears.setdefault(x.exercise_id, (x, set()))[1].add(w.week_in_block - 1)
+    rows = []
+    for ex_id, (x, variants) in appears.items():
+        on = [wk for wk in range(1, n_weeks + 1) if variant_of(wk, block) in variants]
+        base = default_weight(experience, x.load)
+        rows.append(WeightScheduleRow(
+            exercise_id=ex_id, name=x.name, load=x.load, weeks=on,
+            weight_lb=[suggested_weight(goal, x.load, base, weight_steps(goal, block, variants, 1, wk)) for wk in on]))
+    return WeightPlan(rule=WEIGHT_RULES[goal], calibration=CALIBRATION_NOTE, defaults_lb=DEFAULT_WEIGHT_LB[experience],
+                      step_lb=WEIGHT_STEP_LB[goal], schedule_weeks=n_weeks, schedule=rows)
 
 
 # ---------------------------------------------------------------- the generator
 
 def generate(profile: dict, swaps: dict[str, str] | None = None, with_swap_options: bool = False) -> WeeklyProgram:
-    """Build the weekly plan for a quiz profile (dict with the quiz_profiles columns, lists decoded).
+    """Build the plan for a quiz profile (dict with the quiz_profiles columns, lists decoded).
     swaps (review mode): {generated exercise id: replacement id}, applied only where valid (see _apply_swaps)."""
-    goals = sorted(set(profile.get("goals") or [])) or ["general_health"]
+    goal = profile.get("goal") if profile.get("goal") in GOALS else "feel_good"
     experience = profile.get("experience_level") or "beginner"
     flags = sorted(set(profile.get("injury_flags") or []))
     notes: list[str] = []
-    missing = [k for k in ("experience_level", "days_available", "session_length_minutes") if not profile.get(k)]
-    if missing:
-        notes.append("Retake the quiz to personalize this further: we used defaults for "
-                     + ", ".join(m.replace("_", " ") for m in missing) + ".")
-
     if needs_clinical_review(profile.get("pregnancy_status")):
         return WeeklyProgram(generated=False, blocked_reason=CLINICAL_REVIEW_MESSAGE, needs_clinical_review=True,
-                             goals=goals, experience_level=experience, notes=notes,
+                             goal=goal, goal_label=GOAL_LABELS[goal], experience_level=experience,
                              days=[PlanDay(day=d, kind="rest") for d in WEEK])
 
-    b = blend_protocols(load_protocols(goals, experience))
-    session_length = min(b.session_length_minutes, profile.get("session_length_minutes") or b.session_length_minutes)
-    if session_length < b.session_length_minutes:
-        b.session_length_minutes = session_length
-    n, day_notes = training_day_count(profile.get("days_available") or 3, b.sessions_per_week,
-                                      profile.get("other_activity_days") or 0)
-    notes += day_notes
-
+    p = load_protocol(goal, experience)
     checked_only = checked_only_for(flags)        # no exceptions: an injury flag always means checked_only
-    picker = Picker(equipment=available_equipment(profile.get("equipment") or ["bodyweight"]),
-                    injury_flags=flags, checked_only=checked_only, experience_level=experience,
-                    low_impact=experience == "beginner" or "rehab" in goals or bool(flags))
-    templates = DAY_TEMPLATES[b.split_type]
-    training = DAY_PATTERNS[n]
-    days = []
-    slots: dict[tuple[str, int], tuple[str, str | None]] = {}
-    for day in WEEK:
-        if day in training:
-            label, groups, direction = templates[training.index(day) % len(templates)]
-            days.append(build_day(day, label, groups, picker, b, direction, slots))
-        else:
-            days.append(PlanDay(day=day, kind="rest"))
+    picker = Picker(equipment=available_equipment(profile.get("equipment") or ["bodyweight"]), injury_flags=flags,
+                    checked_only=checked_only, experience_level=experience,
+                    low_impact=experience == "beginner" or bool(flags))
+    weeks, slots = [], {}
+    for i, layout in enumerate(STRUCTURES[goal], start=1):
+        days, used = [], {}
+        for day in WEEK:
+            if day in layout:
+                days.append(build_day(day, layout[day], picker, p, goal, experience, used))
+            else:
+                days.append(PlanDay(day=day, kind="rest"))
+        slots.update({(i, d, n): s for (d, n), s in used.items()})
+        weeks.append(PlanWeek(week_in_block=i, days=days))
     swap_options = None
     if swaps or with_swap_options:
-        days, swap_options = _apply_swaps(days, slots, picker, b, swaps or {})
+        weeks, swap_options = _apply_swaps(weeks, slots, picker, p, goal, experience, swaps or {})
 
-    if picker.empty_groups:
+    notes.append(CALIBRATION_NOTE)
+    if picker.empty:
         reason = "your equipment" + (" and the injury filter" if checked_only else "")
-        notes.append("We couldn't find " + ", ".join(sorted(g.replace("_", " ") for g in picker.empty_groups))
-                     + f" exercises that fit {reason}, so those were left out.")
+        notes.append("We couldn't find exercises for " + ", ".join(sorted(picker.empty))
+                     + f" that fit {reason}, so those spots were left out.")
     if checked_only:
-        notes.append("Because you flagged an injury, every exercise here has injury tags, and anything tagged as "
-                     "unsafe for " + ", ".join(f.replace("_", " ") for f in flags) + " was left out. The tags are "
+        notes.append("Because you flagged an injury, every exercise here has drafted injury data, and anything tagged "
+                     "as unsafe for " + ", ".join(f.replace("_", " ") for f in flags) + " was left out. The tags are "
                      "drafts a physical therapist hasn't reviewed yet, so stop anything that hurts.")
-    elif any(e.injury_check == "not_yet_checked" for d in days for e in d.exercises):
+    elif any(x.injury_check == "not_yet_checked" for w in weeks for d in w.days for x in d.exercises):
         notes.append("Some exercises haven't been checked for injury safety yet (they're marked). Skip anything "
                      "that doesn't feel right.")
 
     return WeeklyProgram(
-        generated=True, goals=goals, experience_level=experience, training_days=n, days=days, notes=notes,
+        generated=True, goal=goal, goal_label=GOAL_LABELS[goal], experience_level=experience,
+        training_days=TRAINING_DAYS, block_weeks=BLOCK_WEEKS[goal], weeks=weeks, days=weeks[0].days, notes=notes,
         protocol=ProtocolSummary(
-            goals_used=b.goals, experience_level=experience, split_type=b.split_type,
-            sessions_per_week=b.sessions_per_week, session_length_minutes=b.session_length_minutes,
-            sets_range=fmt_range(*b.sets), reps_range=fmt_range(*b.reps), rest_seconds=b.rest_seconds,
-            progression_notes=b.progression_notes, blending_rules_applied=b.rules, status=b.status,
-            review_notice=REVIEW_NOTICE if b.status == "placeholder" else None, citations=b.citations),
-        progression=progression_for(flags, goals, b),
+            goal=goal, experience_level=experience, session_length_minutes=p.session_length_minutes,
+            sets_range=fmt_range(*p.sets), reps_range=fmt_range(*p.reps), rest_seconds=p.rest_seconds,
+            progression_note=p.progression_note, status=p.status,
+            review_notice=REVIEW_NOTICE if p.status == "placeholder" else None, citations=list(p.citations)),
+        weights=weight_plan(goal, experience, weeks),
         swap_options=swap_options if with_swap_options else None,
         safety=SafetySummary(injury_flags=flags, checked_only=checked_only, excluded_as_contraindicated=picker.excluded,
                              equipment=picker.equipment,
-                             left_out_for_injury=contraindicated_exercises(flags, sorted(picker.candidates),
+                             # only the muscle groups this plan actually draws from (as excluded_as_contraindicated)
+                             left_out_for_injury=contraindicated_exercises(flags, sorted(picker.group_pool),
                                                                            picker.equipment, checked_only)),
     )
 
 
-PROFILE_COLUMNS = ("goals", "injury_flags", "experience_level", "days_available", "session_length_minutes",
-                   "equipment", "other_activity_days", "pregnancy_status", "plan_swaps")
+PROFILE_COLUMNS = ("goal", "injury_flags", "experience_level", "equipment", "pregnancy_status", "plan_swaps")
 
 
 def generate_for_user(user_id: int, with_swap_options: bool = False) -> WeeklyProgram:
@@ -589,7 +662,7 @@ def generate_for_user(user_id: int, with_swap_options: bool = False) -> WeeklyPr
     if row is None:
         raise NoProfile("Take the quiz first so we can build your plan.")
     profile = dict(row)
-    for col in ("goals", "injury_flags", "equipment"):
+    for col in ("injury_flags", "equipment"):
         profile[col] = json.loads(profile[col] or "[]")
     swaps = json.loads(profile.pop("plan_swaps") or "{}")
     return generate(profile, swaps=swaps, with_swap_options=with_swap_options)
@@ -601,14 +674,10 @@ def generate_for_user(user_id: int, with_swap_options: bool = False) -> WeeklyPr
 # can never drift from the algorithm. Nothing here is hand-written output.
 
 EXAMPLE_PROFILE = {
-    "age": 45,                               # shown on the page; the generator doesn't use age
-    "goals": ["general_health"],
+    "goal": "feel_good",
     "experience_level": "beginner",
     "injury_flags": ["lower_back"],
-    "equipment": ["resistance_band"],        # resistance bands only
-    "days_available": 3,
-    "session_length_minutes": 30,
-    "other_activity_days": 0,
+    "equipment": ["bodyweight", "resistance_band"],   # bodyweight is always included
     "pregnancy_status": "none",
 }
 
@@ -627,7 +696,7 @@ class PlanExample(BaseModel):
 
 def filter_funnel(profile: dict) -> list[FilterStep]:
     """How many exercises in the whole library survive each safety/equipment filter, in the order the page
-    explains them. Counted live with the same search_exercises() the generator uses."""
+    explains them. Counted live with the same search the generator uses."""
     flags = sorted(set(profile.get("injury_flags") or []))
     equipment = available_equipment(profile.get("equipment") or ["bodyweight"])
     stages = [("The whole exercise library", {})]
@@ -642,7 +711,7 @@ def filter_funnel(profile: dict) -> list[FilterStep]:
                    {"injury_flags": flags, "checked_only": checked_only_for(flags), "equipment": equipment}))
     steps, previous = [], None
     for label, kwargs in stages:
-        left = search_exercises(limit=1, **kwargs)["total_matching"]
+        left = search_all_exercises(**kwargs)["total_matching"]
         steps.append(FilterStep(step=label, exercises_left=left, removed=0 if previous is None else previous - left))
         previous = left
     return steps

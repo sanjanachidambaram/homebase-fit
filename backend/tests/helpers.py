@@ -2,12 +2,15 @@
 
 
 def quiz_answers(**overrides) -> dict:
-    """A complete, valid set of answers for the current quiz (content/quiz/quiz_questions.yaml)."""
+    """A complete, valid set of answers for the current quiz (content/quiz/quiz_questions.yaml): the losing-weight path,
+    so weight and goal weight are asked. For another goal, pass goal=... (weight is then ignored unless you drop it)."""
     answers = {
-        "goals": ["weight_loss", "rehab"], "timeline": "8_weeks", "experience_level": "beginner",
-        "days_available": 4, "session_length": "30", "equipment": ["bodyweight", "mat", "resistance_band"],
-        "other_activity_days": 0, "injuries": ["lower_back"], "pregnancy_status": "none",
-        "age": 34, "weight": 165, "height": 66,
+        "goal": "lose_weight", "experience_level": "beginner",
+        "equipment": ["bodyweight", "mat", "resistance_band"], "injuries": ["lower_back"], "pregnancy_status": "none",
+        "weight": 165, "goal_weight": 155,
     }
     answers.update(overrides)
+    if answers.get("goal") != "lose_weight":   # only asked on the losing-weight path
+        answers.pop("weight", None)
+        answers.pop("goal_weight", None)
     return answers

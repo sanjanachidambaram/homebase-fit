@@ -2,215 +2,121 @@
 # GOAL PROTOCOLS: the training parameters behind every generated plan.
 # PLACEHOLDER VALUES: PT / OB-GYN TO REVIEW every row and add real citations.
 # =====================================================================
-# One row per goal x experience level (5 goals x 3 levels = 15 rows; the seed checks they're all here).
-# The program generator (backend/app/services/program_generator.py) reads these; it never invents
-# sets, reps, or rest itself. After editing, rebuild from backend/:
+# One row per goal x experience level (3 goals x 3 levels = 9 rows; the seed checks they're all here).
+# The program generator (backend/app/services/program_generator.py) reads these; it never invents sets, reps, rest
+# or session length itself. After editing, rebuild from backend/:
 #   .venv\Scripts\python.exe -m app.db.seed
 #
-# Fields:
-#   goal                    weight_loss | strength | tone | rehab | general_health
-#   experience_level        beginner | intermediate | advanced
-#   sessions_per_week       1-6 (the plan always keeps at least one rest day)
-#   session_length_minutes  typical session length for this protocol
-#   split_type              full_body | upper_lower | push_pull_legs | circuit
-#   sets_range, reps_range  "low-high" (or one number), e.g. "2-3", "12-15"
-#   rest_seconds            rest between sets
-#   progression_note        how to make it harder over time
+# What is NOT here, because it's fixed by the plan design (backend/prompts/shared_rules.md, rule 6):
+#   the week structure (always 4 training days: Getting stronger = 3 strength + 1 cardio; Losing weight =
+#   2 strength + 2 cardio; Feeling good = 2 mobility/core + 1 strength + 1 cardio), how weeks repeat (2-, 4- and
+#   8-week blocks), the default starting weights, and how weights go up (rule 8).
 #
-# Progressive overload (applied by code to every calendar week; backend/prompts/shared_rules.md rule 8):
-#   the general principle of doing a little more over time. Every 2 weeks: +1 rep up to the top of reps_range, then
-#   +1 set (reps back to the bottom) up to the top of sets_range, then it holds. It never goes past these ranges, so
-#   reviewing the ranges reviews the ceiling. Only sets and reps change; rest and exercise choice never do.
-#   Anyone with an injury flag or a rehab goal stays at the starting values (no automatic progression) until a PT has
-#   reviewed their case.
-#   reference_notes         (optional) background notes, e.g. from the retired program templates
+# Fields:
+#   goal                    stronger | lose_weight | feel_good
+#   experience_level        beginner | intermediate | advanced
+#   session_length_minutes  15-60: the time budget every training day is filled to
+#   sets_range, reps_range  "low-high" (or one number), e.g. "2-3", "12-15". For Getting stronger the reps are the
+#                           person's own call during each set ("to failure" is their judgment, not the app's); the
+#                           range is shown only as a rough guide.
+#   rest_seconds            rest between sets on strength days
+#   progression_note        shown with the plan
 #   status                  placeholder | pt_reviewed (pt_reviewed requires at least one citation)
 #   citations               list of { claim, source }. PT TO FILL IN.
 #
-# These numbers are placeholders chosen to be conservative. They are NOT presented to users as
-# scientific fact: the app labels every placeholder row "Content pending expert review".
+# These numbers are placeholders chosen to be conservative. They are NOT presented to users as scientific fact:
+# the app labels every placeholder row "Content pending expert review".
 
 protocols:
-  # ---------------------------------------------------------------- weight loss
-  - goal: weight_loss
+  # ---------------------------------------------------------------- Getting stronger
+  - goal: stronger
     experience_level: beginner
-    sessions_per_week: 3
-    session_length_minutes: 30
-    split_type: circuit
-    sets_range: "2-3"
-    reps_range: "12-15"
-    rest_seconds: 30
-    progression_note: Add a round, or trim rest by 5 seconds, once every round feels comfortable.
-    reference_notes: >
-      From the retired "Total-Body Tone & Burn" template: full-body circuits with short rests to keep the
-      heart rate up while every major muscle group gets worked each session.
-    status: placeholder
-    citations: []
-  - goal: weight_loss
-    experience_level: intermediate
-    sessions_per_week: 4
     session_length_minutes: 40
-    split_type: circuit
-    sets_range: "3"
-    reps_range: "12-15"
-    rest_seconds: 30
-    progression_note: Add a fourth round or a light weight before shortening rest further.
-    status: placeholder
-    citations: []
-  - goal: weight_loss
-    experience_level: advanced
-    sessions_per_week: 5
-    session_length_minutes: 45
-    split_type: circuit
-    sets_range: "3-4"
-    reps_range: "10-15"
-    rest_seconds: 30
-    progression_note: Progress load on the bigger moves while keeping rests short.
-    status: placeholder
-    citations: []
-
-  # ---------------------------------------------------------------- strength
-  - goal: strength
-    experience_level: beginner
-    sessions_per_week: 3
-    session_length_minutes: 40
-    split_type: full_body
     sets_range: "2-3"
-    reps_range: "8-10"
-    rest_seconds: 90
-    progression_note: When you can do every set at the top of the rep range with good form, go a little heavier.
-    reference_notes: >
-      From the retired "Home Strength Foundations" template: training each muscle group about twice a week
-      with gradual overload, using a basic home setup (dumbbells and a band).
-    status: placeholder
-    citations: []
-  - goal: strength
-    experience_level: intermediate
-    sessions_per_week: 4
-    session_length_minutes: 45
-    split_type: upper_lower
-    sets_range: "3-4"
-    reps_range: "6-8"
-    rest_seconds: 120
-    progression_note: Add weight in small steps when all sets hit the top of the rep range.
-    status: placeholder
-    citations: []
-  - goal: strength
-    experience_level: advanced
-    sessions_per_week: 5
-    session_length_minutes: 60
-    split_type: push_pull_legs
-    sets_range: "4-5"
-    reps_range: "4-6"
-    rest_seconds: 150
-    progression_note: Use planned heavier and lighter weeks rather than adding weight every session.
-    status: placeholder
-    citations: []
-
-  # ---------------------------------------------------------------- tone
-  - goal: tone
-    experience_level: beginner
-    sessions_per_week: 3
-    session_length_minutes: 30
-    split_type: full_body
-    sets_range: "2-3"
-    reps_range: "10-12"
-    rest_seconds: 60
-    progression_note: Add a set to each exercise before adding weight.
-    status: placeholder
-    citations: []
-  - goal: tone
-    experience_level: intermediate
-    sessions_per_week: 4
-    session_length_minutes: 40
-    split_type: upper_lower
-    sets_range: "3"
-    reps_range: "10-15"
-    rest_seconds: 60
-    progression_note: Add weight or slow the lowering phase once 15 reps feel easy.
-    status: placeholder
-    citations: []
-  - goal: tone
-    experience_level: advanced
-    sessions_per_week: 5
-    session_length_minutes: 45
-    split_type: push_pull_legs
-    sets_range: "3-4"
-    reps_range: "10-15"
-    rest_seconds: 45
-    progression_note: Increase weekly sets gradually; keep a lighter week every month or so.
-    status: placeholder
-    citations: []
-
-  # ---------------------------------------------------------------- rehab
-  - goal: rehab
-    experience_level: beginner
-    sessions_per_week: 3
-    session_length_minutes: 20
-    split_type: full_body
-    sets_range: "1-2"
-    reps_range: "10-12"
-    rest_seconds: 60
-    progression_note: Only progress when the movement is completely comfortable; stop if anything hurts.
-    reference_notes: >
-      From the retired "Back-Friendly Fat Loss" template: core stabilization (dead bug, bird dog) and glute
-      strengthening with low-impact steady movement; no jumping and no loaded spinal bending.
-    status: placeholder
-    citations: []
-  - goal: rehab
-    experience_level: intermediate
-    sessions_per_week: 3
-    session_length_minutes: 25
-    split_type: full_body
-    sets_range: "2-3"
-    reps_range: "10-12"
-    rest_seconds: 60
-    progression_note: Add a set or a light band before adding harder variations.
-    status: placeholder
-    citations: []
-  - goal: rehab
-    experience_level: advanced
-    sessions_per_week: 4
-    session_length_minutes: 30
-    split_type: full_body
-    sets_range: "2-3"
-    reps_range: "10-15"
-    rest_seconds: 60
-    progression_note: Progress slowly and keep the flagged area pain-free; check in with a PT.
-    status: placeholder
-    citations: []
-
-  # ---------------------------------------------------------------- general health
-  - goal: general_health
-    experience_level: beginner
-    sessions_per_week: 3
-    session_length_minutes: 30
-    split_type: full_body
-    sets_range: "2"
-    reps_range: "10-12"
-    rest_seconds: 60
-    progression_note: Add a set or a few reps every couple of weeks.
-    status: placeholder
-    citations: []
-  - goal: general_health
-    experience_level: intermediate
-    sessions_per_week: 3
-    session_length_minutes: 40
-    split_type: full_body
-    sets_range: "2-3"
-    reps_range: "10-12"
-    rest_seconds: 60
-    progression_note: Add weight once all sets feel comfortable.
-    status: placeholder
-    citations: []
-  - goal: general_health
-    experience_level: advanced
-    sessions_per_week: 4
-    session_length_minutes: 45
-    split_type: upper_lower
-    sets_range: "3"
     reps_range: "8-12"
-    rest_seconds: 60
-    progression_note: Vary your exercises every few weeks to keep it fresh.
+    rest_seconds: 90
+    progression_note: The weight goes up each time a day repeats; how many reps you do is your call.
+    status: placeholder
+    citations: []
+
+  - goal: stronger
+    experience_level: intermediate
+    session_length_minutes: 45
+    sets_range: "3"
+    reps_range: "6-10"
+    rest_seconds: 120
+    progression_note: The weight goes up each time a day repeats; how many reps you do is your call.
+    status: placeholder
+    citations: []
+
+  - goal: stronger
+    experience_level: advanced
+    session_length_minutes: 60
+    sets_range: "3-4"
+    reps_range: "5-8"
+    rest_seconds: 150
+    progression_note: The weight goes up each time a day repeats; how many reps you do is your call.
+    status: placeholder
+    citations: []
+
+  # ---------------------------------------------------------------- Losing weight
+  - goal: lose_weight
+    experience_level: beginner
+    session_length_minutes: 30
+    sets_range: "2-3"
+    reps_range: "12-15"
+    rest_seconds: 30
+    progression_note: Weights go up 5 lb every 4 weeks, when the 4-week pattern starts again.
+    status: placeholder
+    citations: []
+
+  - goal: lose_weight
+    experience_level: intermediate
+    session_length_minutes: 40
+    sets_range: "3"
+    reps_range: "12-15"
+    rest_seconds: 30
+    progression_note: Weights go up 5 lb every 4 weeks, when the 4-week pattern starts again.
+    status: placeholder
+    citations: []
+
+  - goal: lose_weight
+    experience_level: advanced
+    session_length_minutes: 45
+    sets_range: "3-4"
+    reps_range: "10-15"
+    rest_seconds: 30
+    progression_note: Weights go up 5 lb every 4 weeks, when the 4-week pattern starts again.
+    status: placeholder
+    citations: []
+
+  # ---------------------------------------------------------------- Just feeling good in my body
+  - goal: feel_good
+    experience_level: beginner
+    session_length_minutes: 20
+    sets_range: "2-3"
+    reps_range: "10-12"
+    rest_seconds: 45
+    progression_note: Weights stay wherever you set them; the 8-week pattern keeps things varied.
+    status: placeholder
+    citations: []
+
+  - goal: feel_good
+    experience_level: intermediate
+    session_length_minutes: 25
+    sets_range: "2-3"
+    reps_range: "10-12"
+    rest_seconds: 45
+    progression_note: Weights stay wherever you set them; the 8-week pattern keeps things varied.
+    status: placeholder
+    citations: []
+
+  - goal: feel_good
+    experience_level: advanced
+    session_length_minutes: 30
+    sets_range: "3"
+    reps_range: "10-12"
+    rest_seconds: 45
+    progression_note: Weights stay wherever you set them; the 8-week pattern keeps things varied.
     status: placeholder
     citations: []

@@ -112,7 +112,7 @@ def test_custom_day_survives_a_quiz_retake(client, on_day, use_script):
     before = by_date(get_days(client, h))
     custom = override(client, h, before[d(3)]["id"]).json()["entry"]          # Thursday, a rest day in the plan
 
-    retake(client, uid, h, goals=["strength"], experience_level="advanced", days_available=6)
+    retake(client, uid, h, goal="stronger", experience_level="advanced", injuries=["none"])
     after = by_date(get_days(client, h))
     kept = after[d(3)]
     assert (kept["id"], kept["source"], kept["workout"], kept["planned"]) == \

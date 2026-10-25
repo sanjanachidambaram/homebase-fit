@@ -33,7 +33,7 @@ export const CONSENT_LABEL =
 export const PRIVACY_POINTS: { heading: string; text: string }[] = [
   {
     heading: 'What we store',
-    text: 'Your username, your first name (only to greet you on your Dashboard), and a scrambled (hashed) password; your quiz answers (goals, timeline, experience, the days and time you have, equipment, other activity, injuries, pregnancy or postpartum status, age, weight, height, and an optional weight goal); your favorite exercises; the workouts and measurements you log; and, if you describe symptoms we redirect to a professional, the words that triggered it.',
+    text: 'Your username, your first name (only to greet you on your Dashboard), and a scrambled (hashed) password; your quiz answers (your goal, experience, equipment, injuries, pregnancy or postpartum status, and, only if your goal is losing weight, your weight and an optional goal weight); your favorite exercises; the workouts and measurements you log; and, if you describe symptoms we redirect to a professional, the words that triggered it.',
   },
   {
     heading: 'Why',
@@ -41,7 +41,7 @@ export const PRIVACY_POINTS: { heading: string; text: string }[] = [
   },
   {
     heading: 'AI features',
-    text: 'Your weekly plan is built by our own code, not by AI. To explain it and to coach you, the app sends your goals, experience level, injury areas, timeline, age, weight, and height, plus the exercises in your plan, to an AI model provider (OpenAI, through the Portkey gateway). Your username, first name, pregnancy or postpartum status, weight goal, and anything you type in your own words are never sent.',
+    text: 'Your weekly plan is built by our own code, not by AI. To explain it and to coach you, the app sends your goal, experience level and injury areas, plus the exercises in your plan, to an AI model provider (OpenAI, through the Portkey gateway). Your username, first name, weight, goal weight, pregnancy or postpartum status, and anything you type in your own words are never sent.',
   },
   {
     heading: 'Deleting your data',

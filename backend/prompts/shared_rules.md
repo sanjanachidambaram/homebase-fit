@@ -50,8 +50,9 @@ All data access goes through the MCP tool server (`app/mcp_server/server.py`) vi
 
 ## 2. Privacy and user identity (all agents)
 
-- User context comes only from `app/agents/context.py` (`agent_profile_for`): goals, timeline,
-  injury_flags, age, weight, height. Never email, name, user id, password data, or free-text notes.
+- User context comes only from `app/agents/context.py` (`agent_profile_for`): the goal and injury_flags (since
+  2026-10-25; age, height and timeline are no longer asked, and weight never reaches a model). Never email, name,
+  user id, password data, weight, or free-text notes.
 - **Username and first name are identifying, exactly like email (decided 2026-10-23).** Sign-in uses a username,
   and sign-up asks for a first name, used only for the Dashboard greeting ("Hi Sarah"). Both live only in the
   `users` table, which no agent, prompt, or MCP tool ever reads. They sit on the same excluded list as email,
@@ -65,7 +66,7 @@ All data access goes through the MCP tool server (`app/mcp_server/server.py`) vi
 - The user is always the one in the sign-in token. Nothing the user types and nothing the model outputs
   can choose which user's data is read.
 - **Calendar notes never reach any model, for any purpose.** They are the user's own words, on the same
-  footing as `injury_notes` and `other_activity_notes`: stored in `calendar_entries.notes`, shown only to that
+  footing as `injury_notes`: stored in `calendar_entries.notes`, shown only to that
   user, and never read by `agent_profile_for`, any MCP tool, or any agent (not the Coach, not anything else).
   Marking a calendar day done writes `workout_logs` rows, and the note is **not** copied into them.
   Test: `test_calendar_notes_never_reach_any_model` runs every agent with a fake model that records everything
@@ -153,38 +154,48 @@ Tests: `test_injured_user_always_gets_checked_only`, `test_injury_filter_is_appl
 replaces it with a plain encouraging line if it still fails. The flags and the strength fun fact are
 built by code from the tool results.
 
-## 6. Building the weekly plan (code, not the model)
+## 6. Building the plan (code, not the model; rewritten 2026-10-25)
 
 Every plan comes from `app/services/program_generator.py`: plain Python, no LLM call. Same profile in, same
-plan out. The training parameters come only from `goal_protocols` (content/protocols/goal_protocols.yaml,
-one row per goal x experience level, PT-reviewable); the generator never invents sets, reps, or rest.
+plan out. The quiz has ONE goal (Getting stronger, Losing weight, Just feeling good in my body). Sets, reps, rest and
+session length come only from `goal_protocols` (content/protocols/goal_protocols.yaml, one row per goal x experience
+level, 9 rows, PT-reviewable); the generator never invents them. The old multi-goal blending is gone.
 
 - **Safety first.** Pregnant or postpartum (`needs_clinical_review`): no plan is generated until
   OB-GYN-reviewed guidance exists; the user is pointed to their OB-GYN or midwife. They also never reach
   ANY AI agent: the Workout Builder and Coach routes return 403, the Program Architect and Basics answer
   from code (the Basics red-flag check still runs and still logs), and the frontend sends them to
   `/pregnancy-support`. One check, `app/safety_rules.py: profile_needs_clinical_review`, decides it. Any injury flag:
-  `checked_only=true` on every exercise search, no exceptions (rule 4).
-- **Blending several goals** (e.g. weight loss + rehab). Where the goals' protocols differ, the more
-  conservative value wins:
-  - sessions per week: the fewest
-  - session length: the shortest (and never longer than the user asked for)
-  - split: the gentlest, in this order: full body > circuit > upper/lower > push/pull/legs
-  - sets: the lower range
-  - reps: the lighter-load (higher-rep) range
-  - rest: the longest
-  - status: placeholder if any goal's protocol is a placeholder; citations: all of them
-- **Training days** = min(days the user has, the protocol's sessions per week), never more than 6 (a full
-  rest day every week), and fewer if training + other regular activity would exceed 6 active days. At least 1.
-- **Exercises**: per day, muscle groups from the split; picked from `search_exercises` with the user's
-  equipment, injury flags and `checked_only`; matched to experience level; no Olympic lifts, strongman,
-  powerlifting, or stretches in the main sets; no jumping/landing moves for rehab, any injury, or beginners.
-  Muscle groups with nothing safe to offer are left out and the plan says so.
-- **The Program Architect** only explains the finished plan, from the plan, the goals, and the protocol's
-  status and citations. It has no tools and never sees age, weight, pregnancy status, notes, or the user id.
+  `checked_only=true` on every exercise search, no exceptions (rule 4). The injury filter applies on top of
+  whichever goal is picked, unchanged: every candidate comes from the same tested SQL as the MCP tool.
+- **The week is fixed by the goal**: always 4 training days (Monday, Wednesday, Friday, Saturday), built from 4 kinds
+  of day: Upper body (chest, back, shoulders, arms), Lower body (legs), Mobility + core, Cardio.
+  - Getting stronger: 3 strength days, each Upper OR Lower (never mixed), + 1 cardio. A 2-week block: odd weeks
+    repeat the same exercises (week 1 = 3 = 5...), and even weeks repeat theirs.
+  - Losing weight: 2 strength days (Upper, Lower) + 2 cardio. A 4-week block: weeks 1-4 each different, weeks 5-8
+    repeat them, and so on.
+  - Just feeling good: 2 mobility/core days + 1 strength day (Upper and Lower alternate) + 1 cardio. An 8-week block
+    (weeks 9-16 repeat 1-8).
+  - Days are 15 to 60 minutes. The protocol's session length is the cap: cardio and mobility days are circuits
+    repeated to fill it (never under 15 minutes); strength days stop at 6 exercises, so with short rests (Losing
+    weight) they run shorter, about 20 minutes. The plan shows each day's real estimate, not the cap.
+- **What goes into a day.** A strength day hits at least two muscle groups in its category (Upper: a push and a pull,
+  e.g. chest AND back; Lower: a knee-dominant and a hip-dominant move) plus at least two accessory exercises. When
+  equipment or the injury filter leaves a slot empty, it falls back to the category's other groups so a day still
+  reaches two groups. Each slot prefers a backbone of effective, easy-at-home moves (push-ups, band/dumbbell rows,
+  overhead press, pull-aparts, curls, dips; squats, lunges, glute bridges, Romanian deadlifts, step-ups, calf raises;
+  plank, dead bug, bird dog, cat-cow, hip mobility; jumping jacks, step-ups at pace, marching) matched against the real
+  library, never invented ("high knees" isn't in the library, so it isn't used). These are candidate pools, not an
+  override of the safety filter. Also: matched to experience level; no Olympic lifts, strongman, powerlifting or
+  plyometrics on strength days; no jumping/landing moves for beginners or anyone with an injury; no pull-up-bar moves
+  unless the person has a full gym.
+- **The Program Architect** only explains the finished plan, from the plan, the goal, the experience level, and the
+  protocol's status and citations. It has no tools and never sees weight, pregnancy status, notes, or the user id.
 
-**Enforced in code and tested:** `tests/test_program_generator.py` (blending, days, the injury filter during
-generation, equipment, pregnancy), `tests/test_plan_agent.py` (the agent's inputs, claims, and logging).
+**Enforced in code and tested:** `tests/test_program_generator.py` (the week by goal, the repeating blocks, two muscle
+groups plus two accessories, the backbone, 15-60 minutes, equipment, the injury filter for every goal and flag,
+pregnancy), `tests/test_calendar_push_pull.py` (the calendar lays out exactly those days), `tests/test_plan_agent.py`
+(the quiz, and the agent's inputs).
 
 ## 7. Numbers come from code (the Workout Reviewer, and any agent that narrates a calculation)
 
@@ -209,7 +220,7 @@ generation, equipment, pregnancy), `tests/test_plan_agent.py` (the agent's input
   (the Reviewer's per-session range for the strength minutes plus each cardio log's own range), and the progress
   marker at the top of the calendar (`app/services/progress_marker.py`) all use these calculations and only add them
   up. The progress marker has no model at all: its numbers come from `check_goal_achievement`, the calorie estimates,
-  pounds = calories / 3,500 (weight-loss goals only, labelled as a rough approximation, never a promise), and
+  pounds = calories / 3,500 (the losing-weight goal only, labelled as a rough approximation, never a promise), and
   `compute_strength_equivalents`; its words are code templates. The full caveats are shown once, at the bottom of the
   calendar, and every figure links to them. Tests: `tests/test_calendar_redesign.py` (hand-checked numbers).
 
@@ -219,26 +230,35 @@ a final check before returning, the reply is replaced by a plain summary written
 Coach's applies (no shaming, guilt or food talk; it allows "calories" and "pounds", which the estimate needs), plus
 no promises ("you will lose..."). Tests: `tests/test_workout_review.py`.
 
-## 8. Progressive overload (decided 2026-10-23)
+## 8. Weights: defaults, calibration, and going up (rewritten 2026-10-25)
 
-- Plans do a little more over time, a general training principle: every 2 weeks, +1 rep up to the top of the
-  protocol's rep range, then +1 set (reps back to the bottom) up to the top of its set range, then it holds. It never
-  goes past the protocol's own ranges (which are what a PT will review), and the session still fits its time (the
-  generator already plans for the top of the set range).
-- It changes **only sets and reps**. Never which exercises are picked (the injury filter alone decides that, untouched)
-  and never rest.
+- **Default starting weights** for exercises that use weights (dumbbells, kettlebells, and gym equipment), always shown
+  as editable suggestions, never forced: beginner = bodyweight only (no number: the person picks); intermediate = 10 lb
+  for arm (Upper body) exercises, 20 lb for leg exercises; advanced = 20 lb arms, 40 lb legs. Bodyweight and band
+  exercises have no weight at all (the weight field is blank and disabled, never a made-up zero).
+- **Week 1 is a calibration week.** The person logs the reps and weight they actually did. From week 2, each
+  suggestion builds on the latest weight logged for that exercise (the anchor); with nothing logged, on the default.
+- **How weights go up**, applied automatically from the anchor, unless the person logs a different weight (that becomes
+  the new anchor, i.e. a manual override):
+  - Getting stronger: up each time that exercise's day comes round again (every 2 weeks per exercise, so the plan
+    gets heavier every week): +2.5 lb for arm exercises, +5 lb for leg exercises (decided with the project owner).
+    Reps are the person's own call ("to failure" is their judgment during the set, not something the app computes).
+  - Losing weight: +5 lb every 4 weeks, when the 4-week block starts again (weeks 5-8 are weeks 1-4, 5 lb heavier).
+  - Just feeling good: no automatic increase; weights stay wherever the person sets them.
+- **DECISION (2026-10-25, project owner): the goal's rule applies to everyone, including people with an injury
+  flag.** This reverses the 2026-10-23 rule that held injured / rehab profiles flat. Reasoning: there's no rehab goal
+  any more; the injury filter alone still decides which exercises they get (unchanged, rule 4), every weight is only a
+  suggestion they can lower, and the plan keeps telling them to stop anything that hurts. Worth revisiting once a PT
+  has reviewed the protocols and injury tags.
 - Weeks count from `quiz_profiles.plan_started_on` (set whenever the quiz is saved; a retake is a new plan and starts
-  week 1 again), so days laid out later, on a top-up or by "Save to calendar", get the right week.
-- **DECISION: no automatic progression for anyone with an injury flag or a rehab goal.** Their sets and reps stay at
-  the protocol's starting values, and the plan says why ("paused until a physical therapist has reviewed your plan").
-  Reason: the protocols and the injury tags are unreviewed drafts, and raising training volume for someone working
-  around an injury is a clinical judgment the app can't make. Flat is the most conservative option; it can be
-  revisited once a PT has reviewed the rehab protocols. Pregnant / postpartum users have no plan at all (rule 6).
+  week 1 again). Suggestions are computed live from the logs (`app/calendar.py: weight_suggestions`), not frozen in
+  the calendar snapshot. Sets, reps and exercise choice never change with the weeks.
 
-**Enforced in code:** `progression_enabled`, `progressed` and `exercise_for_week` in
-`app/services/program_generator.py`; each calendar day's snapshot carries its `week` and `progression_step`.
-Tests: `test_injured_and_rehab_profiles_do_not_progress_but_the_same_goal_without_injury_does`,
-`test_an_injured_calendar_stays_flat_week_after_week`, `test_progression_never_goes_past_the_protocols_own_ranges`.
+**Enforced in code:** `DEFAULT_WEIGHT_LB`, `WEIGHT_STEP_LB`, `weight_steps`, `suggested_weight` in
+`app/services/program_generator.py`; `weight_suggestions` and `log_rows` in `app/calendar.py`.
+Tests: `tests/test_program_generator.py` (defaults, each goal's rule, anchors), `tests/test_progression_and_modes.py`
+(calibration from a real log, 5 lb after 4 weeks, feeling good stays put, beginners, injured users progress, logging
+stores only real weights).
 
 ## 9. Cardio logs (decided 2026-10-23)
 

@@ -125,9 +125,7 @@ def get_progress_summary(user_id: int, today: date | None = None) -> dict:
 
 # Simple, transparent product heuristics. Not science. PT TO REVIEW.
 THRESHOLDS = {
-    "target_sessions_per_week_by_timeline": {"4_weeks": 4, "8_weeks": 3, "12_weeks": 3, "16_weeks": 3,
-                                             "no_deadline": 2},
-    "default_target_sessions_per_week": 3,
+    "target_sessions_per_week": 4,          # every plan has 4 training days a week (the 2026-10-25 rewrite)
     "ahead_if_ratio_at_least": 1.25,       # sessions per week / target
     "on_track_if_ratio_at_least": 0.75,
     "volume_ahead_if_ratio_at_least": 1.10,  # last 15 days vs the 15 days before (strength goal)
@@ -136,7 +134,6 @@ THRESHOLDS = {
     "min_days_between_weigh_ins_to_judge": 7,
     "plan_on_track_if_completed_ratio_at_least": 0.75,   # completed / scheduled plan workout days so far
 }
-TIMELINE_WEEKS = {"4_weeks": 4, "8_weeks": 8, "12_weeks": 12, "16_weeks": 16}
 HEURISTIC_NOTE = ("These statuses come from simple app thresholds (listed in thresholds_used), not from scientific "
                   "or medical guidance. They have not been reviewed by a physical therapist. Do not present them "
                   "as science-backed.")
@@ -161,7 +158,7 @@ def check_goal_achievement(user_id: int, today: date | None = None) -> dict:
     t = THRESHOLDS
     conn = connect_readonly()
     try:
-        # Same PII boundary as get_user_profile: goals and timeline only come through agent_profile_for.
+        # Same PII boundary as get_user_profile: the goal only comes through agent_profile_for.
         profile = agent_profile_for(user_id, conn)
         quiz = conn.execute("SELECT created_at FROM quiz_profiles WHERE user_id = ?", (user_id,)).fetchone()
         started = datetime.fromisoformat(quiz["created_at"].replace("Z", "+00:00")).date() if quiz else None
@@ -169,24 +166,15 @@ def check_goal_achievement(user_id: int, today: date | None = None) -> dict:
                      if started else None)
     finally:
         conn.close()
-    if profile is None or quiz is None or not profile.goals:
-        return {"status": "insufficient_data", "reasons": ["No quiz profile with goals yet."],
+    if profile is None or quiz is None or not profile.goal:
+        return {"status": "insufficient_data", "reasons": ["No quiz profile with a goal yet."],
                 "checks": [], "note": HEURISTIC_NOTE}
 
     summary = get_progress_summary(user_id, today)
     days_since_quiz = (today - started).days
-    timeline = profile.timeline or "no_deadline"
-    weeks_total = TIMELINE_WEEKS.get(timeline)
-    timeline_info = {
-        "timeline": timeline,
-        "days_since_quiz": days_since_quiz,
-        "weeks_total": weeks_total,
-        "weeks_elapsed": round(days_since_quiz / 7, 1),
-        "timeline_ended": bool(weeks_total and days_since_quiz >= weeks_total * 7),
-    }
     result = {
-        "goals": profile.goals,
-        "timeline": timeline_info,
+        "goal": profile.goal,
+        "plan": {"days_since_quiz": days_since_quiz, "weeks_elapsed": round(days_since_quiz / 7, 1)},
         "progress": {**{k: summary[k] for k in ("sessions_logged", "total_weight_lifted_lbs",
                                                  "current_streak_days", "body_weight_trend")}, **adherence},
         "thresholds_used": t,
@@ -199,42 +187,40 @@ def check_goal_achievement(user_id: int, today: date | None = None) -> dict:
 
     checks = []
     # 1. Consistency applies to every goal. Judge over the time since the quiz if that's under 30 days.
-    target = t["target_sessions_per_week_by_timeline"].get(timeline, t["default_target_sessions_per_week"])
+    target = t["target_sessions_per_week"]
     weeks = min(WINDOW_DAYS, days_since_quiz) / 7
     per_week = summary["sessions_logged"] / weeks
     result["progress"].update(sessions_per_week=round(per_week, 2), weeks_considered=round(weeks, 1))
     ratio = per_week / target
     checks.append({"check": "consistency", "status": _rate(ratio, t["ahead_if_ratio_at_least"],
                                                              t["on_track_if_ratio_at_least"]),
-                   "detail": f"{per_week:.1f} sessions per week vs a target of {target} for the '{timeline}' timeline"})
+                   "detail": f"{per_week:.1f} sessions per week vs the plan's {target}"})
 
     # 2. Goal-specific checks, only where the logs can actually measure the goal.
-    for goal in profile.goals:
-        if goal == "weight_loss":
+    for goal in [profile.goal]:
+        if goal == "lose_weight":
             bw = summary["body_weight_trend"]
             if bw["entries"] >= 2 and (_parse(bw["latest_date"]) - _parse(bw["first_date"])).days >= \
                     t["min_days_between_weigh_ins_to_judge"]:
                 status = "on_track" if bw["direction"] == "down" else "behind"
-                checks.append({"check": "weight_loss", "status": status,
+                checks.append({"check": "lose_weight", "status": status,
                                "detail": f"body weight {bw['direction']} ({bw['change']:+} lb over the window)"})
             else:
-                checks.append({"check": "weight_loss", "status": "not_enough_data",
+                checks.append({"check": "lose_weight", "status": "not_enough_data",
                                "detail": f"needs 2+ weigh-ins at least {t['min_days_between_weigh_ins_to_judge']} "
                                          "days apart"})
-        elif goal == "strength":
+        elif goal == "stronger":
             prior, last = summary["weight_lifted_prior_15_days_lbs"], summary["weight_lifted_last_15_days_lbs"]
             if prior > 0:
-                checks.append({"check": "strength", "status": _rate(last / prior, t["volume_ahead_if_ratio_at_least"],
+                checks.append({"check": "stronger", "status": _rate(last / prior, t["volume_ahead_if_ratio_at_least"],
                                                                     t["volume_on_track_if_ratio_at_least"]),
                                "detail": f"{last:,.0f} lb lifted in the last 15 days vs {prior:,.0f} lb in the 15 before"})
             else:
-                checks.append({"check": "strength", "status": "not_enough_data",
+                checks.append({"check": "stronger", "status": "not_enough_data",
                                "detail": "no weight logged in the earlier 15 days to compare with"})
-        else:   # tone, rehab: nothing in the logs measures them
+        else:   # feel_good: nothing in the logs measures how someone feels
             checks.append({"check": goal, "status": "not_measurable",
-                           "detail": f"No logged measurement tracks '{goal}', so it is judged on consistency only."
-                                     + (" Rehab progress is a question for a physical therapist." if goal == "rehab"
-                                        else "")})
+                           "detail": "No logged measurement tracks feeling good, so it is judged on consistency only."})
 
     # 3. Did they do the plan they were given? Completed vs scheduled workout days on their calendar.
     scheduled, done = adherence["plan_workouts_scheduled"], adherence["plan_workouts_completed"]

@@ -134,3 +134,27 @@ def test_only_you_can_reset_your_quiz(client):
     r = client.delete(f"/api/users/{a['user_id']}/quiz-profile", headers={"Authorization": f"Bearer {b['token']}"})
     assert r.status_code == 403
     assert client.delete(f"/api/users/{a['user_id']}/quiz-profile").status_code == 401
+
+
+# ---------------------------------------------------------------- the 2026-10-25 quiz rewrite: old profiles carried over
+
+@pytest.mark.parametrize("old_goals, goal", [
+    (["weight_loss", "rehab"], "lose_weight"), (["strength"], "stronger"), (["tone"], "stronger"),
+    (["rehab"], "feel_good"), (["general_health"], "feel_good"), ([], "feel_good"),
+])
+def test_old_quiz_profiles_are_carried_over_not_dropped(old_goals, goal):
+    """On deploy, profiles saved under the old quiz are migrated (app/db/reset.py, migrate_quiz_profile): one goal,
+    weight kept only for losing weight (the new schema refuses it otherwise), only equipment the quiz still offers,
+    bodyweight always in, review swaps cleared, removed answers dropped."""
+    import json
+    from app.db.reset import migrate_quiz_profile
+    old = {"user_id": 7, "goals": json.dumps(old_goals), "timeline": "8_weeks", "age": 30, "weight": 150.0,
+           "height": 64.0, "goal_weight": 140.0, "goal_date": "2026-12-01", "days_available": 3,
+           "equipment": json.dumps(["mat", "bench", "pull_up_bar", "dumbbells"]), "plan_swaps": '{"a": "b"}',
+           "plan_reviewed": 1, "experience_level": "beginner"}
+    new = migrate_quiz_profile(old)
+    assert new["goal"] == goal
+    assert (new["weight"], new["goal_weight"]) == ((150.0, 140.0) if goal == "lose_weight" else (None, None))
+    assert json.loads(new["equipment"]) == ["bodyweight", "dumbbells", "mat"]
+    assert (new["plan_swaps"], new["plan_reviewed"]) == ("{}", 0)
+    assert migrate_quiz_profile(new) == new                       # a new-style row passes through unchanged

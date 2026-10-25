@@ -105,10 +105,21 @@ def search_exercises(
     limit: int = 20,
     checked_only: bool = False,
 ) -> dict:
-    if muscle_group is not None and muscle_group not in MUSCLE_GROUPS:
-        raise ToolInputError(f"Unknown muscle_group '{muscle_group}'. Valid: {list(MUSCLE_GROUPS)}.")
     if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= MAX_LIMIT:
         raise ToolInputError(f"limit must be a whole number from 1 to {MAX_LIMIT}.")
+    return _search(muscle_group, equipment, injury_flags, limit, checked_only)
+
+
+def search_all_exercises(muscle_group: str | None = None, equipment: list[str] | str | None = None,
+                         injury_flags: list[str] | None = None, checked_only: bool = False) -> dict:
+    """The same search with no row limit, for the plan generator (which ranks the whole filtered pool itself). The
+    filters are exactly search_exercises' SQL; only the LIMIT differs. Not exposed as an MCP tool."""
+    return _search(muscle_group, equipment, injury_flags, None, checked_only)
+
+
+def _search(muscle_group, equipment, injury_flags, limit: int | None, checked_only: bool) -> dict:
+    if muscle_group is not None and muscle_group not in MUSCLE_GROUPS:
+        raise ToolInputError(f"Unknown muscle_group '{muscle_group}'. Valid: {list(MUSCLE_GROUPS)}.")
     flags = _clean_flags(injury_flags)
     have = _clean_equipment(equipment)
 
@@ -131,7 +142,7 @@ def search_exercises(
         rows = conn.execute(
             f"SELECT e.* FROM exercises e WHERE {base}{inj} "
             "ORDER BY (e.contraindication_status = 'untagged'), e.source_dataset = 'free-exercise-db', e.name "
-            "LIMIT :limit", {**params, "limit": limit}).fetchall()
+            "LIMIT :limit", {**params, "limit": -1 if limit is None else limit}).fetchall()
         unchecked_in_pool = conn.execute(
             f"SELECT COUNT(*) FROM exercises e WHERE {base}{inj} AND e.contraindication_status = 'untagged'",
             params).fetchone()[0]

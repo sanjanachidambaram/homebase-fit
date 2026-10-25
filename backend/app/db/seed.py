@@ -30,9 +30,8 @@ from app.safety_rules import INJURY_FLAGS, RATIONALE_CITATION_LIKE, RATIONALE_PE
 MUSCLE_GROUPS = ("legs", "arms", "chest", "shoulders", "back", "core", "full_body")
 FORCES = {"push", "pull", "static", None}   # movement direction; None = no single direction
 INJURY_TAGS = set(INJURY_FLAGS)   # app/safety_rules.py
-GOALS = ("weight_loss", "strength", "tone", "rehab", "general_health")
+GOALS = ("stronger", "lose_weight", "feel_good")
 EXPERIENCE = ("beginner", "intermediate", "advanced")
-SPLITS = {"full_body", "upper_lower", "push_pull_legs", "circuit"}
 VIDEO_EXTS = (".mp4", ".webm")
 MEDIA_EXTS = (".gif", *VIDEO_EXTS, ".jpg", ".jpeg", ".png", ".webp")
 DEFAULT_MEDIA_EXT = ".gif"
@@ -316,8 +315,8 @@ def parse_range(text: str) -> tuple[int, int] | None:
 def seed_goal_protocols(conn: sqlite3.Connection, sources: set[str], errors: list[str]) -> None:
     """content/protocols/goal_protocols.yaml: exactly one row per goal x experience level."""
     path = CONTENT_DIR / "protocols" / "goal_protocols.yaml"
-    fields = ("goal", "experience_level", "sessions_per_week", "session_length_minutes", "split_type",
-              "sets_range", "reps_range", "rest_seconds", "progression_note")
+    fields = ("goal", "experience_level", "session_length_minutes", "sets_range", "reps_range", "rest_seconds",
+              "progression_note")
     seen: set[tuple[str, str]] = set()
     for i, p in enumerate(load_yaml(path).get("protocols", [])):
         where = f"{rel(path)} row {i + 1} ({p.get('goal')}/{p.get('experience_level')})"
@@ -329,12 +328,10 @@ def seed_goal_protocols(conn: sqlite3.Connection, sources: set[str], errors: lis
             problems.append(f"goal must be one of {GOALS}")
         if p["experience_level"] not in EXPERIENCE:
             problems.append(f"experience_level must be one of {EXPERIENCE}")
-        if p["split_type"] not in SPLITS:
-            problems.append(f"split_type must be one of {sorted(SPLITS)}")
         if parse_range(p["sets_range"]) is None or parse_range(p["reps_range"]) is None:
             problems.append('sets_range and reps_range must look like "2-3" or "10"')
-        if not 1 <= int(p["sessions_per_week"]) <= 6:
-            problems.append("sessions_per_week must be 1-6 (every plan keeps a rest day)")
+        if not 15 <= int(p["session_length_minutes"]) <= 60:
+            problems.append("session_length_minutes must be 15-60")
         if key in seen:
             problems.append("duplicate goal + experience_level")
         if problems:
@@ -346,11 +343,11 @@ def seed_goal_protocols(conn: sqlite3.Connection, sources: set[str], errors: lis
             continue
         seen.add(key)
         conn.execute(
-            "INSERT INTO goal_protocols (goal, experience_level, sessions_per_week, session_length_minutes, "
-            "split_type, sets_range, reps_range, rest_seconds, progression_note, reference_notes, source_id, "
-            "status, citations) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (p["goal"], p["experience_level"], int(p["sessions_per_week"]), int(p["session_length_minutes"]),
-             p["split_type"], str(p["sets_range"]), str(p["reps_range"]), int(p["rest_seconds"]),
+            "INSERT INTO goal_protocols (goal, experience_level, session_length_minutes, sets_range, reps_range, "
+            "rest_seconds, progression_note, reference_notes, source_id, status, citations) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (p["goal"], p["experience_level"], int(p["session_length_minutes"]),
+             str(p["sets_range"]), str(p["reps_range"]), int(p["rest_seconds"]),
              p["progression_note"].strip(), (p.get("reference_notes") or "").strip() or None, source, *review))
     missing = [f"{g}/{e}" for g in GOALS for e in EXPERIENCE if (g, e) not in seen]
     if missing and not any(rel(path) in e for e in errors):

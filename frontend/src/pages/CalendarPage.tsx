@@ -43,6 +43,116 @@ import { setSession, useSession, type Session } from '../session'
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
+type LogRow = { exercise_id: string; reps?: number | null; weight_lb?: number | null }
+type DayChange = { date?: string; notes?: string | null; completed?: boolean; log?: LogRow[] }
+
+const firstInt = (s: string) => {
+  const m = /\d+/.exec(s)
+  return m ? Number(m[0]) : null
+}
+
+/** "Mark done" for a workout day: what you actually did. Reps for every exercise; weight only for exercises that use
+ *  weights (bodyweight ones have no weight box, never a made-up zero). Weights start at the suggestion, which you can
+ *  change. Week 1 is the calibration week: later suggestions build on what you log here. */
+function LogDayForm({
+  entry,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  entry: CalendarEntry
+  busy: boolean
+  onSave: (log: LogRow[]) => void
+  onCancel: () => void
+}) {
+  const w = entry.workout
+  const [rows, setRows] = useState(() =>
+    w.exercises.map((x) => {
+      const info = entry.weights[x.exercise_id]
+      return {
+        id: x.exercise_id,
+        name: x.name,
+        weighted: !!info?.weighted,
+        reps: x.reps_your_call ? '' : String(firstInt(x.reps) ?? ''),
+        weight: info?.suggested_lb != null ? String(info.suggested_lb) : '',
+        timed: /\d\s*s\b|hold|sec/.test(x.reps), // holds and cardio intervals: no reps to count
+      }
+    }),
+  )
+  const set = (i: number, key: 'reps' | 'weight', v: string) =>
+    setRows((r) => r.map((row, j) => (j === i ? { ...row, [key]: v } : row)))
+  return (
+    <form
+      className="log-form"
+      onSubmit={(e) => {
+        e.preventDefault()
+        onSave(
+          rows.map((r) => ({
+            exercise_id: r.id,
+            reps: r.timed || r.reps === '' ? null : Number(r.reps),
+            weight_lb: r.weighted && r.weight !== '' ? Number(r.weight) : null,
+          })),
+        )
+      }}
+    >
+      {w.calibration_week && (
+        <p className="hint">Calibration week: log what you actually did. Next time, suggestions build on it.</p>
+      )}
+      <table className="log-table">
+        <thead>
+          <tr>
+            <th scope="col">Exercise</th>
+            <th scope="col">Reps</th>
+            <th scope="col">Weight (lb)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={r.id}>
+              <th scope="row">{r.name}</th>
+              <td>
+                {r.timed ? (
+                  <span className="hint">timed</span>
+                ) : (
+                  <input
+                    type="number"
+                    min={0}
+                    max={500}
+                    aria-label={`Reps for ${r.name}`}
+                    value={r.reps}
+                    onChange={(e) => set(i, 'reps', e.target.value)}
+                  />
+                )}
+              </td>
+              <td>
+                <input
+                  type="number"
+                  min={0}
+                  max={1000}
+                  step={0.5}
+                  aria-label={`Weight for ${r.name}`}
+                  placeholder={r.weighted ? 'lb' : 'bodyweight'}
+                  disabled={!r.weighted}
+                  value={r.weighted ? r.weight : ''}
+                  onChange={(e) => set(i, 'weight', e.target.value)}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="day-notes-actions">
+        <button type="submit" className="btn-secondary btn-small" disabled={busy}>
+          {busy ? 'Saving…' : 'Save as done'}
+        </button>
+        <button type="button" className="btn-link" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
 const pad = (n: number) => String(n).padStart(2, '0')
 const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 const parse = (s: string) => new Date(`${s}T12:00:00`) // noon: safe from DST edges
@@ -75,7 +185,7 @@ function DayCard({
   cardio?: ReactNode // the cardio log for that date (on a strength day it doesn't tick the workout off)
   busy: boolean
   supportMessage: string | null
-  onChange: (id: number, change: { notes?: string | null; completed?: boolean }) => Promise<boolean>
+  onChange: (id: number, change: DayChange) => Promise<boolean>
   onBuild: (entry: CalendarEntry) => void
   onUsePlan: (entry: CalendarEntry) => void
   onCardio: (entry: CalendarEntry) => void
@@ -86,6 +196,7 @@ function DayCard({
     disabled: entry.completed || busy,
   })
   const [draft, setDraft] = useState(entry.notes ?? '')
+  const [logging, setLogging] = useState(false)
   const [saved, setSaved] = useState(false)
   const dirty = draft.trim() !== (entry.notes ?? '')
   const w = entry.workout
@@ -166,17 +277,36 @@ function DayCard({
       {entry.day_type === 'workout' ? (
         <>
           <p className="hint">
-            About {Math.round(w.est_minutes)} min{w.week && entry.source === 'generated' ? ` · Week ${w.week}` : ''}
+            About {Math.round(w.est_minutes)} min
+            {w.week && entry.source === 'generated' ? ` · Week ${w.week}` : ''}
+            {w.block_weeks && w.block_weeks > 1 && entry.source === 'generated'
+              ? ` (week ${w.week_in_block} of the ${w.block_weeks}-week pattern)`
+              : ''}
           </p>
+          {w.calibration_week && entry.source === 'generated' && !entry.completed && (
+            <p className="hint calibration-tag">Calibration week: the weights are just starting suggestions.</p>
+          )}
           <ul className="day-exercises">
-            {w.exercises.map((x) => (
-              <li key={x.exercise_id}>
-                <strong>{x.name}</strong>
-                <span>
-                  {x.sets} × {x.reps} · {MUSCLE_GROUP_LABELS[x.muscle_group] ?? x.muscle_group}
-                </span>
-              </li>
-            ))}
+            {w.exercises.map((x) => {
+              const info = entry.weights?.[x.exercise_id]
+              return (
+                <li key={x.exercise_id}>
+                  <strong>{x.name}</strong>
+                  <span>
+                    {x.reps_your_call ? `${x.sets} sets × your call` : `${x.sets} × ${x.reps}`} ·{' '}
+                    {MUSCLE_GROUP_LABELS[x.muscle_group] ?? x.muscle_group}
+                    {info?.logged_lb != null || info?.logged_reps != null ? (
+                      <>
+                        {' '}
+                        · did {info.logged_reps ?? '–'} reps{info.logged_lb != null ? ` at ${info.logged_lb} lb` : ''}
+                      </>
+                    ) : info?.weighted ? (
+                      <> · {info.suggested_lb != null ? `try ${info.suggested_lb} lb` : 'pick a weight'}</>
+                    ) : null}
+                  </span>
+                </li>
+              )
+            })}
           </ul>
           {w.notes?.map((note) => (
             <p key={note} className="hint day-builder-note">
@@ -186,12 +316,28 @@ function DayCard({
           <label className={`chip-check day-done-toggle${entry.completed ? ' chip-on' : ''}`}>
             <input
               type="checkbox"
-              checked={entry.completed}
+              checked={entry.completed || logging}
               disabled={busy || (!entry.completed && !entry.can_complete)}
-              onChange={(e) => onChange(entry.id, { completed: e.target.checked })}
+              onChange={(e) => {
+                if (!e.target.checked) {
+                  setLogging(false)
+                  if (entry.completed) onChange(entry.id, { completed: false })
+                } else if (w.exercises.length) setLogging(true) // log reps and weights first
+                else onChange(entry.id, { completed: true })
+              }}
             />
             {entry.completed ? 'Done!' : 'Mark done'}
           </label>
+          {logging && !entry.completed && (
+            <LogDayForm
+              entry={entry}
+              busy={busy}
+              onCancel={() => setLogging(false)}
+              onSave={async (log) => {
+                if (await onChange(entry.id, { completed: true, log })) setLogging(false)
+              }}
+            />
+          )}
           {!entry.completed && !entry.can_complete && <p className="hint">Tick it off on the day.</p>}
           {cardio}
         </>
@@ -441,7 +587,7 @@ function Calendar({ session }: { session: Session }) {
     useSensor(KeyboardSensor),
   )
 
-  async function change(id: number, body: { date?: string; notes?: string | null; completed?: boolean }) {
+  async function change(id: number, body: DayChange) {
     setBusyId(id)
     setError(null)
     try {

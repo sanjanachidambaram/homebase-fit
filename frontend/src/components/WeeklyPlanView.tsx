@@ -1,6 +1,7 @@
-// A generated weekly plan, day by day. Used by the Dashboard card and the "Your Personalized Plan" page.
+// A generated plan: the week structure, each week of the repeating pattern day by day, and how the weights go up.
+// Used by the Dashboard card and the "Your Personalized Plan" page. Built by code, never AI.
 import { useState } from 'react'
-import { MUSCLE_GROUP_LABELS, type WeeklyProgram } from '../api'
+import { MUSCLE_GROUP_LABELS, type PlanExercise, type WeeklyProgram } from '../api'
 import { useFavorites } from '../favorites'
 import { rationaleCredit } from '../injurySafety'
 import ExerciseDetail from './ExerciseDetail'
@@ -10,14 +11,65 @@ import ReviewInfo from './ReviewInfo'
 const DAY_NAMES: Record<string, string> = {
   mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday',
 }
-const SPLITS: Record<string, string> = {
-  full_body: 'Full body', circuit: 'Circuit', upper_lower: 'Upper / lower', push_pull_legs: 'Push / pull / legs',
-}
 const words = (s: string) => s.replace(/_/g, ' ')
+const lb = (n: number | null) => (n === null ? 'your pick' : `${n} lb`)
+
+function repsText(x: PlanExercise) {
+  return x.reps_your_call ? `${x.sets} sets × your call (about ${x.reps})` : `${x.sets} × ${x.reps}`
+}
+
+/** The weights table: suggested starting weights and how they climb, from the defaults (before anything is logged). */
+function WeightTable({ plan }: { plan: WeeklyProgram }) {
+  const w = plan.weights
+  if (!w) return null
+  return (
+    <section className="progression" aria-label="How the weights go up">
+      <h4>How the weights go up</h4>
+      <p>{w.rule}</p>
+      <p className="hint">{w.calibration}</p>
+      {w.schedule.length > 0 ? (
+        <div className="weight-table-wrap">
+          <table className="weight-table">
+            <thead>
+              <tr>
+                <th scope="col">Exercise</th>
+                {Array.from({ length: w.schedule_weeks }, (_, i) => (
+                  <th key={i} scope="col">
+                    Wk {i + 1}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {w.schedule.map((row) => (
+                <tr key={row.exercise_id}>
+                  <th scope="row">{row.name}</th>
+                  {Array.from({ length: w.schedule_weeks }, (_, i) => {
+                    const at = row.weeks.indexOf(i + 1)
+                    return <td key={i}>{at === -1 ? '·' : lb(row.weight_lb[at])}</td>
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="hint">This plan's exercises use your bodyweight or bands, so there are no weights to set.</p>
+      )}
+      <p className="hint">
+        {w.defaults_lb
+          ? `Starting suggestions for your level: ${w.defaults_lb.arms} lb for arm exercises, ${w.defaults_lb.legs} lb for leg exercises.`
+          : 'At your level we start with bodyweight only, so pick your own weights; once you log one, the suggestions build on it.'}{' '}
+        Every weight is a suggestion you can change.
+      </p>
+    </section>
+  )
+}
 
 export default function WeeklyPlanView({ plan, startOpen = true }: { plan: WeeklyProgram; startOpen?: boolean }) {
   const favorites = useFavorites()
   const [open, setOpen] = useState(startOpen)
+  const [week, setWeek] = useState(1)
   const [openId, setOpenId] = useState<string | null>(null)
 
   if (!plan.generated) {
@@ -32,22 +84,44 @@ export default function WeeklyPlanView({ plan, startOpen = true }: { plan: Weekl
     )
   }
   const p = plan.protocol!
+  const days = plan.weeks[week - 1]?.days ?? plan.days
+  // The real day lengths, not the protocol's target: strength days can run shorter than the circuits.
+  const minutes = days.filter((d) => d.exercises.length).map((d) => Math.round(d.est_minutes))
+  const [shortest, longest] = [Math.min(...minutes), Math.max(...minutes)]
 
   return (
     <div className="weekly-plan">
       <div className="chip-row">
+        <span className="chip">{plan.goal_label}</span>
         <span className="chip">{plan.training_days} days a week</span>
-        <span className="chip">{SPLITS[p.split_type] ?? words(p.split_type)}</span>
-        <span className="chip">~{p.session_length_minutes} min</span>
-        <span className="chip">
-          {p.sets_range} sets × {p.reps_range} reps
-        </span>
-        <span className="chip">{p.rest_seconds}s rest</span>
+        <span className="chip">repeats every {plan.block_weeks} weeks</span>
+        {minutes.length > 0 && (
+          <span className="chip">
+            {shortest === longest ? `about ${shortest}` : `${shortest} to ${longest}`} min a day
+          </span>
+        )}
+        <span className="chip">{p.rest_seconds}s rest between sets</span>
         {plan.safety?.checked_only && <span className="chip chip-safe">Injury-filtered</span>}
       </div>
 
-      <ol className="week-strip" aria-label="Your week">
-        {plan.days.map((d) => (
+      {plan.block_weeks > 1 && (
+        <div className="week-picker" role="group" aria-label="Week of the pattern">
+          {plan.weeks.map((w) => (
+            <button
+              key={w.week_in_block}
+              type="button"
+              className="day-choice-btn"
+              aria-pressed={week === w.week_in_block}
+              onClick={() => setWeek(w.week_in_block)}
+            >
+              Week {w.week_in_block}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <ol className="week-strip" aria-label={`Week ${week}`}>
+        {days.map((d) => (
           <li key={d.day} className={d.kind === 'training' ? 'strip-train' : 'strip-rest'}>
             <span className="strip-day">{DAY_NAMES[d.day].slice(0, 3)}</span>
             <span className="strip-kind">{d.kind === 'training' ? (d.focus ?? 'Train') : 'Rest'}</span>
@@ -61,7 +135,7 @@ export default function WeeklyPlanView({ plan, startOpen = true }: { plan: Weekl
 
       {open && (
         <div className="plan-days">
-          {plan.days
+          {days
             .filter((d) => d.kind === 'training')
             .map((d) => (
               <section key={d.day} className="plan-day">
@@ -80,7 +154,8 @@ export default function WeeklyPlanView({ plan, startOpen = true }: { plan: Weekl
                         </button>
                         <div className="session-meta">
                           <span className="chip chip-small">{MUSCLE_GROUP_LABELS[x.muscle_group]}</span>
-                          {x.sets} sets × {x.reps} · rest {x.rest_seconds}s
+                          {repsText(x)} · rest {x.rest_seconds}s
+                          {x.weighted && <> · start at {lb(x.default_weight_lb)}</>}
                         </div>
                         {x.injury_check === 'not_yet_checked' && (
                           <span className="review-tag">Not yet checked for injury safety</span>
@@ -92,10 +167,12 @@ export default function WeeklyPlanView({ plan, startOpen = true }: { plan: Weekl
               </section>
             ))}
           <p className="hint">
-            Rest days: {plan.days.filter((d) => d.kind === 'rest').map((d) => DAY_NAMES[d.day]).join(', ')}.
+            Rest days: {days.filter((d) => d.kind === 'rest').map((d) => DAY_NAMES[d.day]).join(', ')}.
           </p>
         </div>
       )}
+
+      <WeightTable plan={plan} />
 
       {!!plan.safety?.left_out_for_injury?.length && (
         <details className="left-out">
@@ -125,36 +202,16 @@ export default function WeeklyPlanView({ plan, startOpen = true }: { plan: Weekl
         </details>
       )}
 
-      {plan.progression && (
-        <section className={`progression${plan.progression.enabled ? '' : ' progression-paused'}`} aria-label="Progression">
-          <h4>{plan.progression.enabled ? 'How it builds over time' : 'Progression is paused'}</h4>
-          <p>{plan.progression.reason}</p>
-          <ol className="progression-weeks">
-            {plan.progression.schedule.map((w) => (
-              <li key={w.week}>
-                <span>Wk {w.week}</span>
-                <strong>
-                  {w.sets}×{w.reps}
-                </strong>
-              </li>
-            ))}
-          </ol>
-          <p className="hint">Sets × reps per exercise (holds: seconds = reps × 2). Rest and exercises stay the same.</p>
-        </section>
-      )}
-
       <div className="plan-footnotes">
         <ReviewInfo item={p} />
         <details>
           <summary>How we built this</summary>
           <ul>
-            <li>Goals: {plan.goals.map(words).join(', ')} ({words(plan.experience_level)})</li>
-            {p.blending_rules_applied.length > 0 && (
-              <li>Where your goals differ, we used the gentler setting: {p.blending_rules_applied.join('; ')}.</li>
-            )}
-            {p.progression_notes.map((n) => (
-              <li key={n}>Progressing: {n}</li>
-            ))}
+            <li>
+              Goal: {plan.goal_label} ({words(plan.experience_level)}): {p.sets_range} sets of {p.reps_range} reps on
+              strength days.
+            </li>
+            <li>{p.progression_note}</li>
             {plan.notes.map((n) => (
               <li key={n}>{n}</li>
             ))}

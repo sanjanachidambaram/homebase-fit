@@ -32,15 +32,13 @@ FIRST_NAME_MAX = 50
 
 # Quiz question id -> quiz_profiles column. The quiz file can change wording and
 # options freely, but these ids must stay (see content/quiz/quiz_questions.yaml).
+# (Rewritten 2026-10-25: one goal; timeline, days, session length, other activity, age, height and goal date are
+# no longer asked, and weight / goal weight only on the "Losing weight" path.)
 QUIZ_COLUMNS = {
-    "goals": "goals", "timeline": "timeline", "injuries": "injury_flags", "age": "age", "weight": "weight",
-    "height": "height", "experience_level": "experience_level", "days_available": "days_available",
-    "session_length": "session_length_minutes", "equipment": "equipment",
-    "other_activity_days": "other_activity_days", "other_activity_notes": "other_activity_notes",
-    "pregnancy_status": "pregnancy_status", "goal_weight": "goal_weight", "goal_date": "goal_date",
+    "goal": "goal", "experience_level": "experience_level", "equipment": "equipment", "injuries": "injury_flags",
+    "pregnancy_status": "pregnancy_status", "weight": "weight", "goal_weight": "goal_weight",
 }
-LIST_COLUMNS = {"goals", "injury_flags", "equipment"}
-INT_COLUMNS = {"age", "days_available", "session_length_minutes", "other_activity_days"}
+LIST_COLUMNS = {"injury_flags", "equipment"}
 TEXT_MAX = 500
 GOAL_DATE_MAX_YEARS = 5
 
@@ -110,7 +108,7 @@ def profile_dict(row: sqlite3.Row | None) -> dict | None:
     if row is None:
         return None
     p = dict(row)
-    for col in ("goals", "injury_flags", "equipment"):
+    for col in ("injury_flags", "equipment"):
         p[col] = json.loads(p[col])
     p["consent_accepted"] = bool(p["consent_accepted"])
     if "plan_swaps" in p:
@@ -179,9 +177,10 @@ def validate_answer(q: sqlite3.Row, value: Any) -> Any:
             if len(value) > 1:
                 raise HTTPException(422, f"'{qid}': '{exclusive}' can't be combined with other choices.")
             return []
-        return sorted(set(value))
+        always = settings.get("always_included")          # e.g. bodyweight: always on, even if unticked
+        return sorted(set(value) | ({always} if always else set()))
     if qtype == "single_select":
-        if value not in allowed:
+        if not isinstance(value, str) or value not in allowed:   # one choice: a list (or anything else) is refused
             raise HTTPException(422, f"'{qid}': choose one of {sorted(allowed)}.")
         return value
     if qtype == "number":
@@ -222,7 +221,10 @@ def save_quiz(user_id: int, body: QuizSubmission, uid: int = Depends(token_user_
     if unknown:
         raise HTTPException(422, f"Unknown question id(s): {sorted(unknown)}.")
     values: dict[str, Any] = {}
-    for qid, q in questions.items():
+    for qid, q in sorted(questions.items(), key=lambda kv: kv[1]["order_index"]):
+        ask_if = json.loads(q["settings"]).get("ask_if")
+        if ask_if and body.answers.get(ask_if["question"]) != ask_if["equals"]:
+            continue   # not asked for this answer (e.g. weight unless the goal is losing weight): never stored
         answer = body.answers.get(qid)
         if answer in (None, "", []):
             if q["required"]:
@@ -233,9 +235,6 @@ def save_quiz(user_id: int, body: QuizSubmission, uid: int = Depends(token_user_
 
     for col in LIST_COLUMNS:
         values[col] = json.dumps(values.get(col, []))
-    for col in INT_COLUMNS & values.keys():
-        values[col] = int(values[col])
-    values.setdefault("other_activity_days", 0)
 
     # Every quiz column is written on every save, so a retake clears answers that were left blank.
     row = {col: values.get(col) for col in QUIZ_COLUMNS.values()}

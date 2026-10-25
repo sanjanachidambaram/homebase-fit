@@ -39,17 +39,17 @@ def day(n: int) -> str:
     return (TODAY - timedelta(days=n)).isoformat()
 
 
-def make_user(username="private.person", first_name="Zenobia", goals=("weight_loss",), timeline="8_weeks", injuries=("lower_back",),
+def make_user(username="private.person", first_name="Zenobia", goal="lose_weight", injuries=("lower_back",),
               quiz_days_ago=20, notes="Dr. Smith said L4 disc issue") -> int:
     conn = connect()
     with conn:
         uid = conn.execute("INSERT INTO users (username, first_name, password_hash) VALUES (?, ?, 'x')", (username, first_name)).lastrowid
         stamp = (datetime.now(timezone.utc) - timedelta(days=quiz_days_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
         conn.execute(
-            "INSERT INTO quiz_profiles (user_id, goals, timeline, injury_flags, injury_notes, age, weight, height, "
+            "INSERT INTO quiz_profiles (user_id, goal, injury_flags, injury_notes, weight, "
             "consent_accepted, consent_accepted_at, consent_version, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, 34, 165, 66, 1, ?, 'v1', ?, ?)",
-            (uid, json.dumps(list(goals)), timeline, json.dumps(list(injuries)), notes, stamp, stamp, stamp))
+            "VALUES (?, ?, ?, ?, ?, 1, ?, 'v1', ?, ?)",
+            (uid, goal, json.dumps(list(injuries)), notes, 165 if goal == "lose_weight" else None, stamp, stamp, stamp))
     conn.close()
     return uid
 
@@ -126,9 +126,8 @@ def test_running_every_tool_leaves_the_database_unchanged(test_db):
 def test_profile_returns_only_the_allowed_fields(test_db):
     uid = make_user()
     p = call("get_user_profile", user_id=uid)
-    assert set(p) == {"found", "goals", "timeline", "injury_flags", "age", "weight_lb", "height_in"}
-    assert p["goals"] == ["weight_loss"] and p["injury_flags"] == ["lower_back"] and p["timeline"] == "8_weeks"
-    assert (p["age"], p["weight_lb"], p["height_in"]) == (34, 165, 66)
+    assert set(p) == {"found", "goal", "injury_flags"}                     # no weight: it never reaches a model
+    assert p["goal"] == "lose_weight" and p["injury_flags"] == ["lower_back"]
 
 
 def test_profile_matches_the_shared_pii_boundary_function(test_db):
@@ -328,20 +327,20 @@ def test_goal_check_insufficient_data(test_db):
 
 
 def test_goal_check_on_track_ahead_behind(test_db):
-    # on track: 8_weeks target is 3 a week; 9 sessions over a 20-day-old quiz is ~3.2 a week
-    ok = make_user("user_a", goals=("tone",), timeline="8_weeks", quiz_days_ago=20)
+    # on track: every plan targets 4 a week; 9 sessions over a 20-day-old quiz is ~3.2 a week (0.79 of target)
+    ok = make_user("user_a", goal="feel_good", quiz_days_ago=20)
     for d in (0, 2, 4, 6, 8, 10, 12, 14, 16):
         log(ok, d)
     r = call("check_goal_achievement", user_id=ok)
     assert r["status"] == "on_track" and r["checks"][0]["check"] == "consistency"
     assert r["checks"][1]["status"] == "not_measurable"
 
-    ahead = make_user("user_b", goals=("tone", "rehab"), timeline="8_weeks", quiz_days_ago=14)
+    ahead = make_user("user_b", goal="feel_good", quiz_days_ago=14)          # 12 in 2 weeks = 6 a week
     for d in range(12):
         log(ahead, d)
     assert call("check_goal_achievement", user_id=ahead)["status"] == "ahead"
 
-    behind = make_user("user_c", goals=("tone",), timeline="4_weeks", quiz_days_ago=20)
+    behind = make_user("user_c", goal="feel_good", quiz_days_ago=20)
     log(behind, 1)
     r = call("check_goal_achievement", user_id=behind)
     assert r["status"] == "behind" and r["thresholds_used"]["ahead_if_ratio_at_least"] == 1.25
@@ -349,27 +348,27 @@ def test_goal_check_on_track_ahead_behind(test_db):
 
 
 def test_goal_check_weight_loss_and_strength_signals(test_db):
-    gaining = make_user("user_d", goals=("weight_loss",), quiz_days_ago=25)
+    gaining = make_user("user_d", goal="lose_weight", quiz_days_ago=25)
     for d in range(0, 24, 2):
         log(gaining, d)
     weigh(gaining, 20, 160.0)
     weigh(gaining, 0, 163.0)
     r = call("check_goal_achievement", user_id=gaining)
-    assert r["status"] == "behind" and {"check": "weight_loss", "status": "behind"}.items() <= r["checks"][1].items()
+    assert r["status"] == "behind" and {"check": "lose_weight", "status": "behind"}.items() <= r["checks"][1].items()
 
-    losing = make_user("user_e", goals=("weight_loss",), quiz_days_ago=25)
+    losing = make_user("user_e", goal="lose_weight", quiz_days_ago=25)
     for d in range(0, 24, 2):
         log(losing, d)
     weigh(losing, 20, 163.0)
     weigh(losing, 0, 160.0)
     assert call("check_goal_achievement", user_id=losing)["checks"][1]["status"] == "on_track"
 
-    nodata = make_user("user_f", goals=("weight_loss",), quiz_days_ago=25)
+    nodata = make_user("user_f", goal="lose_weight", quiz_days_ago=25)
     log(nodata, 0)
     assert call("check_goal_achievement", user_id=nodata)["checks"][1]["status"] == "not_enough_data"
 
-    lifter = make_user("user_g", goals=("strength",), quiz_days_ago=25)
+    lifter = make_user("user_g", goal="stronger", quiz_days_ago=25)
     for d in range(0, 24, 2):
         log(lifter, d, weight=40 if d >= 15 else 10)       # lifts got lighter recently
     r = call("check_goal_achievement", user_id=lifter)
-    assert r["checks"][1]["check"] == "strength" and r["checks"][1]["status"] == "behind"
+    assert r["checks"][1]["check"] == "stronger" and r["checks"][1]["status"] == "behind"

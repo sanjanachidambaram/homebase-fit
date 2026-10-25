@@ -55,10 +55,10 @@ def build_throwaway_db(path: Path) -> int:
                      "WHERE id = ?", (TEST_EXERCISE,))
         uid = conn.execute("INSERT INTO users (username, first_name, password_hash) VALUES ('smoke.test', 'Smokey', 'x')").lastrowid
         conn.execute(
-            "INSERT INTO quiz_profiles (user_id, goals, timeline, injury_flags, injury_notes, age, weight, height, "
+            "INSERT INTO quiz_profiles (user_id, goal, injury_flags, injury_notes, weight, "
             "consent_accepted, consent_accepted_at, consent_version, created_at, updated_at) "
-            "VALUES (?, '[\"weight_loss\", \"strength\"]', '8_weeks', '[\"lower_back\"]', 'SMOKE-TEST-PRIVATE-NOTE', "
-            "34, 165, 66, 1, ?, 'smoke', ?, ?)", (uid, stamp, stamp, stamp))
+            "VALUES (?, 'lose_weight', '[\"lower_back\"]', 'SMOKE-TEST-PRIVATE-NOTE', "
+            "165, 1, ?, 'smoke', ?, ?)", (uid, stamp, stamp, stamp))
         for d in range(0, 18, 2):
             when = (today - timedelta(days=d)).date().isoformat()
             conn.execute("INSERT INTO workout_logs (user_id, date, exercise_id, sets, reps, weight_used) "
@@ -96,8 +96,7 @@ async def main() -> None:
         show("1. get_user_profile")
         p = (await c.call_tool("get_user_profile", {"user_id": uid})).data
         print("   ", json.dumps(p))
-        check(set(p) == {"found", "goals", "timeline", "injury_flags", "age", "weight_lb", "height_in"},
-              "only goals/timeline/injury_flags/age/weight/height returned")
+        check(set(p) == {"found", "goal", "injury_flags"}, "only the goal and injury flags returned (no weight)")
         check("SMOKE-TEST-PRIVATE-NOTE" not in json.dumps(p) and "smoke.test" not in json.dumps(p),
               "no email and no free-text injury note")
 

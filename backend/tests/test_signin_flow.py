@@ -68,13 +68,13 @@ def test_sign_up_quiz_plan_calendar_and_still_signed_in(client, pregnancy):
     cal = client.get("/api/calendar", headers=h).json()
     stored = rows("SELECT COUNT(*) AS n FROM calendar_entries WHERE user_id = ?", uid)[0]["n"]
     if pregnancy == "none":
-        assert plan["generated"] is True and plan["training_days"] == 3
+        assert plan["generated"] is True and plan["training_days"] == 4
         assert stored == 28 and cal["needs_clinical_review"] is False and cal["entries"]
     else:
         assert plan["generated"] is False and plan["needs_clinical_review"] is True
         assert stored == 0 and cal["needs_clinical_review"] is True and cal["entries"] == []
 
-    assert submit_quiz(client, uid, h, pregnancy_status=pregnancy, days_available=5).status_code == 200   # retake
+    assert submit_quiz(client, uid, h, pregnancy_status=pregnancy, goal="stronger").status_code == 200   # retake
     assert_signed_in(client, uid, h, username)
 
 
@@ -108,7 +108,7 @@ def test_running_the_seed_mid_session_keeps_the_user_signed_in(client, private_o
     assert_signed_in(client, uid, h, username)     # same token, same password
     for table, old in before.items():
         assert rows(f"SELECT * FROM {table} WHERE user_id = ? ORDER BY id", uid) == old, table
-    assert submit_quiz(client, uid, h, days_available=2).status_code == 200
+    assert submit_quiz(client, uid, h, experience_level="advanced").status_code == 200
 
 
 def test_wiping_users_is_now_explicit(client, private_original):
@@ -136,7 +136,7 @@ def test_quiz_save_survives_a_calendar_failure(client):
 
     # ...and once the calendar works again,
     me = assert_signed_in(client, uid, h, username)                          # the user is still signed in,
-    assert me["quiz_profile"]["goals"] == ["rehab", "weight_loss"]
+    assert me["quiz_profile"]["goal"] == "lose_weight"
     assert rows("SELECT COUNT(*) AS n FROM calendar_entries WHERE user_id = ?", uid) == [{"n": 28}]   # filled on visit
 
 

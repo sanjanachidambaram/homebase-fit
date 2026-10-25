@@ -1,4 +1,5 @@
-"""Progressive overload (and its safety rule), calendar population modes, and saving Build Your Own to the calendar.
+"""Weights on the calendar (the goal's repeating pattern, the week-1 calibration, each goal's rule for going up, and
+real reps and weights in the logs), calendar population modes, and saving Build Your Own to the calendar.
 
 Run from backend/:
     .venv\\Scripts\\python.exe -m pytest tests/test_progression_and_modes.py -v
@@ -11,94 +12,123 @@ import pytest
 
 from app import calendar
 from app.db import connect
-from app.services import program_generator as gen
-from app.services.program_generator import generate, progressed
 from tests.test_agents import rows, use_script  # noqa: F401  (fixture)
 from tests.test_calendar import MONDAY, account, by_date, d, get_days, on_day, patch, retake  # noqa: F401
 from tests.test_calendar_custom import CORE_SCRIPT
 
-PROFILE = {"goals": ["tone"], "experience_level": "intermediate", "days_available": 4, "session_length_minutes": 45,
-           "equipment": ["bodyweight", "mat", "resistance_band", "dumbbells"], "other_activity_days": 0,
-           "pregnancy_status": "none"}
-
-
-def set_started(uid, day):
-    conn = connect()
-    with conn:
-        conn.execute("UPDATE quiz_profiles SET plan_started_on = ? WHERE user_id = ?", (day.isoformat(), uid))
-    conn.close()
+STRONG = dict(goal="stronger", experience_level="intermediate", equipment=["dumbbells"], injuries=["none"])
 
 
 def workout_days(entries):
     return [e for e in entries if e["day_type"] == "workout"]
 
 
-# ================================================================ progressive overload
-
-def test_one_step_at_a_time_reps_then_sets_up_to_the_ceiling():
-    seq = [progressed((1, 2), (12, 15), k) for k in range(10)]
-    assert seq == [(1, 12), (1, 13), (1, 14), (1, 15), (2, 12), (2, 13), (2, 14), (2, 15), (2, 15), (2, 15)]
-    assert progressed((3, 3), (8, 8), 20) == (3, 8)                                # a fixed protocol never moves
+def weeks(client, h, n):
+    """Calendar entries for the first n weeks from MONDAY (topping the calendar up as 'today' moves on)."""
+    return get_days(client, h, MONDAY, MONDAY + timedelta(days=7 * n - 1))["entries"]
 
 
-def test_injured_and_rehab_profiles_do_not_progress_but_the_same_goal_without_injury_does(test_db):
-    healthy = generate({**PROFILE, "injury_flags": []}).progression
-    injured = generate({**PROFILE, "injury_flags": ["knee"]}).progression
-    rehab = generate({**PROFILE, "goals": ["tone", "rehab"], "injury_flags": []}).progression
-    assert healthy.enabled and healthy.every_weeks == 2
-    assert not injured.enabled and not rehab.enabled and injured.every_weeks is None
-    assert "paused" in injured.reason and "physical therapist" in injured.reason
-    h = [(w.sets, w.reps) for w in healthy.schedule]
-    assert len(set(h)) > 1 and h == sorted(h)                                      # climbs, never drops
-    for flat in (injured, rehab):
-        assert len({(w.sets, w.reps) for w in flat.schedule}) == 1                 # flat at the starting values
-    assert (injured.schedule[0].sets, injured.schedule[0].reps) == h[0]            # same goal, same starting point
-    # (tone + rehab blends in the gentler rehab protocol, so its own starting point is lower)
+def first_weighted(entry):
+    return next(x for x in entry["workout"]["exercises"] if entry["weights"][x["exercise_id"]]["weighted"])
 
 
-def test_progression_never_goes_past_the_protocols_own_ranges(test_db):
-    plan = generate({**PROFILE, "injury_flags": []})
-    s_hi, r_hi = int(plan.protocol.sets_range.split("-")[-1]), int(plan.protocol.reps_range.split("-")[-1])
-    for week in range(1, 105):
-        for day in plan.days:
-            for x in day.exercises:
-                e = gen.exercise_for_week(x.model_dump(), week, True)
-                reps = int(e["reps"].split("s")[0]) // 2 if "hold" in e["reps"] else int(e["reps"])
-                assert int(e["sets"]) <= s_hi and reps <= r_hi
+def same_exercise(entries, ex_id, after):
+    return [e for e in entries if e["date"] > after and ex_id in e["weights"]]
 
 
-def test_calendar_weeks_count_from_the_plans_start_and_only_sets_and_reps_change(client, on_day):
-    """Week numbers come from plan_started_on, including on a top-up weeks later. Exercises and rest never change."""
-    uid, h = account(client, "progress", goals=["tone"], injuries=["none"], experience_level="intermediate")
-    week1 = workout_days(get_days(client, h)["entries"])
-    assert {e["workout"]["week"] for e in week1} == {1, 2, 3, 4}
-    later = {e["date"]: e for e in week1}
-    first, wk3 = week1[0], next(e for e in week1 if e["workout"]["week"] == 3)
-    assert first["workout"]["progression_step"] == 0 and wk3["workout"]["progression_step"] == 1
-    same_day = [e for e in week1 if e["weekday"] == first["weekday"]]
-    a, b = same_day[0]["workout"]["exercises"], same_day[2]["workout"]["exercises"]   # week 1 vs week 3
-    assert [x["exercise_id"] for x in a] == [x["exercise_id"] for x in b]          # same exercises
-    assert [x["rest_seconds"] for x in a] == [x["rest_seconds"] for x in b]        # same rest
-    assert [(x["sets"], x["reps"]) for x in a] != [(x["sets"], x["reps"]) for x in b]   # a little more volume
+# ================================================================ the calendar follows the goal's pattern
 
-    on_day(MONDAY + timedelta(days=28))                                            # 4 weeks on: the calendar tops up
-    topped = workout_days(get_days(client, h, MONDAY + timedelta(days=28), MONDAY + timedelta(days=34))["entries"])
-    assert topped and {e["workout"]["week"] for e in topped} == {5}                # week 5, counted from the start
-    assert later  # (the first 4 weeks were laid out before)
+def test_getting_stronger_repeats_every_two_weeks_on_the_calendar(client, on_day):
+    uid, h = account(client, "pattern", **STRONG)
+    days = workout_days(weeks(client, h, 4))
+    by = {(e["workout"]["week"], e["weekday"]): e for e in days}
+    assert {e["workout"]["block_weeks"] for e in days} == {2}
+    for wd in ("mon", "wed", "fri", "sat"):
+        ids = lambda w: [x["exercise_id"] for x in by[(w, wd)]["workout"]["exercises"]]  # noqa: E731
+        assert ids(1) == ids(3) and ids(2) == ids(4)                    # week 1 = week 3, week 2 = week 4
+    assert by[(1, "mon")]["workout"]["focus"] == "Upper body" and by[(2, "mon")]["workout"]["focus"] == "Lower body"
+    assert by[(1, "mon")]["workout"]["calibration_week"] is True and by[(2, "mon")]["workout"]["calibration_week"] is False
 
 
-def test_an_injured_calendar_stays_flat_week_after_week(client, on_day):
-    uid, h = account(client, "flat")                                  # lower-back injury + rehab goal
-    entries = workout_days(get_days(client, h)["entries"])
-    on_day(MONDAY + timedelta(days=56))
-    entries += workout_days(get_days(client, h, MONDAY + timedelta(days=56), MONDAY + timedelta(days=62))["entries"])
-    assert max(e["workout"]["week"] for e in entries) == 9
-    assert {e["workout"]["progression_step"] for e in entries} == {0}
-    by_ex = {}
-    for e in entries:
-        for x in e["workout"]["exercises"]:
-            by_ex.setdefault(x["exercise_id"], set()).add((x["sets"], x["reps"]))
-    assert all(len(v) == 1 for v in by_ex.values())                               # nothing ever ramps up
+# ================================================================ weights: calibration, then the goal's rule
+
+def test_week_1_calibrates_and_later_suggestions_build_on_what_was_logged(client, on_day):
+    uid, h = account(client, "calibrate", **STRONG)
+    days = workout_days(weeks(client, h, 4))
+    mon1 = next(e for e in days if e["date"] == d(0))
+    ex = first_weighted(mon1)
+    assert mon1["weights"][ex["exercise_id"]]["suggested_lb"] == 10              # intermediate arms default
+    r = patch(client, h, mon1["id"], completed=True, log=[{"exercise_id": ex["exercise_id"], "reps": 9, "weight_lb": 15}])
+    assert r.status_code == 200, r.text
+    days = workout_days(weeks(client, h, 4))
+    mon1 = next(e for e in days if e["date"] == d(0))
+    assert (mon1["weights"][ex["exercise_id"]]["logged_reps"], mon1["weights"][ex["exercise_id"]]["logged_lb"]) == (9, 15)
+    mon3 = next(e for e in days if e["date"] == d(14))                           # the same day, 2 weeks later
+    assert mon3["weights"][ex["exercise_id"]]["suggested_lb"] == 17.5            # 15 logged + 2.5 lb (arms)
+
+
+def test_losing_weight_goes_up_5_lb_when_the_four_week_pattern_starts_again(client, on_day):
+    uid, h = account(client, "loser", goal="lose_weight", experience_level="intermediate", equipment=["dumbbells"],
+                     injuries=["none"])
+    on_day(MONDAY + timedelta(days=28))                                          # 4 weeks on: the calendar tops up
+    days = workout_days(weeks(client, h, 5))
+    on_day(MONDAY)
+    w1 = next(e for e in days if e["date"] == d(0))
+    w5 = next(e for e in days if e["date"] == (MONDAY + timedelta(days=28)).isoformat())
+    assert w1["workout"]["week_in_block"] == w5["workout"]["week_in_block"] == 1
+    ex = first_weighted(w1)
+    assert w1["weights"][ex["exercise_id"]]["suggested_lb"] == 10 and w5["weights"][ex["exercise_id"]]["suggested_lb"] == 15
+
+
+def test_feeling_good_never_raises_a_weight_by_itself(client, on_day):
+    uid, h = account(client, "steady", goal="feel_good", experience_level="intermediate", equipment=["dumbbells"],
+                     injuries=["none"])
+    on_day(MONDAY + timedelta(days=28))
+    days = workout_days(weeks(client, h, 8))
+    suggested = {i["suggested_lb"] for e in days for i in e["weights"].values() if i["weighted"]}
+    assert suggested and suggested <= {10, 20}                                    # only the defaults, ever
+
+
+def test_beginners_start_with_no_number_then_build_on_their_first_log(client, on_day):
+    uid, h = account(client, "newbie", goal="stronger", experience_level="beginner", equipment=["dumbbells"],
+                     injuries=["none"])
+    days = workout_days(weeks(client, h, 4))
+    mon1 = next(e for e in days if e["date"] == d(0))
+    ex = first_weighted(mon1)
+    assert mon1["weights"][ex["exercise_id"]]["suggested_lb"] is None            # bodyweight only: their pick
+    patch(client, h, mon1["id"], completed=True, log=[{"exercise_id": ex["exercise_id"], "reps": 10, "weight_lb": 8}])
+    mon3 = next(e for e in workout_days(weeks(client, h, 4)) if e["date"] == d(14))
+    assert mon3["weights"][ex["exercise_id"]]["suggested_lb"] == 10.5           # 8 + 2.5
+
+
+def test_injured_users_progress_by_their_goals_rule_too(client, on_day):
+    """Decision 2026-10-25 (shared_rules.md rule 8): weights go up for everyone; the injury filter still decides the
+    exercises."""
+    uid, h = account(client, "hurt", **{**STRONG, "injuries": ["knee"]})
+    days = workout_days(weeks(client, h, 4))
+    mon1, mon3 = (next(e for e in days if e["date"] == d(n)) for n in (0, 14))
+    ex = first_weighted(mon1)
+    assert mon3["weights"][ex["exercise_id"]]["suggested_lb"] == mon1["weights"][ex["exercise_id"]]["suggested_lb"] + 2.5
+
+
+def test_logging_stores_reps_and_only_real_weights(client, on_day):
+    uid, h = account(client, "logger", **STRONG)
+    mon1 = next(e for e in workout_days(weeks(client, h, 1)) if e["date"] == d(0))
+    body = next(x for x in mon1["workout"]["exercises"] if not mon1["weights"][x["exercise_id"]]["weighted"])
+    heavy = first_weighted(mon1)
+    assert patch(client, h, mon1["id"], completed=True,
+                 log=[{"exercise_id": "made_up", "reps": 5}]).status_code == 422          # not on this day
+    r = patch(client, h, mon1["id"], completed=True, log=[
+        {"exercise_id": body["exercise_id"], "reps": 12, "weight_lb": 99},                # bodyweight: weight ignored
+        {"exercise_id": heavy["exercise_id"], "reps": 8, "weight_lb": 12.5}])
+    assert r.status_code == 200
+    logged = {r["exercise_id"]: r for r in rows("SELECT exercise_id, reps, weight_used FROM workout_logs "
+                                                "WHERE calendar_entry_id = ?", mon1["id"])}
+    assert (logged[body["exercise_id"]]["reps"], logged[body["exercise_id"]]["weight_used"]) == (12, None)
+    assert (logged[heavy["exercise_id"]]["reps"], logged[heavy["exercise_id"]]["weight_used"]) == (8, 12.5)
+    assert len(logged) == len(mon1["workout"]["exercises"])                             # one row per exercise
+    patch(client, h, mon1["id"], completed=False)
+    assert rows("SELECT COUNT(*) AS n FROM workout_logs WHERE calendar_entry_id = ?", mon1["id"]) == [{"n": 0}]
 
 
 # ================================================================ calendar population modes
@@ -178,7 +208,7 @@ def test_save_a_built_workout_to_a_calendar_day(client, on_day, use_script):
     assert entry["planned"]["focus"] == wed["workout"]["focus"]                   # the plan is kept for revert
     assert rows("SELECT COUNT(*) AS n FROM agent_runs") == [{"n": 1}]             # saving spent no more tokens
 
-    retake(client, uid, h, days_available=5)
+    retake(client, uid, h, experience_level="intermediate")
     assert by_date(get_days(client, h))[d(2)]["source"] == "custom"               # survives a retake
     back = client.delete(f"/api/calendar/{wed['id']}/custom", headers=h).json()["entry"]
     assert back["source"] == "generated"                                          # and reverts

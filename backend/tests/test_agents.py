@@ -71,11 +71,11 @@ def mcp_calls(monkeypatch):
     return calls
 
 
-def account(client, username, injuries=("lower_back",), goals=None) -> tuple[int, dict]:
+def account(client, username, injuries=("lower_back",), goal=None) -> tuple[int, dict]:
     r = client.post("/api/users", json={"username": username, "first_name": "Tester", "password": "correct horse 1"})
     uid, token = r.json()["user_id"], r.json()["token"]
     h = {"Authorization": f"Bearer {token}"}
-    answers = quiz_answers(injuries=list(injuries) or ["none"], **({"goals": goals} if goals else {}))
+    answers = quiz_answers(injuries=list(injuries) or ["none"], **({"goal": goal} if goal else {}))
     assert client.put(f"/api/users/{uid}/quiz-profile", headers=h, json={
         "consent_accepted": True, "consent_version": "test", "answers": answers}).status_code == 200
     return uid, h
@@ -245,7 +245,7 @@ def test_no_agent_ever_sees_the_username_or_first_name(client, use_script, mcp_c
 
 def test_user_cannot_reach_another_users_data(client, use_script, mcp_calls):
     a, ha = account(client, "user_a", injuries=("lower_back",))
-    b, hb = account(client, "user_b", injuries=("knee",), goals=["strength"])
+    b, hb = account(client, "user_b", injuries=("knee",), goal="stronger")
     log_days(b, range(12), weight=50)        # B has an 12-day streak and real lifting; A has nothing
 
     # 1. Request bodies can't carry a user_id.

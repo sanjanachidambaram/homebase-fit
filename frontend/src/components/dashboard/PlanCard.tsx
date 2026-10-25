@@ -39,8 +39,7 @@ export default function PlanCard({ token, userId }: { token: string; userId: num
       {!rec && !loading && (
         <>
           <p>
-            Your week, built from your quiz: your goals, the days and time you have, your equipment, and any injuries,
-            with the gentler setting wherever your goals differ.
+            Your weeks, built from your quiz: your goal, your experience, your equipment, and any injuries.
           </p>
           <button type="button" className="btn btn-big" onClick={build}>
             Build my plan

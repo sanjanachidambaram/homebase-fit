@@ -152,7 +152,7 @@ def test_a_done_strength_day_shows_the_reviewers_per_session_range(client, on_da
     assert workout["calories"] is None                                          # not done yet: no number
     patch(client, h, workout["id"], completed=True)
     day = days(client, h)[workout["date"]]
-    want = estimate(workout["workout"]["est_minutes"], 165, None, [], None)["per_session_kcal"]
+    want = estimate(workout["workout"]["est_minutes"], 165, None, None)["per_session_kcal"]
     assert {k: day["calories"][k] for k in ("low", "high")} == want             # the exact same calculation
 
 
@@ -180,7 +180,7 @@ def test_pregnant_users_get_no_day_choices(client, on_day):
 
 def test_the_progress_marker_only_adds_up_numbers_the_code_already_computed(client, on_day, use_script):
     script = use_script(("final", {"encouragement": "x", "fun_fact_comparison": None}))
-    uid, h = account(client, "progress")                                       # goals: weight_loss + rehab
+    uid, h = account(client, "progress")                                       # goal: losing weight, 165 lb
     cal = days(client, h)
     week = [e for e in cal.values() if e["date"] <= d(6)]
     workout = next(e for e in week if e["day_type"] == "workout" and e["date"] <= d(1))
@@ -192,7 +192,7 @@ def test_the_progress_marker_only_adds_up_numbers_the_code_already_computed(clie
     assert p["available"] and p["computed_by"] == "code" and p["agent_called"] is False and script.calls == 0
     items = {i["kind"]: i for i in p["items"]}
 
-    strength = estimate(workout["workout"]["est_minutes"], 165, None, [], None)["per_session_kcal"]
+    strength = estimate(workout["workout"]["est_minutes"], 165, None, None)["per_session_kcal"]
     done = {"low": strength["low"] + 110, "high": strength["high"] + 210}       # + the 30-minute walk
     assert items["energy"]["value"]["kcal"] == done
     planned = [e for e in week if e["day_type"] in ("workout", "cardio")] + [rest]
@@ -200,7 +200,7 @@ def test_the_progress_marker_only_adds_up_numbers_the_code_already_computed(clie
 
     # pounds: the done days plus the rest of this week's planned workouts, / 3,500, rounded outward
     later = [e for e in week if e["day_type"] == "workout" and e["id"] != workout["id"] and e["date"] >= d(0)]
-    rest_of_week = [estimate(e["workout"]["est_minutes"], 165, None, [], None)["per_session_kcal"] for e in later]
+    rest_of_week = [estimate(e["workout"]["est_minutes"], 165, None, None)["per_session_kcal"] for e in later]
     total = {"low": done["low"] + sum(k["low"] for k in rest_of_week),
              "high": done["high"] + sum(k["high"] for k in rest_of_week)}
     wc = items["weight_change"]["value"]
@@ -212,9 +212,12 @@ def test_the_progress_marker_only_adds_up_numbers_the_code_already_computed(clie
         assert not any(w in item["text"].lower() for w in ("diet", "eat", "food", "fat", "body", "skinny"))
 
 
-def test_no_weight_change_line_without_a_weight_loss_goal(client, on_day):
-    uid, h = account(client, "strongonly", goals=["strength"], injuries=["none"])
+def test_other_goals_get_no_calorie_or_pound_lines(client, on_day):
+    """Weight is only asked when the goal is losing weight, so other goals have no weight to do calorie math with: the
+    marker shows the days done and minutes, never a calorie or pound figure (and the done day has no calorie chip)."""
+    uid, h = account(client, "strongonly", goal="stronger", injuries=["none"])
     workout = next(e for e in days(client, h).values() if e["day_type"] == "workout" and e["date"] <= d(1))
     patch(client, h, workout["id"], completed=True)
     kinds = {i["kind"] for i in client.get("/api/calendar/progress", headers=h).json()["items"]}
-    assert "energy" in kinds and "weight_change" not in kinds
+    assert "sessions" in kinds and not kinds & {"energy", "weight_change"}
+    assert days(client, h)[workout["date"]]["calories"] is None

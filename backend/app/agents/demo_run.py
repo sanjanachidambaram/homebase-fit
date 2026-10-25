@@ -47,10 +47,9 @@ def main() -> None:
         h = {"Authorization": f"Bearer {token}"}
         client.put(f"/api/users/{uid}/quiz-profile", headers=h, json={
             "consent_accepted": True, "consent_version": "2026-10-22",
-            "answers": {"goals": ["weight_loss", "rehab"], "timeline": "8_weeks", "experience_level": "beginner",
-                        "days_available": 4, "session_length": "30", "equipment": ["bodyweight", "mat", "resistance_band"],
-                        "other_activity_days": 0, "injuries": ["lower_back"], "pregnancy_status": "none",
-                        "age": 34, "weight": 165, "height": 66}})
+            "answers": {"goal": "lose_weight", "experience_level": "beginner",
+                        "equipment": ["bodyweight", "mat", "resistance_band"], "injuries": ["lower_back"],
+                        "pregnancy_status": "none", "weight": 165, "goal_weight": 155}})
         today = datetime.now(timezone.utc).date()
         conn = connect()
         with conn:
@@ -64,7 +63,7 @@ def main() -> None:
                 conn.execute("INSERT INTO measurements (user_id, date, body_weight) VALUES (?, ?, ?)",
                              (uid, (today - timedelta(days=d)).isoformat(), w))
         conn.close()
-        print(f"Demo user {uid} ({username}): goals weight_loss + rehab, injury lower_back, 11-day streak.\n")
+        print(f"Demo user {uid} ({username}): goal lose_weight, injury lower_back, 11-day streak.\n")
 
         for label, method, route, body in CALLS:
             started = time.perf_counter()

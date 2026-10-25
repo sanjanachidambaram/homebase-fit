@@ -56,7 +56,8 @@ function PlanPreview({ example }: { example: PlanExample | null }) {
         ))}
       </ol>
       <p className="preview-caption">
-        Built live just now for a {profile.age}-year-old {words(profile.experience_level)} with a{' '}
+        Built live just now for a {words(profile.experience_level)} whose goal is{' '}
+        {profile.goal === 'feel_good' ? 'just feeling good' : words(profile.goal)}, with a{' '}
         {profile.injury_flags.map(words).join(' and ')} injury and {profile.equipment.map(words).join(', ')}.
       </p>
     </>

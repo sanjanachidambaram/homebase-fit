@@ -99,12 +99,12 @@ def test_coverage_mostly_pulling_balanced_and_no_upper_body(test_db):
 
 def test_estimate_matches_hand_calculation_for_weight_loss():
     # 165 lb = 74.84 kg; 30 min = 0.5 h.  3.5 x 74.84 x 0.5 = 130.97 -> 130 (down to 5)
-    # 7.5 x 74.84 x 0.5 = 280.66 -> 285 (up to 5).  x 4 days = 520 to 1140 a week.
-    # 8 weeks: 520 x 8 / 3500 = 1.19 -> 1.1 lb (down);  1140 x 8 / 3500 = 2.61 -> 2.7 lb (up)
-    e = wr.estimate(30, 165, 4, ["weight_loss", "rehab"], "8_weeks")
+    # 7.5 x 74.84 x 0.5 = 280.66 -> 285 (up to 5).  x the plan's 4 days = 520 to 1140 a week.
+    # The next 4 weeks: 520 x 4 / 3500 = 0.59 -> 0.5 lb (down);  1140 x 4 / 3500 = 1.30 -> 1.4 lb (up)
+    e = wr.estimate(30, 165, 4, "lose_weight")
     assert e["per_session_kcal"] == {"low": 130, "high": 285}
     assert e["weekly_kcal"] == {"low": 520, "high": 1140}
-    assert e["weight_change"]["weeks"] == 8 and e["weight_change"]["pounds"] == {"low": 1.1, "high": 2.7}
+    assert e["weight_change"]["weeks"] == 4 and e["weight_change"]["pounds"] == {"low": 0.5, "high": 1.4}
     assert "not a precise prediction" in e["weight_change"]["label"]
     assert wr.CAVEAT_POUNDS in e["caveats"] and wr.CAVEAT_DIET in e["caveats"]
     assert "small piece of weight change compared with eating" in wr.CAVEAT_DIET
@@ -115,19 +115,20 @@ def test_estimate_matches_hand_calculation_for_weight_loss():
 
 def test_estimate_without_a_weight_loss_goal_has_no_pounds():
     # 200 lb = 90.72 kg; 45 min = 0.75 h.  3.5 x 90.72 x 0.75 = 238.1 -> 235;  7.5 x 90.72 x 0.75 = 510.3 -> 515
-    e = wr.estimate(45, 200, 3, ["strength"], None)
-    assert e["per_session_kcal"] == {"low": 235, "high": 515} and e["weekly_kcal"] == {"low": 705, "high": 1545}
+    e = wr.estimate(45, 200, 4, "stronger")
+    assert e["per_session_kcal"] == {"low": 235, "high": 515} and e["weekly_kcal"] == {"low": 940, "high": 2060}
     assert e["weight_change"] is None and e["sources"] == ["compendium-physical-activities"]
     assert wr.CAVEAT_POUNDS not in e["caveats"]
 
 
 def test_estimate_is_always_a_range_and_never_invents_a_weight():
     for minutes, lb in ((5, 100), (20, 130), (60, 250), (90, 180)):
-        e = wr.estimate(minutes, lb, 5, ["weight_loss"], "no_deadline")
+        e = wr.estimate(minutes, lb, 4, "lose_weight")
         k, p = e["per_session_kcal"], e["weight_change"]["pounds"]
         assert k["low"] < k["high"] and k["low"] % 5 == 0 and k["high"] % 5 == 0
-        assert p["low"] < p["high"] and e["weight_change"]["weeks"] == 4         # no deadline: next 4 weeks
-    assert wr.estimate(30, None, 4, ["weight_loss"], "8_weeks")["available"] is False
+        assert p["low"] < p["high"] and e["weight_change"]["weeks"] == 4         # always the next 4 weeks
+    none = wr.estimate(30, None, 4, "stronger")       # weight is only asked when the goal is losing weight
+    assert none == {"available": False, "reason": wr.NO_WEIGHT_REASON} and "losing weight" in none["reason"]
 
 
 # ================================================================ 3. the model narrates; it can't invent a number
@@ -180,7 +181,7 @@ def test_review_route_returns_coverage_estimate_and_citations(client, narrator):
     res = r["result"]
     assert [e["name"] for e in res["exercises"]] == ["Dead Bug", "Incline Push-Up", "Bodyweight Squat"]
     assert res["coverage"]["groups_missing"] == ["back", "chest", "shoulders"]
-    assert res["estimate"]["available"] and res["estimate"]["weight_change"]["weeks"] == 8
+    assert res["estimate"]["available"] and res["estimate"]["weight_change"]["weeks"] == 4
     assert {c["id"] for c in res["citations"]} == {"compendium-physical-activities", "cdc-losing-weight"}
     assert all(c["url"].startswith("https://") for c in res["citations"])
     assert rows("SELECT agent_name, route, user_id, status FROM agent_runs") == [
@@ -240,10 +241,10 @@ def test_the_model_never_sees_who_the_user_is(client, narrator):
     from tests.helpers import quiz_answers
     client.put(f"/api/users/{r['user_id']}/quiz-profile", headers=h, json={
         "consent_accepted": True, "consent_version": "t", "injury_notes": "PRIVATE-INJURY-NOTE from Dr. Smith",
-        "answers": quiz_answers(weight=173, other_activity_notes="PRIVATE-ACTIVITY-NOTE")})
+        "answers": quiz_answers(weight=173, goal_weight=158.5)})
     review_api(client, h)
     sent = " ".join(n.seen)
-    for secret in (username, "very.private", first_name, "PRIVATE-INJURY-NOTE", "Dr. Smith", "PRIVATE-ACTIVITY-NOTE",
-                   '"user_id"', '"weight_lb"', '"weight":', "173"):
+    for secret in (username, "very.private", first_name, "PRIVATE-INJURY-NOTE", "Dr. Smith",
+                   '"user_id"', '"weight_lb"', '"weight":', "173", "158.5", "goal_weight"):
         assert secret not in sent, secret
     assert "per_session_kcal" in sent                                              # it did get the computed review

@@ -1,7 +1,9 @@
-// Onboarding quiz: account -> general questions -> REQUIRED medical disclaimer
-// acknowledgment -> health/injury questions -> submit.
-// Health questions (health: true in quiz_questions.yaml) stay hidden until the
-// disclaimer is accepted, and the API rejects any submission without consent.
+// Onboarding quiz: account -> general questions (goal, experience, equipment) -> REQUIRED medical disclaimer
+// acknowledgment -> health questions (injuries, pregnancy; weight and goal weight only if the goal is losing weight)
+// -> review your answers -> submit.
+// Health questions (health: true in quiz_questions.yaml) stay hidden until the disclaimer is accepted, and the API
+// rejects any submission without consent. Questions with ask_if are only shown (and only sent) when that answer
+// matches; the API ignores them otherwise too.
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { fetchQuizQuestions, isSignInGone, submitQuiz, type QuizProfile, type QuizQuestion } from '../api'
 import AccountForm from '../components/AccountForm'
@@ -13,7 +15,7 @@ import { navigate } from '../router'
 import { setSession, useSession } from '../session'
 
 type Answer = string | number | string[] | ''
-type Step = 'general' | 'consent' | 'health' | 'done'
+type Step = 'general' | 'consent' | 'health' | 'review' | 'done'
 
 function isAnswered(q: QuizQuestion, value: Answer | undefined): boolean {
   if (q.type === 'multi_select') return Array.isArray(value) && value.length > 0
@@ -21,57 +23,17 @@ function isAnswered(q: QuizQuestion, value: Answer | undefined): boolean {
   return value !== undefined && value !== ''
 }
 
-/** 70 -> "5 ft 10 in" */
-const feetInches = (inches: number) => `${Math.floor(inches / 12)} ft ${inches % 12} in`
-
 function rangeError(q: QuizQuestion, value: Answer | undefined): string | null {
   if (q.type !== 'number' || typeof value !== 'number') return null
   if ((q.min !== undefined && value < q.min) || (q.max !== undefined && value > q.max)) {
-    const show = (n: number | undefined) => (n !== undefined && q.input === 'feet_inches' ? feetInches(n) : n)
-    return `"${q.prompt}" must be between ${show(q.min)} and ${show(q.max)}.`
+    return `"${q.prompt}" must be between ${q.min} and ${q.max}.`
   }
   return null
 }
 
-/** Height in feet + inches. The answer stays total inches (what the API and the plan use). */
-function FeetInchesField({ q, value, onChange }: { q: QuizQuestion; value: Answer | undefined; onChange: (v: Answer) => void }) {
-  const total = typeof value === 'number' ? value : null
-  const [feet, setFeet] = useState(total === null ? '' : String(Math.floor(total / 12)))
-  const [inches, setInches] = useState(total === null ? '' : String(total % 12))
-  const update = (f: string, i: string) => {
-    setFeet(f)
-    setInches(i)
-    onChange(f === '' ? '' : Number(f) * 12 + (i === '' ? 0 : Number(i)))
-  }
-  return (
-    <fieldset className="question">
-      <legend>{q.prompt}</legend>
-      {q.help_text && <span className="hint question-help">{q.help_text}</span>}
-      <span className="number-row">
-        <input
-          type="number"
-          aria-label="Feet"
-          className="short"
-          min={Math.floor((q.min ?? 0) / 12)}
-          max={Math.floor((q.max ?? 120) / 12)}
-          value={feet}
-          onChange={(e) => update(e.target.value, inches)}
-        />
-        <span className="unit">ft</span>
-        <input
-          type="number"
-          aria-label="Inches"
-          className="short"
-          min={0}
-          max={11}
-          value={inches}
-          onChange={(e) => update(feet, e.target.value)}
-        />
-        <span className="unit">in</span>
-      </span>
-    </fieldset>
-  )
-}
+/** Is this question asked, given the answers so far? (ask_if: e.g. weight only when the goal is losing weight) */
+const asked = (q: QuizQuestion, answers: Record<string, Answer>) =>
+  !q.ask_if || answers[q.ask_if.question] === q.ask_if.equals
 
 function OptionLabel({ label, description }: { label: string; description?: string }) {
   return (
@@ -82,20 +44,22 @@ function OptionLabel({ label, description }: { label: string; description?: stri
   )
 }
 
-/** Gentle, cited note (never a block) when a goal weight + date means losing faster than the guidance pace. */
-function WeightPaceNote({ questions, answers }: { questions: QuizQuestion[]; answers: Record<string, Answer> }) {
-  const [now] = useState(() => Date.now())   // read the clock once, not on every render
-  const note = questions.find((q) => q.rate_note)?.rate_note
-  const { weight, goal_weight: goal, goal_date: when } = answers
-  if (!note || typeof weight !== 'number' || typeof goal !== 'number' || typeof when !== 'string' || !when) return null
-  const weeks = (new Date(when).getTime() - now) / (7 * 24 * 3600 * 1000)
-  const perWeek = (weight - goal) / weeks
-  if (!(weeks > 0) || !(perWeek > note.max_lbs_per_week)) return null
+/** A gentle, cited note (never a block): roughly how long the change takes at a gradual 1-2 lb a week. */
+function PaceNote({ q, answers }: { q: QuizQuestion; answers: Record<string, Answer> }) {
+  const note = q.pace_note
+  const { weight, goal_weight: goal } = answers
+  if (!note || typeof weight !== 'number' || typeof goal !== 'number' || !(weight > goal)) return null
+  const [slow, fast] = note.lbs_per_week
+  const change = weight - goal
   const [label, url] = note.source.split(/:\s(?=https?:)/)
   return (
     <div className="pace-note" role="note">
       <p>
-        <strong>That works out to about {perWeek.toFixed(1)} lb a week.</strong> {note.text}
+        <strong>
+          That's {change} lb: at a gradual {slow} to {fast} lb a week, roughly {Math.ceil(change / fast)} to{' '}
+          {Math.ceil(change / slow)} weeks.
+        </strong>{' '}
+        {note.text} There's no deadline; go at whatever pace works for you.
       </p>
       <p className="hint">
         Source:{' '}
@@ -120,9 +84,7 @@ function QuestionField({
   value: Answer | undefined
   onChange: (v: Answer) => void
 }) {
-  const [tomorrow] = useState(() => new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 10))
   const help = q.help_text && <span className="hint question-help">{q.help_text}</span>
-  if (q.type === 'number' && q.input === 'feet_inches') return <FeetInchesField q={q} value={value} onChange={onChange} />
   if (q.type === 'multi_select') {
     const selected = Array.isArray(value) ? value : []
     const toggle = (v: string, checked: boolean) => {
@@ -134,16 +96,20 @@ function QuestionField({
       <fieldset className="question">
         <legend>{q.prompt}</legend>
         {help}
-        {q.options.map((o) => (
-          <label key={o.value} className="choice">
-            <input
-              type="checkbox"
-              checked={selected.includes(o.value)}
-              onChange={(e) => toggle(o.value, e.target.checked)}
-            />
-            <OptionLabel label={o.label} description={o.description} />
-          </label>
-        ))}
+        {q.options.map((o) => {
+          const always = o.value === q.always_included // e.g. bodyweight: always on
+          return (
+            <label key={o.value} className="choice">
+              <input
+                type="checkbox"
+                checked={always || selected.includes(o.value)}
+                disabled={always}
+                onChange={(e) => toggle(o.value, e.target.checked)}
+              />
+              <OptionLabel label={o.label} description={o.description} />
+            </label>
+          )
+        })}
       </fieldset>
     )
   }
@@ -167,8 +133,8 @@ function QuestionField({
       {help}
       <span className="number-row">
         <input
-          type={q.type === 'number' ? 'number' : q.type === 'date' ? 'date' : 'text'}
-          min={q.type === 'date' ? tomorrow : q.min}
+          type={q.type === 'number' ? 'number' : 'text'}
+          min={q.min}
           max={q.max}
           maxLength={q.type === 'text' ? 500 : undefined}
           value={value === undefined ? '' : String(value)}
@@ -181,6 +147,18 @@ function QuestionField({
       </span>
     </label>
   )
+}
+
+/** The answer as the person would read it: option labels, not stored values. */
+function shown(q: QuizQuestion, value: Answer | undefined): string {
+  if (value === undefined || value === '' || (Array.isArray(value) && !value.length)) return 'Not answered'
+  const label = (v: string) => q.options.find((o) => o.value === v)?.label ?? v
+  if (Array.isArray(value)) {
+    const all = q.always_included && !value.includes(q.always_included) ? [q.always_included, ...value] : value
+    return all.map(label).join(', ')
+  }
+  if (q.type === 'single_select') return label(String(value))
+  return `${value}${q.unit ? ` ${q.unit}` : ''}`
 }
 
 export default function QuizPage() {
@@ -196,18 +174,26 @@ export default function QuizPage() {
 
   useEffect(() => {
     fetchQuizQuestions()
-      .then(setQuestions)
+      .then((qs) => {
+        setQuestions(qs)
+        // Always-included choices (bodyweight) start ticked.
+        setAnswers((a) => {
+          const next = { ...a }
+          for (const q of qs) if (q.always_included && next[q.id] === undefined) next[q.id] = [q.always_included]
+          return next
+        })
+      })
       .catch((e: Error) => setError(e.message))
   }, [])
 
   // Each step is a new screen on the same route, so the route-change scroll reset never fires: start every
-  // step at the top here (Next, Back, the disclaimer, and the thank-you screen after submitting).
+  // step at the top here (Next, Back, the disclaimer, the review screen, and the thank-you screen).
   useLayoutEffect(() => {
     window.scrollTo(0, 0)
   }, [step])
 
-  const general = questions.filter((q) => !q.health)
-  const health = questions.filter((q) => q.health)
+  const general = questions.filter((q) => !q.health && asked(q, answers))
+  const health = questions.filter((q) => q.health && asked(q, answers))
 
   function check(qs: QuizQuestion[]): boolean {
     for (const q of qs) {
@@ -235,7 +221,11 @@ export default function QuizPage() {
     if (!check([...general, ...health])) return
     setSaving(true)
     try {
-      const filled = Object.fromEntries(Object.entries(answers).filter(([, v]) => v !== '' && v !== undefined))
+      // Only the questions that were asked (e.g. no weight unless the goal is losing weight).
+      const visible = new Set([...general, ...health].map((q) => q.id))
+      const filled = Object.fromEntries(
+        Object.entries(answers).filter(([k, v]) => visible.has(k) && v !== '' && v !== undefined),
+      )
       const profile = await submitQuiz(session.userId, session.token, {
         consent_accepted: consent,
         consent_version: CONSENT_VERSION,
@@ -276,9 +266,10 @@ export default function QuizPage() {
       <h2 className="page-title">Your fitness quiz</h2>
       <p className="meta">Signed in as {session.username}</p>
       <ol className="steps">
-        <li className={step === 'general' ? 'current' : ''}>Goals</li>
+        <li className={step === 'general' ? 'current' : ''}>Goal</li>
         <li className={step === 'consent' ? 'current' : ''}>Disclaimer</li>
         <li className={step === 'health' ? 'current' : ''}>Health</li>
+        <li className={step === 'review' ? 'current' : ''}>Review</li>
         <li className={step === 'done' ? 'current' : ''}>Done</li>
       </ol>
 
@@ -288,7 +279,7 @@ export default function QuizPage() {
             <QuestionField key={q.id} q={q} value={answers[q.id]} onChange={set(q.id)} />
           ))}
           {error && <p className="error">{error}</p>}
-          <button className="btn" onClick={() => check(general) && setStep('consent')}>
+          <button className="btn" onClick={() => check(general) && setStep(consent ? 'health' : 'consent')}>
             Next
           </button>
         </div>
@@ -329,12 +320,56 @@ export default function QuizPage() {
                   <span className="hint">This stays in our database and is never sent to the AI model.</span>
                 </label>
               )}
-              {q.id === 'goal_date' && <WeightPaceNote questions={questions} answers={answers} />}
+              {q.pace_note && <PaceNote q={q} answers={answers} />}
             </div>
           ))}
           {error && <p className="error">{error}</p>}
           <div className="button-row">
             <button className="btn-secondary" onClick={() => setStep('consent')}>
+              Back
+            </button>
+            <button className="btn" onClick={() => check(health) && setStep('review')}>
+              Review my answers
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 'review' && consent && (
+        <div className="quiz-step quiz-review">
+          <h3>Review your answers</h3>
+          <p className="hint">Check everything before you submit. Change anything you like.</p>
+          {[
+            { label: 'Your goal and setup', qs: general, back: 'general' as Step },
+            { label: 'Health', qs: health, back: 'health' as Step },
+          ].map((group) => (
+            <section key={group.label} className="review-group" aria-label={group.label}>
+              <div className="review-group-head">
+                <h4>{group.label}</h4>
+                <button type="button" className="btn-ghost btn-small" onClick={() => setStep(group.back)}>
+                  Change
+                </button>
+              </div>
+              <dl>
+                {group.qs.map((q) => (
+                  <div key={q.id} className="review-row">
+                    <dt>{q.prompt}</dt>
+                    <dd>{shown(q, answers[q.id])}</dd>
+                  </div>
+                ))}
+                {group.back === 'health' && injuryNotes.trim() && (
+                  <div className="review-row">
+                    <dt>Anything else we should know?</dt>
+                    <dd>{injuryNotes.trim()}</dd>
+                  </div>
+                )}
+              </dl>
+            </section>
+          ))}
+          <p className="hint">Medical disclaimer: accepted.</p>
+          {error && <p className="error">{error}</p>}
+          <div className="button-row">
+            <button className="btn-secondary" onClick={() => setStep('health')}>
               Back
             </button>
             <button className="btn" disabled={!consent || saving} onClick={submit}>

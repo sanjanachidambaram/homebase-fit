@@ -20,6 +20,7 @@ are recomputed), and rows the new schema rejects (e.g. a favorite for an exercis
 content) are dropped and counted, never silently kept broken.
 """
 
+import json
 import sqlite3
 import sys
 
@@ -30,6 +31,30 @@ from app.db import connect, copy_db, stamp_working_db, table_counts
 # the new column is filled from the old one. 2026-10-23: sign-in moved from email to username, and existing
 # accounts keep their old email as their username, so nobody is locked out.
 RENAMED_COLUMNS = {"users": {"username": "email"}}
+
+
+def migrate_quiz_profile(row: dict) -> dict:
+    """2026-10-25 quiz rewrite: several goals -> one goal, and only the weight-loss path keeps a weight. Profiles saved
+    before it are carried over instead of dropped: weight_loss among the goals -> lose_weight; strength or tone ->
+    stronger; anything else (rehab, general health) -> feel_good. Weight and goal weight are kept only for lose_weight
+    (the new schema refuses them otherwise). Equipment keeps only answers the new quiz still offers, and bodyweight
+    is always included. Review-mode swaps are cleared (they belonged to the old plan). The removed answers (timeline,
+    days, session length, other activity, age, height, goal date) simply aren't copied."""
+    if "goal" in row or "goals" not in row:
+        return row
+    old = set(json.loads(row.get("goals") or "[]"))
+    goal = "lose_weight" if "weight_loss" in old else "stronger" if old & {"strength", "tone"} else "feel_good"
+    equipment = [e for e in json.loads(row.get("equipment") or "[]")
+                 if e in ("bodyweight", "dumbbells", "kettlebells", "resistance_band", "mat", "full_gym")]
+    out = {**row, "goal": goal, "equipment": json.dumps(sorted(set(equipment) | {"bodyweight"})),
+           "plan_swaps": "{}", "plan_reviewed": 0}
+    if goal != "lose_weight":
+        out["weight"] = out["goal_weight"] = None
+    return out
+
+
+# Per-table row migrations for rows saved under an older schema (applied before the column copy below).
+ROW_MIGRATIONS = {"quiz_profiles": migrate_quiz_profile}
 
 # Parents first, so ids line up. (app/users.py USER_DATA_TABLES lists the same tables for account deletion.)
 USER_TABLES = ("users", "quiz_profiles", "exercise_favorites", "measurements", "calendar_entries", "cardio_logs",
@@ -68,6 +93,8 @@ def _restore(keep_users: bool) -> dict:
             for table, rows in saved.items():
                 if not rows:
                     continue
+                if table in ROW_MIGRATIONS:
+                    rows = [ROW_MIGRATIONS[table](r) for r in rows]
                 renamed = {new: old for new, old in RENAMED_COLUMNS.get(table, {}).items()
                            if new not in rows[0] and old in rows[0]}
                 cols = [c for c in _insertable(conn, table) if c in rows[0] or c in renamed]

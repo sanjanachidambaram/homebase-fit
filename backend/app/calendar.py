@@ -16,8 +16,14 @@ Rules, all enforced here in code:
     and never for pregnant / postpartum users (403).
   * Moving a day onto a date that already has one swaps the two. A completed day can't be moved (its
     workout_logs rows are dated), and nothing can be swapped onto a completed day.
-  * Marking a workout day completed writes one workout_logs row per exercise (calendar_entry_id set), so the
-    Coach's streak / overtraining / goal checks read real logged days. Un-marking removes those rows. Rest days
+  * The plan repeats in a 2-, 4- or 8-week block (by goal). Each date's day comes from that week of the block
+    (plan_day_on), counted from quiz_profiles.plan_started_on.
+  * Marking a workout day completed writes one workout_logs row per exercise (calendar_entry_id set), with the reps
+    and weight the person actually did when they send them (weight only for exercises that use weights; blank, never
+    a made-up zero, for bodyweight ones), so the Coach's checks read real logged days. Un-marking removes those rows.
+  * Weight suggestions (weight_suggestions) are worked out live from those logs: the latest logged weight for the
+    exercise (week 1 is the calibration week), or the experience level's default, plus the goal's automatic
+    increases since then (program_generator.weight_steps). Always just a suggestion the person can change. Rest days
     can't be marked completed (that would count as a workout), and neither can days that haven't come yet.
   * Notes are the user's own words. They're always saved, and checked in code (app/agents/safety.py, the same
     red-flag check as the Basics Q&A) when they change. A match logs a safety_events row (source
@@ -49,8 +55,8 @@ from app.agents.safety import NOTE_SUPPORT_MESSAGE, log_safety_event, red_flags_
 from app.db import connect
 from app.safety_rules import CLINICAL_REVIEW_NO_AI, CLINICAL_REVIEW_PAGE, profile_needs_clinical_review
 from app.security import token_user_id
-from app.services.program_generator import (NoProfile, PlanDay, WeeklyProgram, exercise_for_week, generate_for_user,
-                                             progression_step)
+from app.services.program_generator import (WEIGHTED_EQUIPMENT, NoProfile, PlanDay, WeeklyProgram, default_weight,
+                                             generate_for_user, suggested_weight, variant_of, weight_steps)
 
 router = APIRouter(prefix="/api")
 
@@ -82,18 +88,39 @@ def plan_week(day: date, started: date) -> int:
     return max(1, (day - started).days // 7 + 1)
 
 
+def plan_day_on(plan: WeeklyProgram, on: date, started: date) -> PlanDay:
+    """The plan's day for a date: that weekday, in that week of the repeating block."""
+    week = plan.weeks[variant_of(plan_week(on, started), plan.block_weeks)]
+    return {d.day: d for d in week.days}[WEEKDAYS[on.weekday()]]
+
+
+def appears_in(plan: WeeklyProgram) -> dict[str, list[int]]:
+    """Which weeks of the block (0-based) each exercise is on: weight increases count the times its day comes round."""
+    out: dict[str, set[int]] = {}
+    for w in plan.weeks:
+        for d in w.days:
+            for x in d.exercises:
+                out.setdefault(x.exercise_id, set()).add(w.week_in_block - 1)
+    return {k: sorted(v) for k, v in out.items()}
+
+
 def snapshot(plan: WeeklyProgram, day: PlanDay, on: date | None = None, started: date | None = None) -> dict:
-    """What the day widget shows, frozen at creation so later generator changes can't rewrite it. With a date, the
-    sets and reps are that week's (progressive overload; flat for injured / rehab profiles)."""
-    enabled = bool(plan.progression and plan.progression.enabled)
+    """What the day widget shows, frozen at creation so later generator changes can't rewrite it. Weights aren't
+    frozen: they're suggested live from what's been logged (weight_suggestions), so each exercise carries what that
+    needs (weighted, load, default, and the weeks of the block it's on)."""
     week = plan_week(on, started) if on and started else 1
+    weeks_on = appears_in(plan)
     return {
         "plan_day": day.day,
         "focus": day.focus,
+        "category": day.category,
         "est_minutes": round(day.est_minutes, 1),
-        "exercises": [exercise_for_week(e.model_dump(), week, enabled) for e in day.exercises],
+        "exercises": [{**e.model_dump(), "appears_in_weeks": weeks_on.get(e.exercise_id, [])} for e in day.exercises],
         "week": week,
-        "progression_step": progression_step(week, enabled),
+        "week_in_block": variant_of(week, plan.block_weeks) + 1 if plan.block_weeks else None,
+        "block_weeks": plan.block_weeks,
+        "goal": plan.goal,
+        "calibration_week": week == 1,
         "protocol_status": plan.protocol.status if plan.protocol else None,
         "review_notice": plan.protocol.review_notice if plan.protocol else None,
         "snapshot_at": now_utc(),
@@ -136,17 +163,17 @@ def _fill(conn: sqlite3.Connection, user_id: int, dates: list[date], plan: Weekl
     taken = {r[0] for r in conn.execute(
         "SELECT date FROM calendar_entries WHERE user_id = ? AND date BETWEEN ? AND ?",
         (user_id, min(dates).isoformat(), max(dates).isoformat()))}
-    by_weekday = {d.day: d for d in plan.days} if plan and plan.generated else {}
+    has_plan = bool(plan and plan.generated)
     created = 0
     for d in dates:
         if d.isoformat() in taken:
             continue   # a day the user completed, wrote on, or built: keep it exactly as it is
         if cfg["mode"] == "self":
             day_type, content = "rest", open_day(d)
-        elif cfg["review_pending"] or not by_weekday:   # waiting for the review, or no plan (pregnant/postpartum)
+        elif cfg["review_pending"] or not has_plan:   # waiting for the review, or no plan (pregnant/postpartum)
             continue
         else:
-            pd = by_weekday[WEEKDAYS[d.weekday()]]
+            pd = plan_day_on(plan, d, cfg["started"])
             day_type = "workout" if pd.kind == "training" else "rest"
             content = snapshot(plan, pd, d, cfg["started"])
         conn.execute("INSERT INTO calendar_entries (user_id, date, day_type, workout_content) VALUES (?, ?, ?, ?)",
@@ -229,7 +256,7 @@ def day_choice(r: sqlite3.Row) -> str:
     return "open" if content.get("open") else "plan"
 
 
-def entry_dict(r: sqlite3.Row, calories: dict | None = None) -> dict:
+def entry_dict(r: sqlite3.Row, calories: dict | None = None, weights: dict | None = None) -> dict:
     planned = json.loads(r["planned_content"]) if r["planned_content"] else None
     return {
         "id": r["id"],
@@ -245,7 +272,9 @@ def entry_dict(r: sqlite3.Row, calories: dict | None = None) -> dict:
         # What "Revert to planned workout" would bring back (only on custom days).
         "planned": {"day_type": planned["day_type"], "focus": planned["workout_content"].get("focus")} if planned else None,
         "choice": day_choice(r),   # the day-type selector's current pick
+        "weights": weights or {},
         "calories": calories,      # done days only: {"low", "high", "parts"} computed in code, or None
+        # {exercise_id: {"weighted", "suggested_lb", "logged_reps", "logged_lb"}}: the weight field for each exercise
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
     }
@@ -287,11 +316,63 @@ def get_calendar(
         rows = conn.execute("SELECT * FROM calendar_entries WHERE user_id = ? AND date BETWEEN ? AND ? ORDER BY date",
                             (uid, start.isoformat(), end.isoformat())).fetchall()
         weight = _weight(conn, uid)
+        weights = weight_suggestions(conn, uid, rows, cfg)
     finally:
         conn.close()
     cals = day_calories(rows, base["cardio"], weight)
     return {**base, "needs_quiz": not has_quiz, "needs_clinical_review": False,
-            "entries": [entry_dict(r, cals.get(r["date"])) for r in rows]}
+            "entries": [entry_dict(r, cals.get(r["date"]), weights.get(r["id"])) for r in rows]}
+
+
+# ---------------------------------------------------------------- weight suggestions (shared_rules.md rule 8)
+
+def weight_suggestions(conn: sqlite3.Connection, uid: int, rows: list[sqlite3.Row], cfg: dict | None) -> dict:
+    """{entry id: {exercise id: {"weighted", "suggested_lb", "logged_reps", "logged_lb"}}}.
+    suggested_lb = the anchor (the latest weight logged for that exercise before this day, or else the experience
+    level's default in week 1) plus the goal's automatic increases between the anchor's week and this day's week.
+    None means no suggestion (bodyweight, or a beginner who hasn't logged a weight yet). Done days show what was
+    logged instead."""
+    started = cfg["started"] if cfg else today()
+    profile = conn.execute("SELECT goal, experience_level FROM quiz_profiles WHERE user_id = ?", (uid,)).fetchone()
+    history: dict[str, list[tuple[str, float]]] = {}
+    for r in conn.execute("SELECT exercise_id, date, weight_used FROM workout_logs WHERE user_id = ? "
+                          "AND weight_used IS NOT NULL AND exercise_id IS NOT NULL ORDER BY date", (uid,)):
+        history.setdefault(r["exercise_id"], []).append((r["date"], r["weight_used"]))
+    done: dict[int, dict[str, sqlite3.Row]] = {}
+    ids = [r["id"] for r in rows]
+    if ids:
+        for r in conn.execute(f"SELECT calendar_entry_id, exercise_id, reps, weight_used FROM workout_logs "
+                              f"WHERE calendar_entry_id IN ({','.join('?' * len(ids))})", ids):
+            done.setdefault(r["calendar_entry_id"], {})[r["exercise_id"]] = r
+    all_ids = sorted({x.get("exercise_id") for r in rows for x in json.loads(r["workout_content"]).get("exercises", [])
+                      if x.get("exercise_id")})
+    weighted = weighted_ids(conn, all_ids)
+    out: dict[int, dict] = {}
+    for r in rows:
+        content = json.loads(r["workout_content"])
+        goal = content.get("goal") or (profile["goal"] if profile else None)
+        week = plan_week(date.fromisoformat(r["date"]), started)
+        per = {}
+        for x in content.get("exercises", []):
+            ex_id = x.get("exercise_id")
+            if not ex_id:
+                continue
+            info = {"weighted": ex_id in weighted, "suggested_lb": None, "logged_reps": None, "logged_lb": None}
+            if r["id"] in done and ex_id in done[r["id"]]:
+                info["logged_reps"], info["logged_lb"] = done[r["id"]][ex_id]["reps"], done[r["id"]][ex_id]["weight_used"]
+            if info["weighted"] and goal and x.get("load") and r["source"] == "generated":
+                before = [h for h in history.get(ex_id, []) if h[0] < r["date"]]
+                if before:
+                    anchor_lb, anchor_week = before[-1][1], plan_week(date.fromisoformat(before[-1][0]), started)
+                else:
+                    anchor_lb, anchor_week = default_weight(profile["experience_level"] if profile else "beginner",
+                                                            x["load"]), 1
+                steps = weight_steps(goal, content.get("block_weeks") or 1, set(x.get("appears_in_weeks") or []),
+                                     anchor_week, week)
+                info["suggested_lb"] = suggested_weight(goal, x["load"], anchor_lb, steps)
+            per[ex_id] = info
+        out[r["id"]] = per
+    return out
 
 
 @router.get("/calendar/progress")
@@ -316,7 +397,7 @@ def strength_kcal(content: dict, weight_lb: float | None) -> dict | None:
     minutes = float(content.get("est_minutes") or 0)
     if not minutes:
         return None
-    est = estimate(minutes, weight_lb, None, [], None)
+    est = estimate(minutes, weight_lb, None, None)
     return est["per_session_kcal"] if est["available"] else None
 
 
@@ -345,11 +426,19 @@ def day_calories(rows: list[sqlite3.Row], cardio_logs: list[dict], weight_lb: fl
 
 # ---------------------------------------------------------------- updating
 
+class LoggedExercise(BaseModel):
+    model_config = {"extra": "forbid"}
+    exercise_id: str = Field(max_length=100)
+    reps: int | None = Field(None, ge=0, le=500)            # what they did (for "your call" sets, their call)
+    weight_lb: float | None = Field(None, ge=0, le=1000)    # only for exercises that use weights; else leave out
+
+
 class CalendarUpdate(BaseModel):
     model_config = {"extra": "forbid"}   # no user_id, day_type or workout_content from the client
     date: Day | None = None
     notes: str | None = Field(None, max_length=NOTES_MAX)
     completed: bool | None = None
+    log: list[LoggedExercise] | None = Field(None, max_length=20)   # with completed=true: reps and weights done
 
 
 def first_int(text: str) -> int | None:
@@ -369,20 +458,38 @@ def prescribed(sets: str, reps: str) -> tuple[int | None, int | None, int | None
     return n_sets, first_int(str(reps)), None
 
 
-def log_rows(conn: sqlite3.Connection, uid: int, entry: sqlite3.Row) -> int:
-    """One workout_logs row per planned exercise. These record the plan's prescription (the low end of the
-    sets/reps range) as done; there's no weight, so the Coach's weight-lifted totals don't change.
-    The note is NOT copied."""
+def weighted_ids(conn: sqlite3.Connection, ids: list[str]) -> set[str]:
+    """Which of these exercises use weights (dumbbells, kettlebells, ...): only they get a weight field."""
+    if not ids:
+        return set()
+    rows = conn.execute(f"SELECT id, equipment_needed FROM exercises WHERE id IN ({','.join('?' * len(ids))})", ids)
+    return {r["id"] for r in rows if WEIGHTED_EQUIPMENT & set(json.loads(r["equipment_needed"]))}
+
+
+def log_rows(conn: sqlite3.Connection, uid: int, entry: sqlite3.Row, logged: list | None = None) -> int:
+    """One workout_logs row per planned exercise. Without `logged`, the plan's prescription (the low end of the
+    sets/reps range) with no weight. With it, the reps and weight the person actually did; weight is stored only for
+    exercises that use weights (bodyweight ones stay blank, never a made-up zero). The note is NOT copied."""
     content = json.loads(entry["workout_content"])
     known = {r[0] for r in conn.execute("SELECT id FROM exercises")}
+    done = {x.exercise_id: x for x in (logged or [])}
+    unknown = set(done) - {ex.get("exercise_id") for ex in content.get("exercises", [])}
+    if unknown:
+        raise HTTPException(422, f"Not on this day's plan: {sorted(unknown)}.")
+    weighted = weighted_ids(conn, [ex["exercise_id"] for ex in content.get("exercises", []) if ex.get("exercise_id")])
     n = 0
     for ex in content.get("exercises", []):
         sets, reps, seconds = prescribed(ex.get("sets", ""), ex.get("reps", ""))
+        weight = None
+        if ex.get("exercise_id") in done:
+            mine = done[ex["exercise_id"]]
+            reps = mine.reps if mine.reps is not None else reps
+            weight = mine.weight_lb if ex["exercise_id"] in weighted else None
         conn.execute(
-            "INSERT INTO workout_logs (user_id, date, exercise_id, plan_day, sets, reps, duration_seconds,"
-            " calendar_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO workout_logs (user_id, date, exercise_id, plan_day, sets, reps, weight_used, duration_seconds,"
+            " calendar_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (uid, entry["date"], ex["exercise_id"] if ex.get("exercise_id") in known else None,
-             content.get("plan_day"), sets, reps, seconds, entry["id"]))
+             content.get("plan_day"), sets, reps, weight, seconds, entry["id"]))
         n += 1
     return n
 
@@ -443,7 +550,7 @@ def update_entry(entry_id: int, body: CalendarUpdate, uid: int = Depends(signed_
                         raise HTTPException(422, "Rest days don't get marked done. Resting is the point!")
                     if not can_complete(current["day_type"], current["date"]):
                         raise HTTPException(422, "You can mark a workout done on its day, not before.")
-                    logged = log_rows(conn, uid, current)
+                    logged = log_rows(conn, uid, current, body.log)
                 else:
                     removed = conn.execute("DELETE FROM workout_logs WHERE calendar_entry_id = ? AND user_id = ?",
                                            (entry_id, uid)).rowcount
@@ -618,7 +725,7 @@ def use_plan(entry_id: int, uid: int = Depends(signed_in)) -> dict:
         if not plan.generated:
             raise HTTPException(409, plan.blocked_reason or "There's no generated plan to use.")
         day = date.fromisoformat(entry["date"])
-        pd = {d.day: d for d in plan.days}[WEEKDAYS[day.weekday()]]
+        pd = plan_day_on(plan, day, cfg["started"] if cfg else today())
         day_type = "workout" if pd.kind == "training" else "rest"
         content = snapshot(plan, pd, day, cfg["started"] if cfg else None)
     conn = connect()

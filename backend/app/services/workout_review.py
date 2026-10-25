@@ -8,9 +8,10 @@
      kcal = MET x body weight (kg) x hours. Low end: code 02054, resistance training, multiple exercises, 8-15
      reps (3.5 METs). High end: code 02020, vigorous calisthenics such as push-ups and burpees (7.5 METs; 02040,
      vigorous circuit training with minimal rest, is also 7.5). Where someone lands depends on how hard they work.
-   - Weekly: per session x the days a week they said they can train (quiz).
-   - Pounds, only for people with a weight-loss goal: weekly kcal x weeks / 3,500, labelled as the rough,
+   - Weekly: per session x the plan's training days (always 4 since the 2026-10-25 rewrite).
+   - Pounds, only for people whose goal is losing weight: weekly kcal x 4 weeks / 3,500, labelled as the rough,
      long-used approximation it is.
+   Weight is asked only on the losing-weight path, so other goals get no calorie numbers (no weight to use).
    Ranges are rounded outward (low down, high up) so they never look more precise than they are.
 """
 
@@ -33,8 +34,8 @@ MET_HIGH = {"met": 7.5, "code": "02020",
 KCAL_PER_KG_HOUR_PER_MET = 1.0          # Compendium: 1 MET is about 1.0 kcal/kg/h
 LB_TO_KG = 0.45359237
 KCAL_PER_POUND = 3500                  # the old rule of thumb; labelled as an approximation wherever it's used
-TIMELINE_WEEKS = {"4_weeks": 4, "8_weeks": 8, "12_weeks": 12, "16_weeks": 16}
-DEFAULT_WEEKS = 4                      # "no deadline": show the next 4 weeks
+WEEKS_SHOWN = 4                        # the pound estimate covers the next 4 weeks
+PLAN_DAYS_PER_WEEK = 4                 # every plan has 4 training days (app/services/program_generator.py)
 
 KCAL_ROUND_TO = 5
 POUNDS_ROUND_TO = 0.1
@@ -110,11 +111,13 @@ def coverage(exercises: list[dict]) -> dict:
 
 # ---------------------------------------------------------------- 2. outcome estimate
 
-def estimate(minutes: float, weight_lb: float | None, days_per_week: int | None, goals: list[str],
-             timeline: str | None) -> dict:
+NO_WEIGHT_REASON = ("We only ask for your weight when your goal is losing weight, so there's no calorie estimate "
+                    "for your plan.")
+
+
+def estimate(minutes: float, weight_lb: float | None, days_per_week: int | None, goal: str | None) -> dict:
     if not weight_lb:
-        return {"available": False,
-                "reason": "Add your weight in the quiz to see a calorie estimate (it's only used for this math)."}
+        return {"available": False, "reason": NO_WEIGHT_REASON}
     kg, hours = weight_lb * LB_TO_KG, minutes / 60
     low = _int(_down(MET_LOW["met"] * KCAL_PER_KG_HOUR_PER_MET * kg * hours, KCAL_ROUND_TO))
     high = _int(_up(MET_HIGH["met"] * KCAL_PER_KG_HOUR_PER_MET * kg * hours, KCAL_ROUND_TO))
@@ -134,8 +137,8 @@ def estimate(minutes: float, weight_lb: float | None, days_per_week: int | None,
     }
     if days_per_week:
         out["weekly_kcal"] = {"low": low * days_per_week, "high": high * days_per_week}
-    if days_per_week and "weight_loss" in goals:
-        weeks = TIMELINE_WEEKS.get(timeline or "", DEFAULT_WEEKS)
+    if days_per_week and goal == "lose_weight":
+        weeks = WEEKS_SHOWN
         w = out["weekly_kcal"]
         out["weight_change"] = {
             "weeks": weeks,
@@ -166,11 +169,11 @@ def review(user_id: int, items: list[dict]) -> dict:
         db = {r["id"]: dict(r) for r in conn.execute(
             f"SELECT id, name, muscle_group, force FROM exercises WHERE id IN ({','.join('?' for _ in ids)})", ids)}
         profile = conn.execute(
-            "SELECT weight, days_available, goals, timeline FROM quiz_profiles WHERE user_id = ?", (user_id,)).fetchone()
+            "SELECT weight, goal FROM quiz_profiles WHERE user_id = ?", (user_id,)).fetchone()
         exercises = [{"exercise_id": i, **{k: db[i][k] for k in ("name", "muscle_group", "force")}} for i in ids if i in db]
         minutes = sum(float(i["est_minutes"]) for i in items if i["exercise_id"] in db)
-        est = estimate(minutes, profile["weight"] if profile else None, profile["days_available"] if profile else None,
-                       json.loads(profile["goals"]) if profile else [], profile["timeline"] if profile else None)
+        est = estimate(minutes, profile["weight"] if profile else None, PLAN_DAYS_PER_WEEK if profile else None,
+                       profile["goal"] if profile else None)
         citations = _citations(conn, est.get("sources", []))
     finally:
         conn.close()

@@ -9,14 +9,11 @@ const words = (s: string) => s.replace(/_/g, ' ')
 const DAY_NAMES: Record<string, string> = {
   mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday',
 }
-const SPLITS: Record<string, string> = {
-  full_body: 'full body', circuit: 'circuit', upper_lower: 'upper / lower', push_pull_legs: 'push / pull / legs',
-}
 
 const STEPS = [
   {
-    title: 'Match your goals and experience to a training protocol',
-    text: 'Each goal (weight loss, strength, tone, rehab, general health) at each experience level has one protocol: how many sessions a week, the split (full body, upper/lower, and so on), and the sets, reps, and rest. Pick more than one goal and we blend them, always taking the gentler setting where they differ. Today these protocols are starting values waiting on review by a physical therapist, and they are labeled that way.',
+    title: 'Your goal sets the shape of your week',
+    text: 'Every plan has 4 training days, built from 4 kinds of day: upper body, lower body, mobility and core, and cardio. Getting stronger: 3 strength days (each one upper OR lower body, never mixed) and 1 cardio day, in a 2-week pattern that repeats. Losing weight: 2 strength days and 2 cardio days, in a 4-week pattern. Just feeling good: 2 mobility and core days, 1 strength day and 1 cardio day, in an 8-week pattern. Your goal and experience level pick the sets, reps, rest and session length (15 to 60 minutes). Those are starting values waiting on review by a physical therapist, and they are labeled that way.',
   },
   {
     title: 'If you flagged an injury, keep only exercises checked for it',
@@ -27,12 +24,12 @@ const STEPS = [
     text: "Exercises that need equipment you don't have are removed. Bodyweight moves and a sturdy chair are always assumed.",
   },
   {
-    title: 'Fill each training day from what’s left',
-    text: 'Each day gets the muscle groups its split calls for, matched to your experience level, with jumping moves left out of gentle plans. Sets, reps, and rest come straight from the protocol, and each session is sized to your time.',
+    title: 'Fill each day from what’s left, starting with the basics',
+    text: 'Each strength day works at least two muscle groups (upper: a push and a pull; lower: a squat-type and a hip-hinge move) plus at least two extra exercises for variety. We reach first for effective, easy-at-home moves (push-ups, rows, squats, glute bridges, planks, marching) from our real library, matched to your experience level, with jumping moves left out of gentle plans. Days change from week to week within the pattern.',
   },
   {
-    title: 'Always keep a rest day',
-    text: 'Every week has at least one full rest day, and fewer sessions if you already do other activity on several days.',
+    title: 'Weights start as suggestions and build on what you log',
+    text: 'Beginners start with bodyweight only; otherwise we suggest 10 lb (arms) and 20 lb (legs), or 20 and 40 if you’re very experienced. Week 1 is a calibration week: log what you actually did, and later suggestions build on it. Getting stronger adds a little each time a day comes back round; losing weight adds 5 lb every 4 weeks; feeling good leaves your weights where you set them. You can always change any weight.',
   },
 ]
 
@@ -62,23 +59,22 @@ function Example() {
       </p>
 
       <div className="chip-row example-profile">
-        <span className="chip">{profile.age} years old</span>
+        <span className="chip">goal: {plan.goal_label}</span>
         <span className="chip">{words(profile.experience_level)}</span>
-        <span className="chip">goal: {profile.goals.map(words).join(', ')}</span>
         <span className="chip">injury: {profile.injury_flags.map(words).join(', ')}</span>
-        <span className="chip">equipment: {profile.equipment.map(words).join(', ')} only</span>
-        <span className="chip">{profile.days_available} days free</span>
-        <span className="chip">{profile.session_length_minutes}-minute sessions</span>
+        <span className="chip">equipment: {profile.equipment.map(words).join(', ')}</span>
       </div>
 
       <section className="example-step">
         <h4>
-          <span className="step-num">1</span> The protocol it matched
+          <span className="step-num">1</span> The week its goal calls for
         </h4>
         <p>
-          <strong>{p.goals_used.map(words).join(' + ')}</strong> at the <strong>{words(plan.experience_level)}</strong>{' '}
-          level: {p.sessions_per_week} sessions a week, {SPLITS[p.split_type] ?? words(p.split_type)} split, about{' '}
-          {p.session_length_minutes} minutes, {p.sets_range} sets of {p.reps_range} reps, {p.rest_seconds} seconds rest.
+          <strong>{plan.goal_label}</strong> at the <strong>{words(plan.experience_level)}</strong> level:{' '}
+          {plan.training_days} days a week (
+          {plan.days.filter((d) => d.kind === 'training').map((d) => d.focus).join(', ')}), a {plan.block_weeks}-week
+          pattern, up to {p.session_length_minutes} minutes a day, {p.sets_range} sets of {p.reps_range} reps on strength
+          days, {p.rest_seconds} seconds rest.
         </p>
         <ReviewInfo item={p} />
       </section>
@@ -111,7 +107,7 @@ function Example() {
 
       <section className="example-step">
         <h4>
-          <span className="step-num">4–5</span> The week it built
+          <span className="step-num">4–5</span> The weeks it built
         </h4>
         <p>
           {plan.training_days} training days and {rest.length} rest days ({rest.map((d) => DAY_NAMES[d.day]).join(', ')}).

@@ -51,7 +51,7 @@ def test_startup_builds_the_working_db_from_the_original(fresh_instance):
     assert got == want                                                  # same tables, same seeded content
     for t in ("calendar_entries", "goal_protocols", "exercises", "sources", "basics_articles", "agent_runs"):
         assert t in got, t
-    assert got["exercises"] == 903 and got["goal_protocols"] == 15 and got["users"] == 0
+    assert got["exercises"] == 903 and got["goal_protocols"] == 9 and got["users"] == 0
 
 
 def test_a_fresh_instance_works_end_to_end(fresh_instance):

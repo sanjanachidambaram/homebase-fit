@@ -155,8 +155,8 @@ def test_seed_rejects_pt_reviewed_without_citation():
 
 def test_agent_profile_contains_no_pii(client):
     from app.agents.context import EXCLUDED_USER_FIELDS, AgentUserProfile, agent_profile_for
-    assert set(AgentUserProfile.model_fields) == {"goals", "timeline", "injury_flags", "age", "weight_lb", "height_in"}
-    assert {"username", "first_name", "email"} <= EXCLUDED_USER_FIELDS          # name sits on the same list as email
+    assert set(AgentUserProfile.model_fields) == {"goal", "injury_flags"}       # since 2026-10-25: no weight, age, height
+    assert {"username", "first_name", "email", "weight", "goal_weight"} <= EXCLUDED_USER_FIELDS
     assert not set(AgentUserProfile.model_fields) & EXCLUDED_USER_FIELDS
     uid, h = sign_up(client, "private.person", first_name="Zenobia")
     assert client.get(f"/api/users/{uid}", headers=h).json()["first_name"] == "Zenobia"   # stored, for the greeting
@@ -164,6 +164,6 @@ def test_agent_profile_contains_no_pii(client):
         "consent_accepted": True, "consent_version": "2026-10-22", "answers": ANSWERS,
         "injury_notes": "Dr. Smith said L4 disc issue"})
     prompt = agent_profile_for(uid).to_prompt_json()
-    for secret in ("private.person", "Zenobia", "Dr. Smith", "L4", str(uid) + ","):
+    for secret in ("private.person", "Zenobia", "Dr. Smith", "L4", str(uid) + ",", "165", "155", '"weight', "goal_weight"):
         assert secret not in prompt
     assert json.loads(prompt)["injury_flags"] == ["lower_back"]

@@ -58,7 +58,7 @@ def _run(fn: Callable[..., dict], *args: Any, **kwargs: Any) -> dict:
 
 @mcp.tool(annotations=READ_ONLY)
 def get_user_profile(user_id: int) -> dict:
-    """Get a user's profile for personalization: goals, timeline, injury_flags, age, weight_lb, height_in.
+    """Get a user's profile for personalization: goal (stronger | lose_weight | feel_good) and injury_flags.
 
     Returns ONLY those fields. No username, first name, email, or free-text notes are ever returned. If the user has not taken
     the quiz yet, returns found=false."""
@@ -124,11 +124,11 @@ def compute_strength_equivalents(total_weight_lifted_lbs: float) -> dict:
 
 @mcp.tool(annotations=READ_ONLY)
 def check_goal_achievement(user_id: int) -> dict:
-    """Compare the user's last 30 days of progress with their quiz goals and timeline.
+    """Compare the user's last 30 days of progress with their quiz goal and the plan's 4 days a week.
 
     Returns status: on_track, ahead, behind, or insufficient_data, plus per-check reasons. The thresholds are simple
     app heuristics (returned in thresholds_used), not science or medical guidance; do not present them as
-    science-backed. Rehab and tone goals are not measurable from the logs and are judged on consistency only."""
+    science-backed. "Just feeling good" isn't measurable from the logs, so it is judged on consistency only."""
     return _run(progress.check_goal_achievement, user_id)
 
 

@@ -2,12 +2,12 @@
 
 Triggered by POST /api/programs/recommend.
   1. Code builds the plan: app/services/program_generator.py (deterministic, no LLM, injury filter applied).
-  2. This agent gets the finished plan, the user's goals, and the protocol's status and citations, and writes
+  2. This agent gets the finished plan, the user's goal, and the protocol's status and citations, and writes
      a short, warm, honest explanation of why the plan fits. It has NO tools: everything it may use is in
      the prompt, so it can't fetch anything else.
 
 Enforced in code (shared_rules.md, rules 1 and 2):
-- The model sees no user id and no profile fields beyond goals and experience level.
+- The model sees no user id and no profile fields beyond the goal and experience level (no weight, ever).
 - If the protocol has no citations, an explanation that claims scientific backing is sent back for a rewrite,
   then replaced with a plain one if it still does.
 - The "pending expert review" note comes from code, not from the model.
@@ -47,10 +47,11 @@ program_architect = Agent(
 
 def plain_explanation(plan: WeeklyProgram) -> str:
     p = plan.protocol
-    goals = " and ".join(g.replace("_", " ") for g in plan.goals)
-    return (f"This plan is built around your {goals} goals: {plan.training_days} {p.split_type.replace('_', ' ')} "
-            f"sessions a week of about {p.session_length_minutes} minutes, with rest days in between. "
-            "Its training settings are still pending expert review, so we can't point to verified evidence yet.")
+    kinds = [d.focus.lower() for d in plan.days if d.kind == "training"]
+    return (f"This plan is built around your goal, {plan.goal_label.lower()}: {plan.training_days} days a week "
+            f"({', '.join(kinds)}), about {p.session_length_minutes} minutes each, with rest days in between, and a "
+            f"{plan.block_weeks}-week pattern that repeats. Its training settings are still pending expert review, so "
+            "we can't point to verified evidence yet.")
 
 
 @program_architect.output_validator
@@ -68,15 +69,16 @@ def plan_for_model(plan: WeeklyProgram) -> str:
     """Everything the model may use, and nothing else: goals, the plan's structure, status and citations."""
     p = plan.protocol
     return json.dumps({
-        "goals": plan.goals,
+        "goal": plan.goal_label,
         "experience_level": plan.experience_level,
         "plan": {
             "training_days_per_week": plan.training_days,
-            "split": p.split_type,
+            "repeats_every_weeks": plan.block_weeks,
             "session_minutes": p.session_length_minutes,
             "sets": p.sets_range, "reps": p.reps_range, "rest_seconds": p.rest_seconds,
-            "week": [{"day": d.day, "focus": d.focus, "exercises": [e.name for e in d.exercises]}
-                     if d.kind == "training" else {"day": d.day, "rest": True} for d in plan.days],
+            "how_weights_go_up": plan.weights.rule if plan.weights else None,
+            "week_1": [{"day": d.day, "focus": d.focus, "exercises": [e.name for e in d.exercises]}
+                       if d.kind == "training" else {"day": d.day, "rest": True} for d in plan.days],
             "low_impact_injury_safe": plan.safety.checked_only,
         },
         "protocol_status": p.status,

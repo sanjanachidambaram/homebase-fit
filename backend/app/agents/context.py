@@ -9,12 +9,14 @@ with `agent_profile_for(user_id)` below and pass the resulting
 `AgentUserProfile` (or its `.to_prompt_json()`) to the model. Never pass a
 users row, a quiz_profiles row, or a request body straight into a prompt.
 
-`AgentUserProfile` contains structured fields only: goals, timeline,
-injury_flags, age, weight, height. It deliberately EXCLUDES (EXCLUDED_USER_FIELDS
-below, checked when this module loads):
+`AgentUserProfile` contains two structured fields only: goal and injury_flags
+(since the 2026-10-25 quiz rewrite; age, height, timeline and weight are gone from
+it). It deliberately EXCLUDES (EXCLUDED_USER_FIELDS below, checked when this module
+loads):
   - username, first_name, email and password_hash (identify the person)
   - user id (links model-provider logs back to our database)
   - injury_notes (free text; people type names, doctors, diagnoses, etc.)
+  - weight and goal_weight (body measurements; used only by code, for calorie math)
 The SQL below selects only the allowed columns and never joins `users`, and
 the model forbids extra fields, so PII can't slip in by accident.
 =============================================================================
@@ -34,23 +36,19 @@ class AgentUserProfile(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    goals: list[str]
-    timeline: str | None
+    goal: str                 # stronger | lose_weight | feel_good
     injury_flags: list[str]
-    age: int | None
-    weight_lb: float | None
-    height_in: float | None
 
     def to_prompt_json(self) -> str:
         return self.model_dump_json()
 
 
-ALLOWED_COLUMNS = "goals, timeline, injury_flags, age, weight, height"
+ALLOWED_COLUMNS = "goal, injury_flags"
 
 # Identifying fields that must never reach any agent, its prompt, or an MCP tool result. "email" stays listed
 # although sign-in now uses a username: accounts from before 2026-10-23 have their old email as their username.
 EXCLUDED_USER_FIELDS = frozenset({"username", "first_name", "name", "email", "password_hash", "user_id", "id",
-                                  "injury_notes"})
+                                  "injury_notes", "weight", "weight_lb", "goal_weight"})
 _allowed = {c.strip() for c in ALLOWED_COLUMNS.split(",")}
 assert not (_allowed | set(AgentUserProfile.model_fields)) & EXCLUDED_USER_FIELDS, \
     "an excluded (identifying) field was added to the agent profile"
@@ -72,11 +70,4 @@ def agent_profile_for(user_id: int, conn: sqlite3.Connection | None = None) -> A
             conn.close()
     if row is None:
         return None
-    return AgentUserProfile(
-        goals=json.loads(row["goals"]),
-        timeline=row["timeline"],
-        injury_flags=json.loads(row["injury_flags"]),
-        age=row["age"],
-        weight_lb=row["weight"],
-        height_in=row["height"],
-    )
+    return AgentUserProfile(goal=row["goal"], injury_flags=json.loads(row["injury_flags"]))

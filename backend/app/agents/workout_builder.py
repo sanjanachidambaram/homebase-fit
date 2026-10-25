@@ -88,7 +88,7 @@ def _request(ctx: RunContext[AgentDeps]) -> str:
 
 @workout_builder.tool
 async def get_user_profile(ctx: RunContext[AgentDeps]) -> dict:
-    """The signed-in user's goals, timeline, injury flags, age, weight and height."""
+    """The signed-in user's goal and injury flags."""
     return await ctx.deps.gateway.call("get_user_profile", {"user_id": ctx.deps.user_id})
 
 

@@ -64,7 +64,7 @@ def by_date(body: dict) -> dict[str, dict]:
 def stored(e: dict) -> dict:
     """An entry without the fields computed on the fly: the flags from "today" (tests move today forward) and the
     calorie range (computed for done days from the stored snapshot)."""
-    return {k: v for k, v in e.items() if k not in ("can_override", "can_complete", "calories")}
+    return {k: v for k, v in e.items() if k not in ("can_override", "can_complete", "calories", "weights")}
 
 
 def patch(client, h, entry_id, **body):
@@ -79,16 +79,16 @@ def d(offset: int) -> str:
 
 def test_quiz_lays_out_four_weeks_of_the_plan(client, on_day):
     uid, h = account(client, "cal")
-    plan = {p.day: p for p in generate_for_user(uid).days}
+    plan = generate_for_user(uid)
     entries = get_days(client, h)["entries"]
     assert len(entries) == 28 and [e["date"] for e in entries] == [d(i) for i in range(28)]
-    for e in entries:
-        planned = plan[e["weekday"]]
+    for e in entries:   # each date gets that week of the plan's repeating pattern
+        planned = calendar.plan_day_on(plan, date.fromisoformat(e["date"]), MONDAY)
         assert e["day_type"] == ("workout" if planned.kind == "training" else "rest")
         assert [x["exercise_id"] for x in e["workout"]["exercises"]] == [x.exercise_id for x in planned.exercises]
         assert e["completed"] is False and e["notes"] is None
     workout_days = {e["weekday"] for e in entries if e["day_type"] == "workout"}
-    assert workout_days == {"mon", "wed", "fri"}          # beginner weight loss + rehab: 3 days a week
+    assert workout_days == {"mon", "wed", "fri", "sat"}   # every goal: 4 training days, Mon/Wed/Fri/Sat
     assert get_days(client, h, MONDAY + timedelta(days=28), MONDAY + timedelta(days=34))["entries"] == []
 
 
@@ -115,11 +115,11 @@ def test_retake_keeps_logged_and_noted_days_and_refreshes_only_untouched_future_
     assert logs_before
 
     on_day(MONDAY + timedelta(days=2))                       # Wednesday: Mon and Tue are now in the past
-    retake(client, uid, h, goals=["strength"], experience_level="advanced", days_available=6)
-    new_plan = {p.day: p for p in generate_for_user(uid).days}
-    old_pattern = {e["weekday"] for e in before.values() if e["day_type"] == "workout"}
-    new_pattern = {k for k, p in new_plan.items() if p.kind == "training"}
-    assert old_pattern != new_pattern, "the retake should produce a different weekly pattern"
+    retake(client, uid, h, goal="stronger", experience_level="advanced", injuries=["none"])
+    new_plan, new_start = generate_for_user(uid), MONDAY + timedelta(days=2)   # a retake is a new plan, from today
+    old_focus = [e["workout"].get("focus") for e in before.values()][:7]
+    new_focus = [calendar.plan_day_on(new_plan, MONDAY + timedelta(days=i), new_start).focus for i in range(7)]
+    assert old_focus != new_focus, "the retake (a different goal) should produce different days"
 
     after = by_date(get_days(client, h, MONDAY, MONDAY + timedelta(days=29)))
     # the logged day: same row, same snapshot, still done, and its workout_logs untouched
@@ -136,7 +136,7 @@ def test_retake_keeps_logged_and_noted_days_and_refreshes_only_untouched_future_
         if i == 4:
             continue
         assert e["id"] not in {x["id"] for x in before.values()}, d(i)
-        planned = new_plan[e["weekday"]]
+        planned = calendar.plan_day_on(new_plan, date.fromisoformat(e["date"]), new_start)
         assert e["day_type"] == ("workout" if planned.kind == "training" else "rest"), d(i)
         assert [x["exercise_id"] for x in e["workout"]["exercises"]] == [x.exercise_id for x in planned.exercises]
     assert len(after) == 30                                   # Mon 10-19 .. Tue 11-17: one entry per date
@@ -332,17 +332,17 @@ def test_goal_check_compares_completed_days_with_the_plan(client, on_day):
     conn.close()
     on_day(today)
     days = by_date(get_days(client, h, MONDAY, today))
-    workouts = [e for e in days.values() if e["day_type"] == "workout"]     # Mon/Wed/Fri x 2 = 6
-    assert len(workouts) == 6
+    workouts = [e for e in days.values() if e["day_type"] == "workout"]     # Mon/Wed/Fri/Sat x 2 = 8
+    assert len(workouts) == 8
     for e in workouts[:2]:
         assert patch(client, h, e["id"], completed=True).status_code == 200
 
     result = check_goal_achievement(uid, today)
-    assert (result["progress"]["plan_workouts_scheduled"], result["progress"]["plan_workouts_completed"]) == (6, 2)
+    assert (result["progress"]["plan_workouts_scheduled"], result["progress"]["plan_workouts_completed"]) == (8, 2)
     adherence = next(c for c in result["checks"] if c["check"] == "plan_adherence")
-    assert adherence == {"check": "plan_adherence", "status": "behind", "detail": "2 of 6 planned workout days marked done"}
+    assert adherence == {"check": "plan_adherence", "status": "behind", "detail": "2 of 8 planned workout days marked done"}
 
     for e in workouts[2:]:
         patch(client, h, e["id"], completed=True)
     adherence = next(c for c in check_goal_achievement(uid, today)["checks"] if c["check"] == "plan_adherence")
-    assert adherence["status"] == "on_track" and adherence["detail"].startswith("6 of 6")
+    assert adherence["status"] == "on_track" and adherence["detail"].startswith("8 of 8")

@@ -12,103 +12,56 @@
 #                    description is a short plain-language line shown under the option.
 #   help_text        (optional) a line shown under the question
 #   exclusive        (multi_select, optional) a value that clears all others, e.g. "none"
+#   always_included  (multi_select, optional) a value that is always on and can't be unticked
 #   allow_free_text  (optional) also show a text box under the options (stored, never sent to the AI)
 #   unit, min, max   (number types, optional)
-#   input            (number types, optional) feet_inches = ask in feet + inches; the answer is still stored
-#                    in inches, and min/max are in inches
-#   required         true/false
+#   ask_if           (optional) {question: <id>, equals: <value>}: only asked (and only stored) when that answer
+#                    matches. Otherwise it's skipped, never required, and saved as empty.
+#   required         true/false (when asked)
 #   health           true = health/injury question. Only shown AFTER the user accepts the medical
 #                    disclaimer, so keep this flag on every health question.
 #
 # Values the program generator relies on (app/services/program_generator.py):
-#   goals:            weight_loss | strength | tone | rehab | general_health (must match goal_protocols.yaml)
-#   experience_level: beginner | intermediate | advanced
+#   goal:             stronger | lose_weight | feel_good (must match goal_protocols.yaml)
+#   experience_level: beginner | intermediate | advanced (also picks the default starting weights)
 #   injuries:         neck | shoulder | upper_back | lower_back | wrist | hip | knee | ankle (must match exercise injury tags)
-#   equipment:        bodyweight | dumbbells | resistance_band | mat | bench | pull_up_bar | kettlebells | full_gym
+#   equipment:        bodyweight | dumbbells | kettlebells | resistance_band | mat | full_gym
 
 questions:
   # ---------------------------------------------------------------- general (before the disclaimer)
-  - id: goals
-    prompt: What do you want your training to do? Pick all that apply.
-    type: multi_select
-    required: true
-    help_text: If you pick more than one, we blend them and use the gentler setting wherever they differ.
-    options:
-      - { value: weight_loss,    label: Lose weight,             description: "Full-body circuits more days of the week, with short rests to keep you moving." }
-      - { value: strength,       label: Get stronger,            description: "Fewer reps with heavier effort, and longer rests between sets." }
-      - { value: tone,           label: Tone up,                 description: "Moderate reps and moderate rest, with more total sets across the week." }
-      - { value: rehab,          label: Rehab an injury,         description: "Controlled, low-impact movement that avoids the injury areas you flag." }
-      - { value: general_health, label: Feel healthier overall,  description: "A balanced mix of strength and movement a few times a week." }
-
-  - id: timeline
-    prompt: Over how many weeks are you hoping to see a change?
+  - id: goal
+    prompt: What's your main fitness goal?
     type: single_select
     required: true
+    help_text: Pick the one that matters most right now. You can retake the quiz any time.
     options:
-      - { value: 4_weeks,     label: About 4 weeks }
-      - { value: 8_weeks,     label: About 8 weeks }
-      - { value: 12_weeks,    label: About 12 weeks }
-      - { value: 16_weeks,    label: About 16 weeks }
-      - { value: no_deadline, label: No deadline, just building a habit }
+      - { value: stronger,    label: Getting stronger,                description: "3 strength days and 1 cardio day a week. Each day works either your upper or lower body, and the weights go up as you go." }
+      - { value: lose_weight, label: Losing weight,                   description: "2 strength days and 2 cardio days a week, in a 4-week pattern that repeats a little heavier." }
+      - { value: feel_good,   label: Just feeling good in my body,    description: "2 mobility and core days, 1 strength day and 1 cardio day a week, in a gentle 8-week pattern." }
 
   - id: experience_level
     prompt: How much strength training have you done?
     type: single_select
     required: true
+    help_text: This sets your suggested starting weights. You can always change them.
     options:
       - { value: beginner,     label: Just starting out,   description: "New to strength training, or coming back after a long break (6+ months)." }
       - { value: intermediate, label: Some experience,     description: "You've trained fairly regularly for 6+ months and know the basic moves." }
       - { value: advanced,     label: Very experienced,    description: "You've trained consistently for 2+ years and are confident with heavier loads." }
 
-  - id: days_available
-    prompt: How many days a week can you realistically work out?
-    type: number
-    unit: days
-    min: 1
-    max: 7
-    required: true
-    help_text: Be honest with yourself. We'll always keep at least one full rest day.
-
-  - id: session_length
-    prompt: How long do you want each workout to be?
-    type: single_select
-    required: true
-    options:
-      - { value: "15", label: 15 minutes }
-      - { value: "20", label: 20 minutes }
-      - { value: "30", label: 30 minutes }
-      - { value: "45", label: 45 minutes }
-      - { value: "60", label: 60 minutes }
-
   - id: equipment
-    prompt: What equipment do you regularly have access to?
+    prompt: What equipment do you have?
     type: multi_select
     required: true
+    always_included: bodyweight
     help_text: Bodyweight moves are always included.
     options:
-      - { value: bodyweight,      label: Just my bodyweight }
+      - { value: bodyweight,      label: Bodyweight (always included) }
       - { value: dumbbells,       label: Dumbbells }
+      - { value: kettlebells,     label: Kettlebell }
       - { value: resistance_band, label: Resistance bands }
       - { value: mat,             label: Exercise mat }
-      - { value: bench,           label: Bench }
-      - { value: pull_up_bar,     label: Pull-up bar }
-      - { value: kettlebells,     label: Kettlebell }
       - { value: full_gym,        label: A full gym }
-
-  - id: other_activity_days
-    prompt: On how many days a week do you already do other physical activity?
-    type: number
-    unit: days
-    min: 0
-    max: 7
-    required: false
-    help_text: Things like running, a dance class, sports, or a physically demanding job. We'll plan around them.
-
-  - id: other_activity_notes
-    prompt: What is that other activity? (optional)
-    type: text
-    required: false
-    help_text: This stays in our database and is never sent to the AI.
 
   # ---------------------------------------------------------------- health (after the disclaimer)
   - id: injuries
@@ -144,17 +97,9 @@ questions:
       - { value: pregnant,   label: Pregnant }
       - { value: postpartum, label: Postpartum, description: "You've had a baby in the past year." }
 
-  - id: age
-    health: true
-    prompt: How old are you?
-    type: number
-    unit: years
-    min: 13
-    max: 100
-    required: true
-
   - id: weight
     health: true
+    ask_if: { question: goal, equals: lose_weight }
     prompt: What is your current weight?
     type: number
     unit: lb
@@ -162,38 +107,19 @@ questions:
     max: 700
     required: true
 
-  - id: height
-    health: true
-    prompt: How tall are you?
-    type: number
-    unit: in
-    input: feet_inches
-    min: 48
-    max: 90
-    required: true
-
   - id: goal_weight
     health: true
-    prompt: Do you have a goal weight? (optional)
+    ask_if: { question: goal, equals: lose_weight }
+    prompt: What's your goal weight?
     type: number
     unit: lb
     min: 60
     max: 700
     required: false
-    help_text: >
-      Totally optional: leave it blank if you'd rather not set one. If you do, the CDC describes losing about
-      1 to 2 pounds a week as the more sustainable pace.
-    # Gentle note shown (never a block) when the goal implies losing faster than this pace.
-    rate_note:
-      max_lbs_per_week: 2
+    help_text: Optional. There's no deadline to pick; we'll just show you what a gradual pace looks like.
+    # A gentle, cited note shown under the answer (never a block): how long the change takes at a gradual pace.
+    pace_note:
+      lbs_per_week: [1, 2]
       text: >
-        People who lose weight gradually, about 1 to 2 pounds a week, are more likely to keep it off,
-        so faster isn't healthier. A later date might feel easier on you, but it's your call.
+        People who lose weight gradually, about 1 to 2 pounds a week, are more likely to keep it off.
       source: "CDC, Losing Weight: https://www.cdc.gov/healthy-weight-growth/losing-weight/index.html"
-
-  - id: goal_date
-    health: true
-    prompt: By when? (optional)
-    type: date
-    required: false
-    help_text: Only if you set a goal weight.

@@ -153,28 +153,24 @@ export interface QuizQuestion {
   unit?: string
   min?: number
   max?: number
-  /** number questions: 'feet_inches' asks in feet + inches; the answer is still total inches */
-  input?: 'feet_inches'
-  /** goal_weight: gentle note when the goal implies losing faster than max_lbs_per_week (never a block) */
-  rate_note?: { max_lbs_per_week: number; text: string; source: string }
+  /** multi_select: a value that's always on (bodyweight) */
+  always_included?: string
+  /** Only asked when another answer matches (weight, goal weight: only when the goal is losing weight) */
+  ask_if?: { question: string; equals: string }
+  /** goal_weight: a gentle, cited note on how long the change takes at a gradual pace (never a block) */
+  pace_note?: { lbs_per_week: [number, number]; text: string; source: string }
 }
 
+export type Goal = 'stronger' | 'lose_weight' | 'feel_good'
+
 export interface QuizProfile {
-  goals: string[]
-  timeline: string | null
+  goal: Goal
   injury_flags: string[]
   injury_notes: string | null
-  age: number | null
-  weight: number | null
-  height: number | null
   experience_level: string | null
-  days_available: number | null
-  session_length_minutes: number | null
   equipment: string[]
-  other_activity_days: number
-  other_activity_notes: string | null
-  goal_weight: number | null
-  goal_date: string | null
+  weight: number | null // only on the losing-weight path
+  goal_weight: number | null // only on the losing-weight path
   pregnancy_status: string | null
   needs_clinical_review: boolean
   consent_accepted: boolean
@@ -303,45 +299,58 @@ export interface PlanExercise {
   rest_seconds: number
   est_minutes: number
   injury_check: string
+  category: PlanCategory
+  slot: string
+  reps_your_call: boolean // Getting stronger: how many reps is the person's own call
+  weighted: boolean // uses dumbbells, kettlebells...: gets a weight field (bodyweight ones stay blank)
+  load: 'arms' | 'legs' | null
+  default_weight_lb: number | null
   swapped_from?: string | null // review mode: the generated exercise this replaced
 }
+
+/** The 4 workout groups days are built from. */
+export type PlanCategory = 'upper' | 'lower' | 'mobility' | 'cardio'
 
 export interface PlanDay {
   day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
   kind: 'training' | 'rest'
+  category: PlanCategory | null
   focus: string | null
   exercises: PlanExercise[]
   est_minutes: number
 }
 
-/** Progressive overload (shared_rules rule 8): steps every 2 weeks, or paused for injured / rehab profiles. */
-export interface Progression {
-  enabled: boolean
-  every_weeks: number | null
-  reason: string
-  schedule: { week: number; sets: number; reps: number }[]
+/** Suggested weights week by week from the defaults (shared_rules rule 8), before anything is logged. */
+export interface WeightPlan {
+  rule: string
+  calibration: string
+  defaults_lb: { arms: number; legs: number } | null // null = beginner: bodyweight only
+  step_lb: { arms: number; legs: number }
+  schedule_weeks: number
+  schedule: { exercise_id: string; name: string; load: 'arms' | 'legs'; weeks: number[]; weight_lb: (number | null)[] }[]
 }
 
 export interface WeeklyProgram {
-  progression?: Progression | null
   swap_options?: Record<string, { id: string; name: string; injury_check: string }[]> | null
   generated: boolean
   blocked_reason: string | null
   needs_clinical_review: boolean
-  goals: string[]
+  goal: Goal
+  goal_label: string
   experience_level: string
   training_days: number
-  days: PlanDay[]
+  block_weeks: number // the pattern repeats every this many weeks
+  weeks: { week_in_block: number; days: PlanDay[] }[]
+  days: PlanDay[] // week 1
+  weights: WeightPlan | null
   protocol: {
-    goals_used: string[]
-    split_type: string
-    sessions_per_week: number
+    goal: Goal
+    experience_level: string
     session_length_minutes: number
     sets_range: string
     reps_range: string
     rest_seconds: number
-    progression_notes: string[]
-    blending_rules_applied: string[]
+    progression_note: string
     status: 'placeholder' | 'pt_reviewed'
     review_notice: string | null
     citations: Citation[]
@@ -436,13 +445,10 @@ export const askBasics = (token: string, question: string) =>
 
 export interface PlanExample {
   profile: {
-    age: number
-    goals: string[]
+    goal: Goal
     experience_level: string
     injury_flags: string[]
     equipment: string[]
-    days_available: number
-    session_length_minutes: number
   }
   funnel: { step: string; exercises_left: number; removed: number }[]
   plan: WeeklyProgram
@@ -462,6 +468,10 @@ export interface CalendarExercise {
   rest_seconds: number
   est_minutes: number
   injury_check: string
+  reps_your_call?: boolean // Getting stronger: reps are the person's own call
+  weighted?: boolean
+  load?: 'arms' | 'legs' | null
+  default_weight_lb?: number | null
 }
 
 export interface CalendarEntry {
@@ -479,8 +489,12 @@ export interface CalendarEntry {
     review_notice: string | null
     notes?: string[] // custom days: the Workout Builder's notes (e.g. fewer moves fit your filters)
     open?: boolean // nothing planned: "I'll build it myself" mode, or a day opened by "Save to calendar"
-    week?: number // week of the plan (progressive overload)
-    progression_step?: number
+    week?: number // week of the plan
+    week_in_block?: number // which week of the repeating 2-, 4- or 8-week pattern
+    block_weeks?: number
+    calibration_week?: boolean // week 1: log what you actually did
+    category?: PlanCategory | null
+    goal?: Goal
     cardio?: { type: string | null } // cardio days: which kind
   }
   completed: boolean
@@ -493,6 +507,8 @@ export interface CalendarEntry {
   choice: 'plan' | 'build' | 'cardio' | 'open'
   /** Done days only: a calorie range computed in code (Compendium MET method), or null. */
   calories: { low: number; high: number; rough: boolean; parts: { what: 'strength' | 'cardio' }[] } | null
+  /** Per exercise: whether it takes a weight, the live suggestion (null = none), and what was logged. */
+  weights: Record<string, { weighted: boolean; suggested_lb: number | null; logged_reps: number | null; logged_lb: number | null }>
   created_at: string
   updated_at: string
 }
@@ -525,7 +541,13 @@ export interface CalendarUpdateResult {
 export const updateCalendarDay = (
   token: string,
   id: number,
-  change: { date?: string; notes?: string | null; completed?: boolean },
+  change: {
+    date?: string
+    notes?: string | null
+    completed?: boolean
+    /** With completed: true, the reps and weights actually done (weight only for exercises that take one). */
+    log?: { exercise_id: string; reps?: number | null; weight_lb?: number | null }[]
+  },
 ) => request<CalendarUpdateResult>(`/api/calendar/${id}`, { method: 'PATCH', body: JSON.stringify(change) }, token)
 
 /** Build a custom workout for one calendar day (Workout Builder agent, same injury filter) and save it there. */

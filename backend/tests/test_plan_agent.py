@@ -53,14 +53,14 @@ def account(client, username="plan", first_name="Tester", **answer_overrides):
 # ---------------------------------------------------------------- the simplified agent
 
 def test_recommend_returns_the_generated_plan_and_an_explanation(client, explainer):
-    e = explainer("A gentle three-day plan built around your weight loss and rehab goals.")
+    e = explainer("A gentle four-day plan built around your goal of losing weight.")
     uid, h = account(client)
     r = client.post("/api/programs/recommend", headers=h)
     assert r.status_code == 200, r.text
     res = r.json()["result"]
-    assert res["explanation"].startswith("A gentle three-day plan")
+    assert res["explanation"].startswith("A gentle four-day plan")
     plan = res["plan"]
-    assert plan["generated"] and plan["training_days"] == 3 and len(plan["days"]) == 7
+    assert plan["generated"] and plan["training_days"] == 4 and len(plan["days"]) == 7 and plan["block_weeks"] == 4
     assert plan["safety"]["checked_only"] is True and plan["safety"]["injury_flags"] == ["lower_back"]
     assert "pending expert review" in res["review_note"].lower()
     assert e.calls == 1 and e.tools == []          # one model request, and no tools at all
@@ -68,13 +68,12 @@ def test_recommend_returns_the_generated_plan_and_an_explanation(client, explain
 
 def test_the_model_sees_only_goals_and_the_plan(client, explainer):
     e = explainer("Here's why it fits.")
-    uid, h = account(client, username="private.person", first_name="Zenobia", other_activity_notes="PRIVATE-ACTIVITY",
-                     goal_weight=150, goal_date=(date.today() + timedelta(days=90)).isoformat())
+    uid, h = account(client, username="private.person", first_name="Zenobia", weight=173, goal_weight=151)
     client.post("/api/programs/recommend", headers=h)
     shown = " ".join(e.prompts)
-    assert '"goals":["rehab","weight_loss"]' in shown and "Glute Bridge" in shown
-    for private in ("private.person", "Zenobia", "PRIVATE-NOTE", "Dr. Smith", "PRIVATE-ACTIVITY",
-                    '"age"', '"weight"', "150", "pregnan", f'"user_id"'):
+    assert '"goal":"Losing weight"' in shown and "Glute Bridge" in shown
+    for private in ("private.person", "Zenobia", "PRIVATE-NOTE", "Dr. Smith", '"weight"', "173", "151",
+                    "pregnan", '"user_id"', "lower_back"):
         assert private not in shown, private
 
 
@@ -131,16 +130,22 @@ def test_get_plan_is_code_only(client, explainer):
 
 # ---------------------------------------------------------------- the new quiz fields
 
-def test_new_quiz_fields_are_saved(client):
-    goal_day = (date.today() + timedelta(days=70)).isoformat()
-    uid, h = account(client, experience_level="intermediate", days_available=5, session_length="45",
-                     equipment=["dumbbells", "bench"], other_activity_days=2, other_activity_notes="  running  ",
-                     goal_weight=158, goal_date=goal_day, injuries=["wrist", "ankle"])
+def test_the_quiz_saves_one_goal_and_weight_only_on_the_losing_weight_path(client):
+    uid, h = account(client, experience_level="intermediate", equipment=["dumbbells", "kettlebells"],
+                     weight=180, goal_weight=165, injuries=["wrist", "ankle"])
     p = client.get(f"/api/users/{uid}", headers=h).json()["quiz_profile"]
-    assert (p["experience_level"], p["days_available"], p["session_length_minutes"]) == ("intermediate", 5, 45)
-    assert p["equipment"] == ["bench", "dumbbells"] and p["other_activity_days"] == 2
-    assert p["other_activity_notes"] == "running" and (p["goal_weight"], p["goal_date"]) == (158, goal_day)
+    assert (p["goal"], p["experience_level"], p["weight"], p["goal_weight"]) == ("lose_weight", "intermediate", 180, 165)
+    assert p["equipment"] == ["bodyweight", "dumbbells", "kettlebells"]                 # bodyweight is always included
     assert p["injury_flags"] == ["ankle", "wrist"] and p["needs_clinical_review"] is False
+    for removed in ("goals", "timeline", "days_available", "session_length_minutes", "other_activity_days",
+                    "other_activity_notes", "age", "height", "goal_date"):
+        assert removed not in p, removed
+
+    # another goal: weight isn't asked, so a weight sent anyway is ignored (and an old one is cleared)
+    r = client.put(f"/api/users/{uid}/quiz-profile", headers=h, json={
+        "consent_accepted": True, "consent_version": "t",
+        "answers": {**quiz_answers(goal="stronger"), "weight": 180, "goal_weight": 165}})
+    assert r.status_code == 200 and (r.json()["goal"], r.json()["weight"], r.json()["goal_weight"]) == ("stronger", None, None)
 
 
 @pytest.mark.parametrize("status, flagged", [("none", False), ("pregnant", True), ("postpartum", True)])
@@ -156,28 +161,37 @@ def test_quiz_validation(client):
     def put(**over):
         return client.put(f"/api/users/{r['user_id']}/quiz-profile", headers=h, json={
             "consent_accepted": True, "consent_version": "t", "answers": quiz_answers(**over)})
-    assert put(goal_date="2001-01-01").status_code == 422                  # past
-    assert put(goal_date=(date.today() + timedelta(days=365 * 6)).isoformat()).status_code == 422   # too far
-    assert put(goal_date="next spring").status_code == 422
-    assert put(goals=["bulk"]).status_code == 422
-    assert put(days_available=8).status_code == 422
-    assert put(other_activity_notes="x" * 501).status_code == 422
+    assert put(goal="bulk").status_code == 422
+    assert put(goal=["stronger", "lose_weight"]).status_code == 422       # one goal, not a list
+    assert put(weight=None).status_code == 422                            # required on the losing-weight path
+    assert put(weight=900).status_code == 422                             # out of range
+    assert put(equipment=["barbell"]).status_code == 422                  # not an option any more
+    for removed in ("timeline", "days_available", "session_length", "other_activity_days", "age", "height",
+                    "goal_date"):
+        assert put(**{removed: 1}).status_code == 422, removed            # removed questions are refused
     assert put(pregnancy_status=None).status_code == 422                  # required
-    assert put(goal_weight=None, goal_date=None).status_code == 200       # the weight goal is optional
+    assert put(goal_weight=None).status_code == 200                       # the goal weight is optional
     # a retake clears an answer that's now left blank
     put(goal_weight=150)
     put(goal_weight=None)
     assert client.get(f"/api/users/{r['user_id']}", headers=h).json()["quiz_profile"]["goal_weight"] is None
 
 
-def test_quiz_questions_carry_descriptions_and_the_cited_pace_note(client):
+def test_quiz_questions_match_the_new_structure(client):
     qs = {q["id"]: q for q in client.get("/api/quiz/questions").json()}
-    goals = {o["value"]: o for o in qs["goals"]["options"]}
-    assert set(goals) == {"weight_loss", "strength", "tone", "rehab", "general_health"}
-    assert all(o.get("description") for o in goals.values())
+    assert list(qs) == ["goal", "experience_level", "equipment", "injuries", "pregnancy_status", "weight", "goal_weight"]
+    goal = qs["goal"]
+    assert goal["type"] == "single_select" and [o["label"] for o in goal["options"]] == [
+        "Getting stronger", "Losing weight", "Just feeling good in my body"]
+    assert all(o.get("description") for o in goal["options"])                           # what each one targets
     assert all(o.get("description") for o in qs["experience_level"]["options"])
-    note = qs["goal_weight"]["rate_note"]
-    assert note["max_lbs_per_week"] == 2 and "cdc.gov" in note["source"]
-    assert qs["goal_date"]["type"] == "date" and not qs["goal_weight"]["required"]
+    assert [o["value"] for o in qs["equipment"]["options"]] == [
+        "bodyweight", "dumbbells", "kettlebells", "resistance_band", "mat", "full_gym"]
+    assert qs["equipment"]["always_included"] == "bodyweight"
+    for q in ("weight", "goal_weight"):
+        assert qs[q]["ask_if"] == {"question": "goal", "equals": "lose_weight"} and qs[q]["health"] is True
+    assert qs["weight"]["required"] and not qs["goal_weight"]["required"]
+    note = qs["goal_weight"]["pace_note"]
+    assert note["lbs_per_week"] == [1, 2] and "cdc.gov" in note["source"]
     health = [q for q in qs.values() if q.get("health")]
-    assert {"injuries", "pregnancy_status", "goal_weight"} <= {q["id"] for q in health}   # behind the consent gate
+    assert {"injuries", "pregnancy_status", "weight", "goal_weight"} == {q["id"] for q in health}   # behind consent
