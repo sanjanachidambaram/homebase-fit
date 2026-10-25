@@ -1,31 +1,51 @@
-# Render Blueprint: one web service that serves the API, the media in content/, and the built React app.
-# Secrets are NOT in this file: each `sync: false` variable is asked for in the Render dashboard the first time the
-# Blueprint is created (see README.md, "Deployment"). Python and Node versions are pinned by .python-version (3.13)
-# and .node-version (24) in the repo root.
+# Render Blueprint for Bee Fit: ONE web service ("bee-fit") that serves the API, the media in content/, and the built
+# React app (FastAPI serves frontend/dist; there is no separate frontend service). Replaces the old "homebase-fit"
+# service name (2026-10-25). Python and Node versions are pinned by .python-version (3.13) and .node-version (24) in
+# the repo root.
 #
-# Paid instance with a persistent disk, chosen deliberately so accounts and data survive redeploys (the free tier
-# wipes the filesystem on every deploy and restart). The working database lives on the disk at /var/data; the code,
-# content and images still come from git with each deploy. On a brand-new disk the app builds the database from
-# backend/app/db/homebase_original.db; after that, startup leaves it alone, except when a deploy ships new content or
-# schema, when it backs the database up on the disk and refreshes it keeping every account (app/db/__init__.py).
+# Secrets are NOT in this file: each `sync: false` variable is asked for in the Render dashboard the first time the
+# Blueprint is created (see README.md, "Deployment"). Only non-secret values are written here.
+#
+# Paid instance with a persistent disk, so accounts and data survive redeploys (the free tier wipes the filesystem on
+# every deploy and restart). The working database lives on the disk at /var/data; the code, content and images come
+# from git with each deploy. On a brand-new disk the app builds the database from backend/app/db/homebase_original.db;
+# after that, startup leaves it alone, except when a deploy ships new content or schema, when it backs the database up
+# on the disk and refreshes it keeping every account (app/db/__init__.py). A NEW service gets a NEW, empty disk: see
+# README.md for moving the old homebase-fit database across.
 services:
   - type: web
-    name: homebase-fit
+    name: bee-fit
     runtime: python
-    plan: starter          # Render's cheapest paid plan (listed as 0.5c-512mb since Aug 2026); disks need a paid plan
+    plan: starter          # Render's cheapest paid plan; disks need a paid plan
     buildCommand: pip install -r backend/requirements.txt && cd frontend && npm ci && npm run build
     startCommand: cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     disk:
-      name: homebase-data
+      name: bee-fit-data
       mountPath: /var/data
       sizeGB: 1            # plenty for the SQLite file and a few backups; can be increased later, never decreased
     envVars:
-      - key: HOMEBASE_DB_PATH # not a secret: where the working database lives (on the persistent disk)
+      # ---- read by the app today (backend/app/config.py, backend/app/agents/harness.py)
+      - key: HOMEBASE_DB_PATH # not a secret: where the working SQLite database lives (on the persistent disk)
         value: /var/data/homebase.db
       - key: APP_ENV          # enter: production
         sync: false
       - key: APP_SECRET_KEY   # enter: a long random string (signs sign-in tokens)
         sync: false
       - key: PORTKEY_API_KEY  # enter: the course Portkey key (or leave blank to run with the AI features off)
+        sync: false
+      # ---- declared for the deployment, but NOT read by the code yet (as of 2026-10-25): the app signs people in
+      # with its own usernames and passwords (no Google or Microsoft sign-in) and stores data in SQLite at
+      # HOMEBASE_DB_PATH (not DATABASE_URL). Values entered here do nothing until code uses them.
+      - key: PUBLIC_BASE_URL  # not a secret: the service's public address
+        value: https://bee-fit.onrender.com
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
         sync: false

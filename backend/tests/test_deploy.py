@@ -219,14 +219,24 @@ def test_a_working_db_from_before_this_change_is_upgraded_not_wiped(disk):
 
 def test_render_yaml_puts_the_database_on_a_persistent_disk():
     spec = yaml.safe_load((config.PROJECT_ROOT / "render.yaml").read_text(encoding="utf-8"))
+    assert len(spec["services"]) == 1                                   # one service: FastAPI serves the built app
     web = spec["services"][0]
+    assert (web["type"], web["name"], web["runtime"]) == ("web", "bee-fit", "python")   # renamed from homebase-fit
     assert web["plan"] == "starter"                                     # paid: disks aren't available on free
-    assert web["disk"] == {"name": "homebase-data", "mountPath": "/var/data", "sizeGB": 1}
+    assert web["buildCommand"] == "pip install -r backend/requirements.txt && cd frontend && npm ci && npm run build"
+    assert web["startCommand"] == "cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    assert web["healthCheckPath"] == "/api/health"
+    assert web["disk"] == {"name": "bee-fit-data", "mountPath": "/var/data", "sizeGB": 1}
     env = {e["key"]: e for e in web["envVars"]}
     assert env["HOMEBASE_DB_PATH"]["value"] == "/var/data/homebase.db"  # on the disk, so it survives deploys
     assert env["HOMEBASE_DB_PATH"]["value"].startswith(web["disk"]["mountPath"] + "/")
-    for secret in ("APP_ENV", "APP_SECRET_KEY", "PORTKEY_API_KEY"):
-        assert env[secret] == {"key": secret, "sync": False}              # still set in the dashboard, never here
+    assert env["PUBLIC_BASE_URL"] == {"key": "PUBLIC_BASE_URL", "value": "https://bee-fit.onrender.com"}
+    for secret in ("APP_ENV", "APP_SECRET_KEY", "PORTKEY_API_KEY", "DATABASE_URL", "GOOGLE_CLIENT_ID",
+                   "GOOGLE_CLIENT_SECRET", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET"):
+        assert env[secret] == {"key": secret, "sync": False}              # set in the dashboard, never here
+    # only the two non-secret settings carry a value; nothing else in the file has one
+    assert {k for k, e in env.items() if "value" in e} == {"HOMEBASE_DB_PATH", "PUBLIC_BASE_URL"}
+    assert "OPENAI_API_KEY" not in env                                  # only set if the project owner asks
 
 
 def test_local_dev_still_uses_the_normal_local_path():
