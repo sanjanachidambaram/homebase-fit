@@ -121,7 +121,7 @@ QUIZ_LOGIC: dict[str, dict] = {
               "1 for pregnant or postpartum)",
         "used": "Pregnant or postpartum: no plan is generated, the quiz sends them to /pregnancy-support, the "
                 "calendar stays empty, Build Your Own and the calendar's day choices are blocked, and every AI route "
-                "refuses (403, or a code-only reply for Ask Workout Basics after the red-flag check). They can still log "
+                "refuses (403). They can still log "
                 "cardio in their own words (no library picker), with no calorie estimates and no progress marker.",
         "safety": "Triggers needs_clinical_review, which blocks every AI feature, so no model is ever called for "
                   "them. Not in the agent profile; never sent to any model.",

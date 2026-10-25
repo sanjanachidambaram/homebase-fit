@@ -1,7 +1,6 @@
 // Where pregnant and postpartum users land (from the quiz, the Dashboard, and any blocked feature).
 // No AI runs for them anywhere; this page is static text plus the OB-GYN's recorded message.
 import { useEffect, useState } from 'react'
-import Link from '../components/Link'
 import { OBGYN_NAME } from '../legal'
 
 const VIDEO = '/content/video/obgyn_pregnancy_message.mp4'
@@ -69,14 +68,6 @@ export default function PregnancySupportPage() {
           <strong>Talk with your OB-GYN or midwife</strong> about what kind of activity is right for you now, and bring
           any questions you have. If you notice bleeding, dizziness, chest pain, or pain anywhere, stop and contact
           them right away.
-        </p>
-      </section>
-
-      <section className="support-more">
-        <h3>Want some general reading?</h3>
-        <p>
-          Our <Link to="/basics">Workout Basics articles</Link> are general background (like how rest between sets
-          works), not a plan or advice for pregnancy. They're also still pending expert review.
         </p>
       </section>
     </article>

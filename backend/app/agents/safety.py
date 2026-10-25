@@ -1,9 +1,10 @@
-"""Red-flag pre-filter: plain code, no LLM. Runs BEFORE any agent sees a free-text question.
+"""Red-flag check: plain code, no LLM. Runs on the user's own words (calendar notes, cardio logs) when saved.
 
-If a question mentions pain/injury warning signs or describes the user's own injury, the Workout Basics
-agent is never called. Instead we log a safety_events row and return a fixed message that points
-the user to a doctor or physical therapist. Being deterministic makes it cheap, predictable, and
-fully testable (tests/test_agents.py). It errs on the side of redirecting.
+If the text mentions pain/injury warning signs or describes the user's own injury, we log a safety_events row and
+show a fixed, supportive message that points the user to a doctor or physical therapist. The words are still saved
+(it's their log) and never sent to any model. Being deterministic makes it cheap, predictable, and fully testable.
+It errs on the side of pointing to a professional. (It also guarded the Workout Basics Q&A until that feature was
+removed, 2026-10-25.)
 
 The term list is a placeholder for the PT/OB-GYN to review.
 """
@@ -11,12 +12,6 @@ The term list is a placeholder for the PT/OB-GYN to review.
 import re
 
 from app.db import connect
-
-REDIRECT_MESSAGE = (
-    "That sounds like something a professional should look at, so I'm not going to give exercise advice for it. "
-    "Please stop any exercise that causes it and talk to a doctor or physical therapist. If it's severe or sudden, "
-    "like chest pain, trouble breathing, or fainting, get medical help right away."
-)
 
 # For a calendar note that trips the check: the note is still saved (it's their log), and this shows inline.
 NOTE_SUPPORT_MESSAGE = (

@@ -1,21 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Bee Fit</title>
-  <ellipse cx="18" cy="40" rx="9" ry="6.5" transform="rotate(-25 18 40)" fill="#ffffff" stroke="#7a5700" stroke-width="2"/>
-  <ellipse cx="46" cy="40" rx="9" ry="6.5" transform="rotate(25 46 40)" fill="#ffffff" stroke="#7a5700" stroke-width="2"/>
-  <path d="M25 37 L19 10 M39 37 L45 10" stroke="#2b2a1e" stroke-width="3.2" stroke-linecap="round" fill="none"/>
-  <path d="M32 61 L29.5 57 L34.5 57 Z" fill="#2b2a1e"/>
-  <ellipse cx="32" cy="46" rx="12" ry="12.5" fill="#ffc61a" stroke="#2b2a1e" stroke-width="2.5"/>
-  <path d="M20.6 43 H43.4 M21.4 50.5 H42.6" stroke="#2b2a1e" stroke-width="4"/>
-  <circle cx="32" cy="27" r="9.5" fill="#ffc61a" stroke="#2b2a1e" stroke-width="2.5"/>
-  <path d="M28.5 18.5 L26 13.5 M35.5 18.5 L38 13.5" stroke="#2b2a1e" stroke-width="2" stroke-linecap="round"/>
-  <circle cx="26" cy="13.2" r="1.8" fill="#2b2a1e"/>
-  <circle cx="38" cy="13.2" r="1.8" fill="#2b2a1e"/>
-  <circle cx="28.6" cy="26" r="1.7" fill="#2b2a1e"/>
-  <circle cx="35.4" cy="26" r="1.7" fill="#2b2a1e"/>
-  <circle cx="26.4" cy="29.6" r="1.6" fill="#ff8c1a" opacity="0.7"/>
-  <circle cx="37.6" cy="29.6" r="1.6" fill="#ff8c1a" opacity="0.7"/>
-  <path d="M29.5 30.4 Q32 33 34.5 30.4" stroke="#2b2a1e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
-  <rect x="8" y="7.5" width="48" height="4" rx="2" fill="#2b2a1e"/>
-  <rect x="3" y="2.5" width="7" height="14" rx="2.5" fill="#b34a00" stroke="#2b2a1e" stroke-width="1.5"/>
-  <rect x="54" y="2.5" width="7" height="14" rx="2.5" fill="#b34a00" stroke="#2b2a1e" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="31" fill="#ffc61a"/>
+  <text x="32" y="34" font-size="40" text-anchor="middle" dominant-baseline="central"
+        font-family="'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif">🐝</text>
 </svg>

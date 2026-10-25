@@ -1,5 +1,5 @@
-// The Bee Fit logo: a little bee lifting a dumbbell over its head, drawn in SVG (no image file). The same drawing is
-// public/favicon.svg. Colors are fixed hex values matching the tokens in index.css, so it looks the same everywhere.
+// The Bee Fit logo: a little bee lifting a dumbbell over its head, drawn in SVG (no image file), the one bee in the
+// app. (The browser tab icon, public/favicon.svg, is separate: the bee emoji on a honey circle.) Colors are fixed hex values matching the tokens in index.css, so it looks the same everywhere.
 // Decorative by default (aria-hidden); pass a title when the logo stands alone and needs a name.
 
 export const BEE_COLORS = {

@@ -4,7 +4,6 @@
 # Add an entry whenever real content arrives, then point that content at it:
 #   exercises   source_dataset is set per folder by the seed
 #   programs    `source:` field in content/programs/*.yaml
-#   articles    `source:` field in the front matter of content/basics/*.md
 # Then rerun the seed (from backend/): .venv\Scripts\python.exe -m app.db.seed
 #
 # Fields:
@@ -28,7 +27,7 @@ sources:
     name: Bee Fit placeholder content (AI-drafted)
     url:
     license: Project content; not yet professionally reviewed
-    used_for: 27 starter exercises (with drafted injury tags), 15 goal protocols, and 5 Workout Basics articles, all pending PT review
+    used_for: 27 starter exercises (with drafted injury tags) and 9 goal protocols, all pending PT review
     status: placeholder
 
   - id: pt-reviewed-protocols
@@ -45,18 +44,11 @@ sources:
     used_for: Plans for pregnant and postpartum users (no plan is generated for them until this exists)
     status: pending
 
-  - id: pt-obgyn-reviewed-basics
-    name: PT/OB-GYN-reviewed Workout Basics articles
-    url:
-    license: Pending; terms to be confirmed with the reviewers
-    used_for: Workout Basics hub articles (replacing the placeholders)
-    status: pending
-
   - id: cdc-losing-weight
     name: "CDC: Losing Weight"
     url: https://www.cdc.gov/healthy-weight-growth/losing-weight/index.html
     license: U.S. government work (public domain)
-    used_for: The quiz note that losing about 1 to 2 pounds a week is more sustainable, and the same context next to the Workout Reviewer's weight-change estimate, and the "Tracking Weight Loss" Workout Basics article
+    used_for: The quiz note that losing about 1 to 2 pounds a week is more sustainable, and the same context next to the Workout Reviewer's weight-change estimate
     status: active
 
   - id: acog-co-804

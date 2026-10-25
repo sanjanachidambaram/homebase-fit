@@ -1,6 +1,5 @@
 // "Your Personalized Plan": how your plan works (the general approach, plus the Program Architect's explanation on
-// request) at the top, then your generated weekly plan (GET /api/plan, built by code, no AI). The Workout Basics
-// articles used to share this page; they have their own page now (BasicsPage, /basics).
+// request) at the top, then your generated weekly plan (GET /api/plan, built by code, no AI).
 import { useEffect, useState } from 'react'
 import { fetchPlan, type WeeklyProgram } from '../api'
 import Link from '../components/Link'

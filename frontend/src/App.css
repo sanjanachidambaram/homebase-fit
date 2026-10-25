@@ -456,8 +456,7 @@ main {
 .account-form input,
 .question input[type='number'],
 .question input[type='text'],
-.question textarea,
-.ask-form input {
+.question textarea {
   min-height: 48px;
   padding: 0.5rem 0.9rem;
   border: 2px solid var(--honey);
@@ -468,8 +467,7 @@ main {
 .controls select:focus,
 .account-form input:focus,
 .question input:focus,
-.question textarea:focus,
-.ask-form input:focus {
+.question textarea:focus {
   border-color: var(--orange-deep);
 }
 
@@ -946,31 +944,6 @@ fieldset.question {
   padding: 0.75rem 1rem;
 }
 
-/* ================================================================ programs & basics page */
-
-.content-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.1rem;
-}
-
-.content-item {
-  background: #fff;
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow);
-  padding: 1rem 1.25rem 1.2rem;
-  border-top: 8px solid var(--honey);
-}
-
-.content-list:first-of-type .content-item {
-  border-top-color: var(--orange);
-}
-
-.content-item h4 {
-  margin: 0.3rem 0 0.2rem;
-  font-size: 1.25rem;
-}
-
 /* ================================================================ dashboard */
 
 .welcome {
@@ -1190,71 +1163,6 @@ fieldset.question {
   background: var(--green-tint);
   font-family: var(--font-display);
   font-weight: 600;
-}
-
-/* Ask Workout Basics */
-.ask-card {
-  grid-column: 1 / -1; /* full width on the Dashboard, so there's room to type a real question */
-  border-top: 8px solid var(--honey);
-}
-
-.ask-form {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-end;
-}
-
-.ask-form textarea {
-  flex: 1;
-  min-width: 0;
-  min-height: 4.5rem;
-  padding: 0.7rem 0.9rem;
-  border: 2px solid var(--honey);
-  border-radius: var(--radius-input);
-  background: #fff;
-  font: inherit;
-  font-size: 1.05rem;
-  resize: vertical;
-}
-
-.ask-form textarea:focus {
-  border-color: var(--orange-deep);
-}
-
-@media (max-width: 560px) {
-  .ask-form {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-
-.answer {
-  margin-top: 0.75rem;
-  padding: 0.9rem 1rem;
-  border-radius: var(--radius-input);
-  background: var(--bg);
-}
-
-.answer > p:first-child {
-  margin-top: 0;
-  font-size: 1.05rem;
-}
-
-.answer-source {
-  margin-top: 0.4rem;
-}
-
-/* Red-flag redirect: plain, calm, full contrast (no cheek, design.md 7 rule 1). */
-.safety-box {
-  margin-top: 0.75rem;
-  padding: 1rem 1.1rem;
-  border-radius: var(--radius-input);
-  background: #fff;
-  border: 2px solid var(--error);
-}
-
-.safety-box p {
-  margin: 0.35rem 0 0;
 }
 
 /* Workout builder */
@@ -1825,8 +1733,7 @@ fieldset.question {
   font-size: 0.92rem;
 }
 
-.support-next,
-.support-more {
+.support-next {
   margin-top: 1.25rem;
   padding: 1rem 1.1rem;
   border-radius: var(--radius-input);
@@ -1834,21 +1741,15 @@ fieldset.question {
   border: 2px solid var(--honey-deep);
 }
 
-.support-more {
-  border-style: dashed;
-}
-
-.support-next h3,
-.support-more h3 {
+.support-next h3 {
   margin: 0 0 0.4rem;
 }
 
-.support-next p,
-.support-more p {
+.support-next p {
   margin: 0;
 }
 
-/* Library filters: muscle group select plus chip groups for equipment, level and injury-safety status. */
+/* Library filters: the quiz-style questions (focus, areas to avoid) plus chip groups for equipment. */
 .filters {
   display: grid;
   gap: 0.75rem;
@@ -2235,7 +2136,7 @@ fieldset.question {
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));   /* four people: a tidy 2 x 2 */
+  grid-template-columns: repeat(2, minmax(0, 1fr));   /* two people, side by side */
   gap: 1rem;
 }
 
@@ -2248,6 +2149,7 @@ fieldset.question {
 .team-card {
   display: grid;
   justify-items: center;
+  align-content: start;   /* photo and caption at the top, so captions line up across cards */
   gap: 0.3rem;
   padding: 1.25rem 1rem;
   border-radius: 24px;

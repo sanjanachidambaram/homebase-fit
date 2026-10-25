@@ -1,7 +1,7 @@
 # Bee Fit: Design Direction
 
 **Status: applied.** Every page follows this file (tokens in `frontend/src/index.css`, components in
-`frontend/src/App.css`). It's the standing design direction for **every** page: quiz, dashboard, programs, basics hub, calendar, progress, faves,
+`frontend/src/App.css`). It's the standing design direction for **every** page: quiz, dashboard, programs, calendar, progress, faves,
 and the exercise detail view. When a page is built, it follows this file; if a page needs
 something this file doesn't cover, add it here first.
 
@@ -58,9 +58,10 @@ Rules:
 4. Safety and legal text (disclaimer, red-flag redirects, delete confirmation) uses dark ink on a
    plain or very light background. Pretty, but never faint (see section 7).
 
-**The logo:** a bee lifting a dumbbell over its head, drawn in inline SVG (`frontend/src/components/BeeLogo.tsx`,
-and the same drawing as `frontend/public/favicon.svg`), shown in the header next to "Bee Fit 🐝", on the landing
-page, and doing a little lift in the loading indicator.
+**The logo:** a bee lifting a dumbbell over its head, drawn in inline SVG (`frontend/src/components/BeeLogo.tsx`),
+the one bee in the app (2026-10-25: the 🐝 emoji next to the name was removed). It's in the header before "Bee Fit",
+above the title on the landing page, next to the streak number, and doing a little lift in the loading indicator.
+**The browser tab icon** (`frontend/public/favicon.svg`) is the 🐝 emoji on a honey-yellow circle, as chosen.
 
 ## 3. Type
 
@@ -168,7 +169,6 @@ Examples:
 | Quiz | One question per screen, big tappable answer cards with emoji-style SVG icons, springy progress bar. The consent step is calm and clear (rule 1) |
 | Dashboard | A greeting, then exactly two cards (2026-10-25): "Plan for today" (today's day from the calendar) and "Your streak" (current and longest streak, active days, day-streak badges). Code only, no AI |
 | Programs | Cards with a colored goal ribbon, weekly strip of rounded day circles |
-| Workout Basics hub | Honey-tinted article cards with a friendly icon; review tag visible |
 | Exercise library + faves | Candy-colored cards per muscle group, hearts, bottom-sheet detail. Filters read like the quiz (its own question component): what to work on (upper body, lower body, core / mobility) and areas to avoid because of an injury |
 | Calendar | Rounded day cells, green check for done days, yellow star for goal days |
 | Progress | Rings and thick bars, the "3 full-size trees" style fun stats, confetti on milestones |

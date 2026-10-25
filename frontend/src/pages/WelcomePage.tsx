@@ -162,7 +162,7 @@ export default function WelcomePage() {
         <p className="landing-kicker">Free · home workouts · built around you</p>
         <h2 className="landing-title">
           <BeeLogo size={96} className="landing-logo" />
-          Bee <span className="landing-title-pop">Fit</span> <span aria-hidden="true">🐝</span>
+          Bee <span className="landing-title-pop">Fit</span>
         </h2>
         <p className="landing-pitch">
           Your goals and your injuries, in <span className="hl">one</span> plan. Finally.

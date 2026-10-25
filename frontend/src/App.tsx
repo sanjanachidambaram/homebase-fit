@@ -4,7 +4,6 @@ import { DisclaimerBar } from './components/Legal'
 import Link from './components/Link'
 import AboutDataPage from './pages/AboutDataPage'
 import AboutPage from './pages/AboutPage'
-import BasicsPage from './pages/BasicsPage'
 import BuildPage from './pages/BuildPage'
 import CalendarPage from './pages/CalendarPage'
 import DashboardPage from './pages/DashboardPage'
@@ -31,7 +30,6 @@ function Moved({ to }: { to: string }) {
 const PAGES: Record<string, () => JSX.Element> = {
   '/': DashboardPage,
   '/plan': PlanPage, // "Your Personalized Plan": the generated week only
-  '/basics': BasicsPage, // the Workout Basics articles and Ask Workout Basics
   '/content': () => <Moved to="/plan" />, // the old combined "Your Plan & Basics" page (2026-10-23)
   '/build': BuildPage,
   '/calendar': CalendarPage,
@@ -48,7 +46,7 @@ const PAGES: Record<string, () => JSX.Element> = {
 }
 
 // Only pages that exist get a nav link. The order (2026-10-25): Dashboard, Personalized Plan, Calendar, Build Your
-// Own, Exercise Library, Workout Basics, then About and Settings last. My Faves lives inside the Exercise Library
+// Own, Exercise Library, then About and Settings last (Workout Basics was removed 2026-10-25). My Faves lives inside the Exercise Library
 // (a subtab), not in the nav.
 const NAV: { path: string; label: string; also?: (path: string) => boolean }[] = [
   { path: '/', label: 'Dashboard' },
@@ -56,7 +54,6 @@ const NAV: { path: string; label: string; also?: (path: string) => boolean }[] =
   { path: '/calendar', label: 'Calendar' },
   { path: '/build', label: 'Build Your Own' },
   { path: '/exercises', label: 'Exercise Library', also: (p) => p === '/faves' },
-  { path: '/basics', label: 'Workout Basics' },
   { path: '/about', label: 'About', also: (p) => p.startsWith('/about/') },
   { path: '/settings', label: 'Settings' },
 ]
@@ -78,7 +75,7 @@ export default function App() {
               <span className="brand-mark" aria-hidden="true">
                 <BeeLogo size={40} />
               </span>
-              Bee Fit <span aria-hidden="true">🐝</span>
+              Bee Fit
             </Link>
           </h1>
           <nav aria-label="Main">

@@ -273,8 +273,6 @@ def test_calendar_notes_never_reach_any_model(client, on_day, monkeypatch):
         ("POST", "/api/programs/recommend", {}, [("final", {"explanation": "A gentle plan."})]),
         ("POST", "/api/workouts/build", {"picks": {"core": 1}, "time_budget_minutes": 10},
          [("final", {"items": [], "balance_note": "-"})]),
-        ("POST", "/api/basics/ask", {"question": "How long should I rest between sets?"},
-         [("final", {"answered": False, "answer": "-", "source_slugs": []})]),
     ]:
         rec = Recorder(*steps)
         monkeypatch.setattr(harness, "get_model", rec.model)

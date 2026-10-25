@@ -1,16 +1,15 @@
 # Bee Fit MCP server
 
 The FastMCP tool layer the AI agents call. It is separate from the REST API (`app/main.py`), which the website uses.
-Exactly **6 tools**, all **read-only**. There is no delete tool, no write tool, and nothing that returns an email.
+Exactly **5 tools**, all **read-only**. There is no delete tool, no write tool, and nothing that returns an email.
 
 | # | Tool | What it does |
 |---|---|---|
-| 1 | `get_user_profile(user_id)` | goals, timeline, injury_flags, age, weight_lb, height_in. Nothing else. Uses `agents/context.py` |
+| 1 | `get_user_profile(user_id)` | goal and injury_flags. Nothing else (no weight, no name). Uses `agents/context.py` |
 | 2 | `search_exercises(muscle_group, equipment, injury_flags, limit, checked_only)` | Exercise library. Injury filter is in the SQL. Untagged exercises are flagged `not_yet_checked` |
-| 3 | `search_basics_kb(query)` | Keyword search over Workout Basics. The only source for answering basics questions |
-| 4 | `get_progress_summary(user_id)` | Last 30 days: sessions, weight lifted, streak, measurement trends |
-| 5 | `compute_strength_equivalents(total_weight_lifted_lbs)` | Fun comparisons with real weights and sources. No database |
-| 6 | `check_goal_achievement(user_id)` | `on_track` / `ahead` / `behind` / `insufficient_data` from the progress and the quiz goals |
+| 3 | `get_progress_summary(user_id)` | Last 30 days: sessions, weight lifted, streak, measurement trends |
+| 4 | `compute_strength_equivalents(total_weight_lifted_lbs)` | Fun comparisons with real weights and sources. No database |
+| 5 | `check_goal_achievement(user_id)` | `on_track` / `ahead` / `behind` / `insufficient_data` from the progress and the quiz goals |
 
 ## Run it
 
@@ -26,7 +25,7 @@ It talks MCP over stdio, so on its own it just waits for a client. To check it w
 backend/.venv/Scripts/python.exe backend/app/mcp_server/smoke_test.py
 ```
 
-The smoke test launches the server from `.mcp.json`, calls all 6 tools, and proves the injury filter removes a
+The smoke test launches the server from `.mcp.json`, calls all 5 tools, and proves the injury filter removes a
 tagged exercise. It uses a throwaway copy of the database (via `HOMEBASE_DB_PATH`), so no committed data is touched.
 
 ## Connecting Claude Code

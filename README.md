@@ -1,4 +1,4 @@
-# Bee Fit 🐝
+# Bee Fit
 
 (Formerly HomeBase Fit, renamed 2026-10-25. Internal names keep `homebase` on purpose: the database files
 `homebase.db` / `homebase_original.db`, `HOMEBASE_DB_PATH`, the Render service and disk, the MCP server id and the

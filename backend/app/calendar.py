@@ -28,7 +28,7 @@ Rules, all enforced here in code:
     increases since then (program_generator.weight_steps). Always just a suggestion the person can change. Rest days
     can't be marked completed (that would count as a workout), and neither can days that haven't come yet.
   * Notes are the user's own words. They're always saved, and checked in code (app/agents/safety.py, the same
-    red-flag check as the Workout Basics Q&A) when they change. A match logs a safety_events row (source
+    red-flag check as cardio logs) when they change. A match logs a safety_events row (source
     'calendar_note') and returns a supportive message pointing to a doctor or PT. No AI call, ever: notes are
     never sent to any model (shared_rules.md rule 2) and no MCP tool reads them.
   * Pregnant / postpartum users have no plan: GET returns an empty calendar that points to /pregnancy-support.

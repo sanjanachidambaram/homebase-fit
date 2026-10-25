@@ -6,8 +6,6 @@ Drop one photo per person in this folder, named exactly:
 |---|---|
 | `sanjana.jpg` | Sanjana — creator |
 | `summer.jpg` | Summer — Personal Trainer & Pilates Instructor |
-| `fauzia.jpg` | Fauzia — Physical Therapist |
-| `sister.jpg` | My sister — OB-GYN |
 
 `.png` or `.webp` work too (for example `sanjana.png`). The About page tries `.jpg`, then `.png`, then `.webp`,
 and shows a placeholder avatar until a file exists, so a missing photo never shows a broken image.

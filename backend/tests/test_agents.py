@@ -2,8 +2,6 @@
 
 Run from backend/:
     .venv\\Scripts\\python.exe -m pytest tests/test_agents.py -v
-Safety-section evidence (prints the safety_events row the test creates):
-    .venv\\Scripts\\python.exe -m pytest tests/test_agents.py -v -s -k red_flag_question_never_reaches_the_agent
 
 No test calls the real model. Each test swaps in a scripted model (PydanticAI's FunctionModel) that plays
 the model's part, including deliberately misbehaving, so the code's checks can be tested exactly.
@@ -13,13 +11,13 @@ All tests run against a throwaway copy of the database.
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock
 
 import pytest
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from app.agents import basics, harness
+from app.agents import harness
+from app.agents.safety import red_flags_in
 from app.agents.harness import McpGateway
 from app.db import connect
 from tests.helpers import quiz_answers
@@ -98,87 +96,24 @@ def rows(sql, *args):
         conn.close()
 
 
-# ================================================================ SAFETY: red-flag pre-filter
+# ================================================================ SAFETY: the shared red-flag check
 
-def test_red_flag_question_never_reaches_the_agent(client, use_script, monkeypatch):
-    script = use_script(("final", {"answered": True, "answer": "x", "source_slugs": []}))
-    agent_run = AsyncMock(side_effect=AssertionError("the Workout Basics agent must not be called"))
-    monkeypatch.setattr(basics.basics_agent, "run", agent_run)
-    uid, h = account(client, "safety")
-
-    r = client.post("/api/basics/ask", json={"question": RED_FLAG_QUESTION}, headers=h)
-
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["result"]["redirected_to_professional"] is True
-    assert "doctor or physical therapist" in body["result"]["answer"]
-    assert body["meta"]["agent_called"] is False and "sharp/severe pain" in body["meta"]["red_flags"]
-    agent_run.assert_not_called()        # the agent's run() was never invoked...
-    assert script.calls == 0             # ...and the model was never called
-    assert rows("SELECT COUNT(*) AS n FROM agent_runs")[0]["n"] == 0   # no tokens spent
-
-    events = rows("SELECT * FROM safety_events_report")
-    assert len(events) == 1
-    e = events[0]
-    assert (e["source"], e["trigger_text"], e["action_taken"], e["username"]) == \
-        ("basics_qa", RED_FLAG_QUESTION, "redirected_to_professional", "safety")
-    print("\nsafety_events row created by the red-flag pre-filter:")
-    print(json.dumps(rows("SELECT * FROM safety_events WHERE id = ?", body["meta"]["safety_event_id"])[0], indent=2))
-
-
-@pytest.mark.parametrize("question", [
+@pytest.mark.parametrize("text", [
+    RED_FLAG_QUESTION,
     "I have numbness in my leg after planks", "I can't move my shoulder since yesterday",
     "Is it okay to work out with chest pain?", "I felt dizzy and almost fainted during squats",
     "I think I tore my hamstring", "my lower back hurts when I bend over", "severe cramps after running",
     "I'm pregnant and noticed some bleeding after a workout", "It hurts when I lift my arm overhead",
 ])
-def test_every_red_flag_redirects_and_logs(client, use_script, question):
-    script = use_script(("final", {"answered": True, "answer": "x", "source_slugs": []}))
-    uid, h = account(client, "user_rf")
-    r = client.post("/api/basics/ask", json={"question": question}, headers=h).json()
-    assert r["result"]["redirected_to_professional"] and script.calls == 0
-    assert rows("SELECT trigger_text FROM safety_events WHERE user_id = ?", uid) == [{"trigger_text": question}]
+def test_every_red_flag_is_caught(text):
+    """The check calendar notes and cardio logs run (it used to guard the Workout Basics Q&A too, removed
+    2026-10-25). Plain code, no model."""
+    assert red_flags_in(text), text
 
 
-def test_ordinary_question_is_answered_from_the_knowledge_base(client, use_script):
-    use_script(("search_basics_kb", {"query": "rest between sets"}),
-               ("final", {"answered": True, "source_slugs": ["rest_between_sets"],
-                          "answer": "Our guide says about 60 to 90 seconds for moderate sets of 8 to 15 reps."}))
-    uid, h = account(client, "ask")
-    r = client.post("/api/basics/ask", json={"question": "How long should I rest between sets?"}, headers=h).json()
-    res = r["result"]
-    assert res["answered"] and not res["redirected_to_professional"]
-    assert res["sources"][0]["slug"] == "rest_between_sets" and res["sources"][0]["status"] == "placeholder"
-    assert res["sources"][0]["review_notice"] == "Content pending expert review" and res["review_note"]
-    assert rows("SELECT COUNT(*) AS n FROM safety_events")[0]["n"] == 0
-
-
-def test_question_with_no_matching_article_never_calls_the_model(client, use_script):
-    script = use_script(("final", {"answered": True, "answer": "made up", "source_slugs": []}))
-    uid, h = account(client, "nomatch")
-    r = client.post("/api/basics/ask", json={"question": "Which protein powder brand is best?"}, headers=h).json()
-    assert r["result"]["answer"] == basics.NO_INFO_MESSAGE and script.calls == 0
-    assert rows("SELECT COUNT(*) AS n FROM agent_runs")[0]["n"] == 0
-
-
-def test_basics_rejects_invented_sources_and_science_claims(client, use_script):
-    use_script(("search_basics_kb", {"query": "rest between sets"}),
-               ("final", {"answered": True, "answer": "Rest 90s.", "source_slugs": ["made_up_article"]}),
-               ("final", {"answered": True, "answer": "Research shows 90 seconds is best.",
-                          "source_slugs": ["rest_between_sets"]}),
-               ("final", {"answered": True, "answer": "Our guide says 60 to 90 seconds for moderate sets.",
-                          "source_slugs": ["rest_between_sets"]}))
-    uid, h = account(client, "claims")
-    res = client.post("/api/basics/ask", json={"question": "How long should I rest between sets?"}, headers=h).json()["result"]
-    assert res["answered"] and "research" not in res["answer"].lower()
-
-
-def test_basics_falls_back_to_no_info_if_the_model_keeps_making_claims(client, use_script):
-    use_script(("search_basics_kb", {"query": "rest"}),
-               ("final", {"answered": True, "answer": "Studies prove it.", "source_slugs": ["rest_between_sets"]}))
-    uid, h = account(client, "claims2")
-    res = client.post("/api/basics/ask", json={"question": "How long should I rest between sets?"}, headers=h).json()["result"]
-    assert res["answer"] == basics.NO_INFO_MESSAGE and not res["answered"]
+@pytest.mark.parametrize("text", ["Felt strong today, added 5 lb", "Easy walk with the dog", "Did all my sets"])
+def test_ordinary_notes_are_not_flagged(text):
+    assert red_flags_in(text) == []
 
 
 # ================================================================ SECURITY: no cross-user access
@@ -191,8 +126,6 @@ def test_model_never_sees_user_id_injury_flags_or_checked_only(client, use_scrip
         ("/api/programs/recommend", "post", {}, {"explanation": "A gentle plan for your goals."}),
         ("/api/workouts/build", "post", {"picks": {"core": 1}, "time_budget_minutes": 20}, None),
         ("/api/coach/summary", "get", None, {"encouragement": "Nice work!", "fun_fact_comparison": None}),
-        ("/api/basics/ask", "post", {"question": "How long should I rest between sets?"},
-         {"answered": False, "answer": "-", "source_slugs": []}),
     ]:
         script = use_script(("final", final or {"items": [], "balance_note": "-"}))
         client.request(method.upper(), route, json=body, headers=ha)
@@ -202,14 +135,13 @@ def test_model_never_sees_user_id_injury_flags_or_checked_only(client, use_scrip
         assert tools or route == "/api/programs/recommend", f"{route}: the model should have been shown its tools"
         for name, params in tools.items():
             assert not params & {"user_id", "injury_flags", "checked_only", "equipment"}, (route, name, params)
-    assert set(shown["/api/basics/ask"]) == {"search_basics_kb"}
     assert set(shown["/api/coach/summary"]) == {"get_progress_summary", "check_goal_achievement",
                                                 "compute_strength_equivalents"}
 
 
 def test_no_agent_ever_sees_the_username_or_first_name(client, use_script, mcp_calls):
     """shared_rules.md rule 2: the username and first name identify the person, so like email they never reach a
-    model. Runs all five agents, tools included, and searches everything each model was sent."""
+    model. Runs every agent, tools included, and searches everything each model was sent."""
     username, first_name = "zenobia.q", "Zenobia"
     r = client.post("/api/users", json={"username": username, "first_name": first_name, "password": "correct horse 1"}).json()
     uid, h = r["user_id"], {"Authorization": f"Bearer {r['token']}"}
@@ -227,9 +159,6 @@ def test_no_agent_ever_sees_the_username_or_first_name(client, use_script, mcp_c
          [("get_progress_summary", {}), ("check_goal_achievement", {}),
           ("compute_strength_equivalents", {"total_weight_lifted_lbs": 1800}),
           ("final", {"encouragement": "Three days in a row, nice!", "fun_fact_comparison": None})]),
-        ("POST", "/api/basics/ask", {"question": "How long should I rest between sets?"},
-         [("search_basics_kb", {"query": "rest between sets"}),
-          ("final", {"answered": True, "source_slugs": ["rest_between_sets"], "answer": "About 60 to 90 seconds."})]),
         ("POST", "/api/workouts/review", {"items": [dead_bug]}, [("final", {"summary": "A short core session."})]),
     ]:
         script = use_script(*steps)
@@ -237,7 +166,7 @@ def test_no_agent_ever_sees_the_username_or_first_name(client, use_script, mcp_c
         assert res.status_code == 200 and script.calls >= 1, (route, res.text)
         sent += script.seen
     text = " ".join(sent).lower()
-    assert "dead_bug" in text and "rest_between_sets" in text and "streak" in text   # tool results were in there
+    assert "dead_bug" in text and "streak" in text                                    # tool results were in there
     for secret in (username, "zenobia"):
         assert secret not in text, secret
     assert "zenobia" not in json.dumps(mcp_calls).lower()                          # nor in any tool call
@@ -252,7 +181,6 @@ def test_user_cannot_reach_another_users_data(client, use_script, mcp_calls):
     assert client.post("/api/programs/recommend", json={"user_id": b}, headers=ha).status_code == 422
     assert client.post("/api/workouts/build", headers=ha,
                        json={"user_id": b, "picks": {"core": 1}, "time_budget_minutes": 20}).status_code == 422
-    assert client.post("/api/basics/ask", json={"question": "How do I rest?", "user_id": b}, headers=ha).status_code == 422
 
     # 2. A manipulated model asks for B's data by id and with a prompt-injection style plan.
     use_script(("get_progress_summary", {"user_id": b}),
@@ -381,12 +309,13 @@ def test_model_written_text_never_shows_emoji(client, use_script):
 
 def test_every_agent_call_is_logged_with_tokens(client, use_script):
     a, ha = account(client, "tok")
-    use_script(("search_basics_kb", {"query": "rest between sets"}),
-               ("final", {"answered": True, "answer": "Our guide says 60 to 90 seconds.", "source_slugs": ["rest_between_sets"]}))
-    meta = client.post("/api/basics/ask", json={"question": "How long should I rest between sets?"}, headers=ha).json()["meta"]
+    dead_bug = {"exercise_id": "dead_bug", "sets": 2, "reps": "8 each side", "rest_seconds": 30}
+    use_script(("search_exercises", {"muscle_group": "core"}), ("final", {"items": [dead_bug], "balance_note": "Core."}))
+    meta = client.post("/api/workouts/build", headers=ha,
+                       json={"picks": {"core": 1}, "time_budget_minutes": 10}).json()["meta"]
     run = rows("SELECT * FROM agent_runs WHERE id = ?", meta["agent_run_id"])[0]
     assert (run["agent_name"], run["user_id"], run["route"], run["status"], run["model"]) == \
-        ("basics", a, "POST /api/basics/ask", "ok", "gpt-6-luna")
+        ("workout_builder", a, "POST /api/workouts/build", "ok", "gpt-6-luna")
     assert run["input_tokens"] > 0 and run["output_tokens"] > 0 and run["requests"] == 2 and run["tool_calls"] == 1
     assert run["input_tokens"] == meta["usage"]["input_tokens"] and run["duration_ms"] >= 0
 

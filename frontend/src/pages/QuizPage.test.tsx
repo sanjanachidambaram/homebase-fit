@@ -108,7 +108,7 @@ describe('the nav', () => {
     const nav = screen.getByRole('navigation', { name: 'Main' })
     const labels = Array.from(nav.querySelectorAll('a')).map((a) => a.textContent)
     expect(labels).toEqual(['Dashboard', 'Personalized Plan', 'Calendar', 'Build Your Own', 'Exercise Library',
-      'Workout Basics', 'About', 'Settings'])
+      'About', 'Settings'])
   })
 
   it('sends the old combined page to the plan', async () => {

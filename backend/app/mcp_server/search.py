@@ -1,4 +1,4 @@
-"""Read-only searches over exercises and Workout Basics articles.
+"""Read-only searches over exercises.
 
 Everything here opens the database read-only (see app.db.connect_readonly). The injury filters are
 SQL, not prompt text: a contraindicated exercise is never returned, whatever the caller asks for.
@@ -221,82 +221,3 @@ def contraindicated_exercises(injury_flags: list[str], muscle_groups: list[str],
                          for i in json.loads(r["injury_contraindications"]) if i in flags],
         })
     return out
-
-
-# ---------------------------------------------------------------- Workout Basics knowledge base
-
-STOPWORDS = {
-    "a", "an", "the", "is", "are", "was", "do", "does", "did", "to", "of", "in", "on", "for", "and", "or", "it",
-    "i", "my", "me", "we", "you", "your", "how", "what", "when", "why", "should", "can", "could", "would", "be",
-    "this", "that", "with", "about", "much", "many", "long", "get", "have", "has", "if", "so", "at", "as", "by",
-    "which", "who", "whom", "whose", "where", "there", "their", "they", "them", "these", "those", "any", "some",
-    "all", "best", "good", "better", "way", "really", "very", "just", "need", "want", "like", "also", "than",
-    "then", "more", "most", "will", "its", "am", "were", "been", "being", "from", "into", "out", "up", "down",
-    "over", "under", "again", "too", "not", "no", "yes", "one", "make", "ok", "okay", "normal", "thing", "things",
-}
-MAX_ARTICLES = 3
-NO_MATCH_MESSAGE = ("No article in the Workout Basics knowledge base matches this question. Do not answer from "
-                    "general knowledge. Reply: \"I don't have verified information on that. Please consult a "
-                    "doctor or physical therapist.\"")
-
-
-def _tokens(text: str) -> list[str]:
-    """Lowercase words with a light plural fix (injuries -> injury, sets -> set), minus filler words."""
-    out = []
-    for w in re.findall(r"[a-z0-9]+", text.lower()):
-        if w in STOPWORDS or len(w) < 2:
-            continue
-        if w.endswith("ies") and len(w) > 4:
-            w = w[:-3] + "y"
-        elif w.endswith("s") and not w.endswith("ss") and len(w) > 3:
-            w = w[:-1]
-        out.append(w)
-    return out
-
-
-def search_basics_kb(query: str) -> dict:
-    if not isinstance(query, str) or not query.strip():
-        raise ToolInputError("query must be a non-empty string.")
-    if len(query) > 500:
-        raise ToolInputError("query must be 500 characters or fewer.")
-    terms = sorted(set(_tokens(query)))
-
-    conn = connect_readonly()
-    try:
-        articles = conn.execute("SELECT * FROM basics_articles ORDER BY title").fetchall()
-    finally:
-        conn.close()
-
-    scored = []
-    for a in articles:
-        title, cat, body = set(_tokens(a["title"])), set(_tokens(a["category"])), _tokens(a["content"])
-        matched = [t for t in terms if t in title or t in cat or t in body]
-        if not matched:
-            continue
-        # title match weighs 3, category 2, body 1 (capped at 5 mentions per term so long text can't dominate)
-        score = sum((3 if t in title else 0) + (2 if t in cat else 0) + min(body.count(t), 5) for t in matched)
-        scored.append((score, a, matched))
-    scored.sort(key=lambda s: (-s[0], s[1]["title"]))
-
-    matches = [{
-        "slug": a["slug"],
-        "title": a["title"],
-        "category": a["category"],
-        "score": score,
-        "matched_terms": matched,
-        "content": a["content"],
-        **_review(a),
-    } for score, a, matched in scored[:MAX_ARTICLES]]
-    result = {
-        "query": query,
-        "searched_terms": terms,
-        "answerable": bool(matches),
-        "matches": matches,
-        "instructions": ("Answer ONLY from the content of these articles, and only claim what they say. Cite the "
-                         "article title. Content with status 'placeholder' is pending expert review: say so. "
-                         "If the articles don't actually answer the question, say you don't have verified "
-                         "information and suggest consulting a doctor or physical therapist."),
-    }
-    if not matches:
-        result["message"] = NO_MATCH_MESSAGE
-    return result

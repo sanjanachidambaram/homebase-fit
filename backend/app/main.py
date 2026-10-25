@@ -21,7 +21,6 @@ from fastapi.staticfiles import StaticFiles
 
 from app import config
 from app.config import CONTENT_DIR, FRONTEND_DIST, MODEL_NAME, is_production, llm_provider
-from app.content import media_url, review_info
 from app.db import connect, ensure_working_db, table_counts
 from app.agent_routes import router as agent_router
 from app.calendar import router as calendar_router
@@ -117,10 +116,6 @@ def data_summary() -> dict:
                 "placeholder": one("SELECT COUNT(*) FROM goal_protocols WHERE status = 'placeholder'"),
                 "with_citations": one("SELECT COUNT(*) FROM goal_protocols WHERE citations <> '[]'"),
             },
-            "basics_articles": {
-                "total": one("SELECT COUNT(*) FROM basics_articles"),
-                "placeholder": one("SELECT COUNT(*) FROM basics_articles WHERE status = 'placeholder'"),
-            },
         }
     finally:
         conn.close()
@@ -132,27 +127,6 @@ def plan_example() -> dict:
     """Public: the worked example on the "How We Build Your Plan" page. A live run of the real generator
     for a fixed profile (no user data, no AI), so the example always matches the current algorithm."""
     return worked_example().model_dump()
-
-
-@app.get("/api/basics")
-def list_basics() -> list[dict]:
-    conn = connect()
-    try:
-        rows = conn.execute("SELECT * FROM basics_articles ORDER BY title").fetchall()
-    finally:
-        conn.close()
-    return [
-        {
-            "slug": r["slug"],
-            "title": r["title"],
-            "category": r["category"],
-            "content": r["content"],
-            "media_url": media_url(r["media_path"]),
-            **review_info(r),
-            "source_id": r["source_id"],
-        }
-        for r in rows
-    ]
 
 
 @app.get("/api/debug/tables")

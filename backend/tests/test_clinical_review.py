@@ -5,16 +5,14 @@ Run from backend/:
 
 Every route that can call the model is tried with a pregnant and a postpartum profile, with a fake model that
 counts its calls. The answer must come from code (or a 403 pointing at /pregnancy-support), with zero model calls
-and no agent_runs row. The red-flag safety check still runs first for Workout Basics questions.
+and no agent_runs row.
 """
 
 import pytest
 
 from app.safety_rules import CLINICAL_REVIEW_NO_AI, CLINICAL_REVIEW_PAGE
 from tests.helpers import quiz_answers
-from tests.test_agents import RED_FLAG_QUESTION, rows, use_script  # noqa: F401  (use_script is a fixture)
-
-ANSWERABLE = "How long should I rest between sets?"   # has a Workout Basics article, so only the clinical block can stop it
+from tests.test_agents import rows, use_script  # noqa: F401  (use_script is a fixture)
 
 
 def account(client, username, pregnancy_status) -> tuple[int, dict]:
@@ -45,11 +43,6 @@ def test_no_ai_route_calls_the_model(client, use_script, status):
         assert r.json()["detail"] == {"code": "needs_clinical_review", "message": CLINICAL_REVIEW_NO_AI,
                                       "page": CLINICAL_REVIEW_PAGE}
 
-    ask = client.post("/api/basics/ask", headers=h, json={"question": ANSWERABLE}).json()
-    assert ask["result"] == {"answer": CLINICAL_REVIEW_NO_AI, "answered": False, "redirected_to_professional": False,
-                             "sources": [], "review_note": None}
-    assert ask["meta"] == {"agent_called": False, "needs_clinical_review": True, "page": "/pregnancy-support"}
-
     plan = client.post("/api/programs/recommend", headers=h).json()
     assert plan["meta"]["agent_called"] is False and plan["result"]["plan"]["generated"] is False
 
@@ -57,21 +50,12 @@ def test_no_ai_route_calls_the_model(client, use_script, status):
     assert rows("SELECT COUNT(*) AS n FROM agent_runs")[0]["n"] == 0
 
 
-def test_red_flag_check_still_runs_first(client, use_script):
-    script = any_model_answer(use_script)
-    uid, h = account(client, "rf-pregnant", "pregnant")
-    r = client.post("/api/basics/ask", headers=h, json={"question": RED_FLAG_QUESTION}).json()
-    assert r["result"]["redirected_to_professional"] is True and script.calls == 0
-    assert rows("SELECT trigger_text FROM safety_events WHERE user_id = ?", uid) == [{"trigger_text": RED_FLAG_QUESTION}]
-
-
 def test_other_users_are_unaffected(client, use_script):
-    use_script(("search_basics_kb", {"query": "rest between sets"}),
-               ("final", {"answered": True, "source_slugs": ["rest_between_sets"],
-                          "answer": "Our guide says about 60 to 90 seconds for moderate sets."}))
+    use_script(("final", {"explanation": "A plan built around your goal."}))
     uid, h = account(client, "not-pregnant", "none")
-    r = client.post("/api/basics/ask", headers=h, json={"question": ANSWERABLE}).json()
-    assert r["meta"]["agent_called"] is True and r["result"]["answered"] is True
+    r = client.post("/api/programs/recommend", headers=h).json()
+    assert r["result"]["explanation"] == "A plan built around your goal."           # the model answered
+    assert rows("SELECT agent_name FROM agent_runs") == [{"agent_name": "program_architect"}]
     assert client.get("/api/coach/summary", headers=h).status_code != 403
 
 

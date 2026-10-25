@@ -27,7 +27,7 @@ def test_summary_matches_the_database(client):
     assert (ex["injury_checked"], ex["with_cautions"], ex["cautions"]) == (903, 860, 2265)
     assert (ex["reasons_ai_drafted"], ex["reasons_pt_reviewed"], ex["injury_pt_reviewed"]) == (2265, 0, 0)
     assert d["protocols"] == {"total": 9, "placeholder": 9, "with_citations": 0}   # 3 goals x 3 levels
-    assert d["basics_articles"] == {"total": 5, "placeholder": 5}
+    assert "basics_articles" not in d                                    # Workout Basics was removed 2026-10-25
 
 
 def test_summary_follows_the_data(client):

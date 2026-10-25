@@ -116,7 +116,6 @@ export interface DataSummary {
     reasons_pt_reviewed: number
   }
   protocols: { total: number; placeholder: number; with_citations: number }
-  basics_articles: { total: number; placeholder: number }
 }
 
 export const fetchDataSummary = () => getJson<DataSummary>('/api/data-summary')
@@ -124,19 +123,6 @@ export const fetchDataSummary = () => getJson<DataSummary>('/api/data-summary')
 export function fetchSources(): Promise<Source[]> {
   return getJson<Source[]>('/api/sources')
 }
-
-// ---------------------------------------------------------------- reviewed content
-
-export interface Article extends ReviewFields {
-  source_id: string
-  slug: string
-  title: string
-  category: string
-  content: string
-  media_url: string | null
-}
-
-export const fetchArticles = () => getJson<Article[]>('/api/basics')
 
 // ---------------------------------------------------------------- accounts and quiz
 
@@ -416,14 +402,6 @@ export interface CoachMessage {
   total_weight_lifted_lbs: number
 }
 
-export interface BasicsAnswer {
-  answer: string
-  answered: boolean
-  redirected_to_professional: boolean
-  sources: { slug: string; title: string; status: string; review_notice: string | null; citations: Citation[] }[]
-  review_note: string | null
-}
-
 export const recommendProgram = (token: string) =>
   request<AgentResponse<PlanRecommendation>>('/api/programs/recommend', { method: 'POST' }, token)
 
@@ -435,9 +413,6 @@ export const buildWorkout = (token: string, body: WorkoutRequest) =>
   )
 
 export const fetchCoach = (token: string) => request<AgentResponse<CoachMessage>>('/api/coach/summary', {}, token)
-
-export const askBasics = (token: string, question: string) =>
-  request<AgentResponse<BasicsAnswer>>('/api/basics/ask', { method: 'POST', body: JSON.stringify({ question }) }, token)
 
 // ---------------------------------------------------------------- the public "How We Build Your Plan" example
 

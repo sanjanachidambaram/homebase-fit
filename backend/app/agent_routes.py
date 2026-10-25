@@ -7,14 +7,13 @@
   POST /api/workouts/review      Workout Reviewer: a Build Your Own session (the review itself is computed by code)
   POST /api/calendar/{id}/review Workout Reviewer: a custom calendar day
   GET  /api/coach/summary        Coach (no longer shown on the Dashboard since 2026-10-25; the route stays)
-  POST /api/basics/ask           Workout Basics (red-flag pre-filter runs first)
 
 Security: the user is ALWAYS the one in the sign-in token (token_user_id). No route accepts a user_id
 from the URL, query, or body, and the request bodies forbid extra fields, so nothing the user types (or a
 model outputs) can point an agent at someone else's data.
 
-Pregnant / postpartum users (needs_clinical_review) never reach a model: the Program Architect and Workout Basics
-answer from code, and the Workout Builder and Coach return 403 pointing to /pregnancy-support.
+Pregnant / postpartum users (needs_clinical_review) never reach a model: the Program Architect
+answers from code, and the Workout Builder and Coach return 403 pointing to /pregnancy-support.
 
 Every agent call is logged to agent_runs with measured token counts (app/agents/harness.py: run_logged).
 """
@@ -24,7 +23,7 @@ from pydantic import BaseModel, Field
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior, UsageLimitExceeded
 
 from app import calendar
-from app.agents import basics, coach, program_architect, workout_builder, workout_reviewer
+from app.agents import coach, program_architect, workout_builder, workout_reviewer
 from app.agents.harness import AgentUnavailable
 from app.db import connect
 from app.safety_rules import CLINICAL_REVIEW_NO_AI, CLINICAL_REVIEW_PAGE, profile_needs_clinical_review
@@ -154,10 +153,3 @@ async def _run_review(uid: int, review: dict, route: str) -> dict:
 @router.get("/coach/summary")
 async def coach_summary(uid: int = Depends(no_ai_for_clinical_review)) -> dict:
     return await _run(coach.coach_summary(uid, route="GET /api/coach/summary"))
-
-
-@router.post("/basics/ask")
-async def ask_basics(body: basics.BasicsQuestion, uid: int = Depends(signed_in_user)) -> dict:
-    # The red-flag safety check still runs for everyone; for pregnant / postpartum users the AI step is skipped.
-    return await _run(basics.answer_question(uid, body.question, route="POST /api/basics/ask",
-                                             clinical_review=profile_needs_clinical_review(uid)))

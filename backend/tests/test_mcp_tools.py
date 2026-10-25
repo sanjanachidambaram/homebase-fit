@@ -22,7 +22,7 @@ from app.mcp_server import progress
 from app.mcp_server.server import mcp
 
 TODAY = datetime.now(timezone.utc).date()
-EXPECTED_TOOLS = {"get_user_profile", "search_exercises", "search_basics_kb",
+EXPECTED_TOOLS = {"get_user_profile", "search_exercises",
                   "get_progress_summary", "compute_strength_equivalents", "check_goal_achievement"}
 
 
@@ -91,7 +91,7 @@ def tag(exercise_id, contraindications, status="draft"):
 
 # ---------------------------------------------------------------- least privilege
 
-def test_exactly_six_tools_all_read_only(test_db):
+def test_exactly_five_tools_all_read_only(test_db):
     async def run():
         async with Client(mcp) as c:
             return await c.list_tools()
@@ -114,7 +114,6 @@ def test_running_every_tool_leaves_the_database_unchanged(test_db):
     before = hashlib.sha256(test_db.read_bytes()).hexdigest()
     call("get_user_profile", user_id=uid)
     call("search_exercises", muscle_group="legs", injury_flags=["knee"])
-    call("search_basics_kb", query="rest between sets")
     call("get_progress_summary", user_id=uid)
     call("compute_strength_equivalents", total_weight_lifted_lbs=1000)
     call("check_goal_achievement", user_id=uid)
@@ -155,7 +154,6 @@ def test_no_tool_ever_returns_username_or_name(test_db):
     outputs = [
         call("get_user_profile", user_id=uid), call("get_progress_summary", user_id=uid),
         call("check_goal_achievement", user_id=uid), call("search_exercises", injury_flags=["knee"]),
-        call("search_basics_kb", query="injury"),
         call("compute_strength_equivalents", total_weight_lifted_lbs=5000),
     ]
     text = json.dumps(outputs).lower()
@@ -234,27 +232,7 @@ def test_limit_and_bad_arguments(test_db):
             call("search_exercises", **bad)
 
 
-# ---------------------------------------------------------------- 4. search_basics_kb
-
-def test_basics_search_finds_the_right_article(test_db):
-    res = call("search_basics_kb", query="How long should I rest between sets?")
-    assert res["answerable"] and res["matches"][0]["slug"] == "rest_between_sets"
-    assert res["matches"][0]["status"] == "placeholder" and res["matches"][0]["review_notice"]
-    assert "30–90 seconds is common" in res["matches"][0]["content"]
-    assert call("search_basics_kb", query="sharp pain, should I stop?")["matches"][0]["slug"] == "push_through_vs_stop"
-    assert call("search_basics_kb", query="injuries")["matches"][0]["slug"] == "injury_prevention_basics"   # plural
-
-
-def test_basics_search_says_so_when_nothing_matches(test_db):
-    res = call("search_basics_kb", query="quantum astrophysics of black holes")
-    assert res["answerable"] is False and res["matches"] == []
-    assert "I don't have verified information" in res["message"]
-    for bad in ("", "   ", "x" * 501):
-        with pytest.raises(ToolError):
-            call("search_basics_kb", query=bad)
-
-
-# ---------------------------------------------------------------- 5. get_progress_summary
+# ---------------------------------------------------------------- 3. get_progress_summary
 
 def test_progress_summary_numbers(test_db):
     uid = make_user()
@@ -292,7 +270,7 @@ def test_streak_rules(test_db):
     assert progress.get_progress_summary(third, TODAY)["current_streak_days"] == 0  # nothing today or yesterday
 
 
-# ---------------------------------------------------------------- 6. compute_strength_equivalents
+# ---------------------------------------------------------------- 4. compute_strength_equivalents
 
 def test_strength_equivalents(test_db):
     zero = call("compute_strength_equivalents", total_weight_lifted_lbs=0)
@@ -315,7 +293,7 @@ def test_strength_equivalents(test_db):
             call("compute_strength_equivalents", total_weight_lifted_lbs=bad)
 
 
-# ---------------------------------------------------------------- 7. check_goal_achievement
+# ---------------------------------------------------------------- 5. check_goal_achievement
 
 def test_goal_check_insufficient_data(test_db):
     assert call("check_goal_achievement", user_id=999)["status"] == "insufficient_data"

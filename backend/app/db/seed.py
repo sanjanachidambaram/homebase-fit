@@ -354,31 +354,6 @@ def seed_goal_protocols(conn: sqlite3.Connection, sources: set[str], errors: lis
         errors.append(f"{rel(path)}: missing protocols for {missing}")
 
 
-def split_front_matter(text: str) -> tuple[dict, str]:
-    if text.startswith("---"):
-        _, header, body = text.split("---", 2)
-        return yaml.safe_load(header) or {}, body.strip()
-    return {}, text.strip()
-
-
-def seed_basics(conn: sqlite3.Connection, sources: set[str], errors: list[str]) -> None:
-    for path in sorted((CONTENT_DIR / "basics").glob("*.md")):
-        meta, body = split_front_matter(path.read_text(encoding="utf-8"))
-        if not require(meta, ("title", "category"), rel(path), errors):
-            continue
-        source = meta.get("source") or DEFAULT_SOURCE
-        if not check_source(source, sources, rel(path), errors):
-            continue
-        review = review_fields(meta, rel(path), errors)
-        if review is None:
-            continue
-        conn.execute(
-            "INSERT INTO basics_articles (slug, title, category, content, media_path, source_id, status, citations)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (path.stem, meta["title"], meta["category"], body, meta.get("media_path"), source, *review),
-        )
-
-
 # ---------------------------------------------------------------- build
 
 def build_original(target: Path | None = None) -> None:
@@ -395,7 +370,6 @@ def build_original(target: Path | None = None) -> None:
         contraindications = seed_authored_exercises(conn, errors)
         seed_free_exercise_db(conn, set(contraindications), errors)
         seed_goal_protocols(conn, sources, errors)
-        seed_basics(conn, sources, errors)
         if errors:
             raise ContentError("\n".join(f"  - {e}" for e in errors))
         conn.commit()

@@ -122,21 +122,9 @@ def test_delete_removes_user_and_all_related_rows(client):
 
 # ---------------------------------------------------------------- citations / status
 
-@pytest.mark.parametrize("route", ["/api/basics"])
-def test_placeholder_content_flagged_with_citations_field(client, route):
-    items = client.get(route).json()
-    assert items
-    for item in items:
-        assert item["status"] == "placeholder"                     # still pending expert review, citation or not
-        assert item["review_notice"] == "Content pending expert review"
-        # Only the weight-loss article cites anything: the CDC pace its text names (content/basics/*.md).
-        want = ["CDC, Losing Weight: https://www.cdc.gov/healthy-weight-growth/losing-weight/index.html"]             if item.get("slug") == "tracking_weight_loss" else []
-        assert [c["source"] for c in item["citations"]] == want, item.get("slug")
-
-
 def test_schema_has_citations_and_status():
     conn = sqlite3.connect(config.ORIGINAL_DB)
-    for table in ("goal_protocols", "basics_articles"):
+    for table in ("goal_protocols", "exercises"):
         cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
         assert {"citations", "status"} <= cols, table
     conn.close()

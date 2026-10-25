@@ -97,16 +97,6 @@ def search_exercises(
 
 
 @mcp.tool(annotations=READ_ONLY)
-def search_basics_kb(query: str) -> dict:
-    """Keyword search of the Workout Basics articles. This is the ONLY source for answering Workout Basics questions.
-
-    Returns the matching articles (full text) with status, review_notice, and citations. If answerable is false,
-    nothing matches: say "I don't have verified information on that. Please consult a doctor or physical
-    therapist." Never answer from outside these results."""
-    return _run(search.search_basics_kb, query)
-
-
-@mcp.tool(annotations=READ_ONLY)
 def get_progress_summary(user_id: int) -> dict:
     """Summarize the user's last 30 days: sessions logged, total weight lifted (lb),
     current streak in days, rest_day_suggested (true at a 10+ day streak), and body-weight and other measurement

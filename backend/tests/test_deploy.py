@@ -49,8 +49,9 @@ def test_startup_builds_the_working_db_from_the_original(fresh_instance):
     got, want = tables(fresh_instance), tables(config.ORIGINAL_DB)
     assert got.pop("app_meta") == 1 and want.pop("app_meta") == 0      # the copy records which original it came from
     assert got == want                                                  # same tables, same seeded content
-    for t in ("calendar_entries", "goal_protocols", "exercises", "sources", "basics_articles", "agent_runs"):
+    for t in ("calendar_entries", "goal_protocols", "exercises", "sources", "agent_runs"):
         assert t in got, t
+    assert "basics_articles" not in got                                 # Workout Basics was removed 2026-10-25
     assert got["exercises"] == 903 and got["goal_protocols"] == 9 and got["users"] == 0
 
 

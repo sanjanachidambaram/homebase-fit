@@ -5,7 +5,7 @@
 --   * Dates are ISO text: date = 'YYYY-MM-DD', timestamps = 'YYYY-MM-DDTHH:MM:SSZ' (UTC).
 --   * Injury tags are neck | shoulder | upper_back | lower_back | wrist | hip | knee | ankle everywhere (quiz answers,
 --     exercises.injury_contraindications).
---   * Content tables (sources, quiz_questions, exercises, goal_protocols, basics_articles)
+--   * Content tables (sources, quiz_questions, exercises, goal_protocols)
 --     are loaded from content/ by app/db/seed.py. User tables start empty.
 --   * There are no stored programs: each user's weekly plan is generated on request, in code,
 --     from their quiz profile + goal_protocols + exercises (app/services/program_generator.py).
@@ -156,18 +156,6 @@ CREATE TABLE goal_protocols (
     UNIQUE (goal, experience_level)
 );
 
-CREATE TABLE basics_articles (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    slug        TEXT NOT NULL UNIQUE,   -- file name without .md
-    title       TEXT NOT NULL,
-    category    TEXT NOT NULL,
-    content     TEXT NOT NULL,          -- markdown body
-    media_path  TEXT,
-    source_id   TEXT NOT NULL REFERENCES sources(id),
-    citations   TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(citations) AND json_type(citations) = 'array'),
-    status      TEXT NOT NULL DEFAULT 'placeholder' CHECK (status IN ('placeholder', 'pt_reviewed'))
-);
-
 -- ---------------------------------------------------------------- bookkeeping
 
 -- Which homebase_original.db the working copy was last built or refreshed from (key 'original_sha256'). On a
@@ -282,7 +270,8 @@ CREATE INDEX idx_measurements_user_date ON measurements(user_id, date);
 
 -- ---------------------------------------------------------------- safety
 
--- Every time the red-flag / injury-language check fires (Workout Basics questions, calendar notes).
+-- Every time the red-flag / injury-language check fires (calendar notes, cardio logs; 'basics_qa' rows are from
+-- the Workout Basics Q&A, removed 2026-10-25, and are kept as history).
 -- Deleting a user deletes their events too (trigger_text is their own words).
 CREATE TABLE safety_events (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -303,7 +292,7 @@ CREATE INDEX idx_safety_events_source ON safety_events(source, timestamp);
 -- app/db/reset.py carries these rows over when it resets the working database.
 CREATE TABLE agent_runs (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    agent_name    TEXT NOT NULL,      -- program_architect | workout_builder | coach | basics
+    agent_name    TEXT NOT NULL,      -- program_architect | workout_builder | coach | workout_reviewer (basics: history)
     user_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
     input_tokens  INTEGER NOT NULL DEFAULT 0,
     output_tokens INTEGER NOT NULL DEFAULT 0,
@@ -311,7 +300,7 @@ CREATE TABLE agent_runs (
     requests      INTEGER NOT NULL DEFAULT 0,   -- model round trips in this call
     tool_calls    INTEGER NOT NULL DEFAULT 0,
     model         TEXT NOT NULL,
-    route         TEXT NOT NULL,      -- e.g. 'POST /api/basics/ask'
+    route         TEXT NOT NULL,      -- e.g. 'POST /api/programs/recommend'
     status        TEXT NOT NULL CHECK (status IN ('ok', 'error')),
     error_type    TEXT,               -- exception class name when status = 'error'
     duration_ms   INTEGER,

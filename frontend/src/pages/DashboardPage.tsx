@@ -1,6 +1,6 @@
 // Home page. Signed in: the Dashboard, which shows only two things (2026-10-25): the plan for today, then your
-// streak. Both are computed by code, no AI. The plan's explanation lives on the Personalized Plan page, Ask
-// Workout Basics on the Workout Basics page. Signed out: the landing page (WelcomePage).
+// streak. Both are computed by code, no AI. The plan's explanation lives on the Personalized Plan page.
+// Signed out: the landing page (WelcomePage).
 import { useEffect, useState } from 'react'
 import { fetchAccount, isSignInGone, type Account } from '../api'
 import ClinicalSupportCard from '../components/ClinicalSupport'

@@ -29,7 +29,10 @@ from app.config import ORIGINAL_DB  # noqa: E402
 from app.db import connect, copy_db  # noqa: E402
 
 TEST_EXERCISE = "Adductor"          # an imported exercise we tag for the test (only in the throwaway copy)
-EXPECTED_TOOLS = {"get_user_profile", "search_exercises", "search_basics_kb",
+# Every exercise has drafted injury data since 2026-10-24, so the copy marks one as never checked, to show the tool
+# still flags unchecked exercises instead of calling them safe.
+UNCHECKED_EXERCISE = "glute_bridge"
+EXPECTED_TOOLS = {"get_user_profile", "search_exercises",
                   "get_progress_summary", "compute_strength_equivalents", "check_goal_achievement"}
 failures: list[str] = []
 
@@ -53,6 +56,7 @@ def build_throwaway_db(path: Path) -> int:
     with conn:
         conn.execute("UPDATE exercises SET injury_contraindications = '[\"knee\"]', contraindication_status = 'draft' "
                      "WHERE id = ?", (TEST_EXERCISE,))
+        conn.execute("UPDATE exercises SET contraindication_status = 'untagged' WHERE id = ?", (UNCHECKED_EXERCISE,))
         uid = conn.execute("INSERT INTO users (username, first_name, password_hash) VALUES ('smoke.test', 'Smokey', 'x')").lastrowid
         conn.execute(
             "INSERT INTO quiz_profiles (user_id, goal, injury_flags, weight, "
@@ -90,7 +94,7 @@ async def main() -> None:
         tools = await c.list_tools()
         names = {t.name for t in tools}
         print("   ", sorted(names))
-        check(names == EXPECTED_TOOLS, "exactly the 6 expected tools")
+        check(names == EXPECTED_TOOLS, f"exactly the {len(EXPECTED_TOOLS)} expected tools")
         check(all(t.annotations and t.annotations.read_only_hint for t in tools), "every tool is marked read-only")
 
         show("1. get_user_profile")
@@ -113,7 +117,10 @@ async def main() -> None:
         check(TEST_EXERCISE in plain_ids and TEST_EXERCISE not in knee_ids, f"tagged test exercise '{TEST_EXERCISE}' is excluded")
         check({"bodyweight_squat", "reverse_lunge", "wall_sit", "goblet_squat"} <= set(removed),
               "the 4 drafted knee-unsafe exercises are excluded too")
-        unchecked = next(e for e in knee["exercises"] if e["injury_unchecked"])
+        # Checked exercises come first, so look where the unchecked one is easy to reach: legs moves on a mat.
+        mat = (await c.call_tool("search_exercises", {"muscle_group": "legs", "equipment": ["mat"],
+                                                      "injury_flags": ["knee"], "limit": 50})).data
+        unchecked = next(e for e in mat["exercises"] if e["injury_unchecked"])
         print(f"    an unchecked exercise: {unchecked['name']!r} -> injury_check={unchecked['injury_check']!r}; "
               f"{unchecked['injury_note']}")
         check(unchecked["injury_check"] == "not_yet_checked" and unchecked["status"] == "placeholder"
@@ -122,14 +129,6 @@ async def main() -> None:
                                                        "checked_only": True})).data
         check(only["count"] > 0 and not any(e["injury_unchecked"] for e in only["exercises"]),
               "checked_only=true returns only exercises that have injury tags")
-
-        show("4. search_basics_kb")
-        kb = (await c.call_tool("search_basics_kb", {"query": "how long should I rest between sets?"})).data
-        print("    top match:", kb["matches"][0]["title"], "| matched terms:", kb["matches"][0]["matched_terms"])
-        none = (await c.call_tool("search_basics_kb", {"query": "quantum astrophysics"})).data
-        print("    off-topic query ->", none["answerable"], "|", none["message"][:70] + "...")
-        check(kb["matches"][0]["slug"] == "rest_between_sets", "finds the right article")
-        check(none["answerable"] is False, "says so when nothing matches")
 
         show("5. get_progress_summary")
         s = (await c.call_tool("get_progress_summary", {"user_id": uid})).data
@@ -145,8 +144,10 @@ async def main() -> None:
         print("   ", eq["headline"])
         for comp in eq["comparisons"]:
             print(f"      {comp['phrase']:<34} ({comp['unit_weight_lbs']:,} lb each)")
-        check(eq["headline"] == "You've lifted about 1.4 full-size trees!",
-              "headline = the biggest comparison reached (6,750 / 4,820 lb tree = 1.4)")
+        # The headline is a random pick among the highest tier the total reaches (app/mcp_server/strength.py).
+        pick = next(comp for comp in eq["comparisons"] if comp["name"] == eq["headline_comparison"])
+        check(eq["headline"] == f"You've lifted {pick['phrase']}!" and pick["name"] in eq["headline_options"],
+              f"headline = a pick from the highest tier reached ({pick['name']}, of {eq['headline_options']})")
         check(all(comp["source"] for comp in eq["comparisons"]), "every comparison names its source")
 
         show("7. check_goal_achievement")
