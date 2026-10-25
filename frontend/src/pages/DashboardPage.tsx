@@ -1,6 +1,6 @@
 // Home page. Signed in: the Dashboard: the plan for today, your streak, this week (workouts logged + a fun fact), and
 // your quiz answers on request. All computed by code, no AI. The plan's explanation lives on the Personalized Plan page.
-// Signed out: the landing page (WelcomePage).
+// Only for a signed-in user: "/" shows the Landing Page to signed-out visitors instead (App.tsx HomeRoute).
 import { useEffect, useState } from 'react'
 import { fetchAccount, isSignInGone, type Account } from '../api'
 import ClinicalSupportCard from '../components/ClinicalSupport'
@@ -9,7 +9,6 @@ import StreakCard from '../components/dashboard/StreakCard'
 import ThisWeekCard from '../components/dashboard/ThisWeekCard'
 import TodayCard from '../components/dashboard/TodayCard'
 import { setSession, useSession, type Session } from '../session'
-import WelcomePage from './WelcomePage'
 
 function Dashboard({ session }: { session: Session }) {
   const [account, setAccount] = useState<Account | null>(null)
@@ -56,5 +55,5 @@ function Dashboard({ session }: { session: Session }) {
 
 export default function DashboardPage() {
   const session = useSession()
-  return session ? <Dashboard key={session.userId} session={session} /> : <WelcomePage />
+  return session ? <Dashboard key={session.userId} session={session} /> : null
 }

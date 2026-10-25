@@ -1,4 +1,7 @@
-// The public landing page (signed out "/"). The one page meant to feel the most alive: floating shapes, cards that
+// The Landing Page, Bee Fit's front door: what a signed-out visitor sees at "/", and what the Bee Fit logo always opens
+// (at /welcome, signed in or not). Signed in, it offers "Go to my Dashboard" instead of sign-up / log-in, and it is
+// never the default view for a signed-in user ("/" is their Dashboard; App.tsx HomeRoute). The one page meant to feel
+// the most alive: floating shapes, cards that
 // rise in as you scroll, and previews built from LIVE data (a real generated week, the real filter funnel, the real
 // library counts), never screenshots. Everything moves only when the visitor's system allows motion: the global
 // prefers-reduced-motion rule (index.css) stills the CSS, and useReveal shows everything at once.
@@ -8,6 +11,8 @@ import { fetchDataSummary, fetchPlanExample, type DataSummary, type PlanExample 
 import AccountForm from '../components/AccountForm'
 import Link from '../components/Link'
 import VideoSlot from '../components/VideoSlot'
+import { navigate } from '../router'
+import { useSession } from '../session'
 
 const INTRO_VIDEO = ['/content/video/intro_podcast.mp4', '/content/video/intro_podcast.mov']
 const DAY = { mon: 'M', tue: 'T', wed: 'W', thu: 'T', fri: 'F', sat: 'S', sun: 'S' } as const
@@ -131,7 +136,8 @@ function SafetyPreview({ data }: { data: DataSummary | null }) {
 
 // ---------------------------------------------------------------- the page
 
-export default function WelcomePage() {
+export default function LandingPage() {
+  const session = useSession()
   const [example, setExample] = useState<PlanExample | null>(null)
   const [data, setData] = useState<DataSummary | null>(null)
   const [mode, setMode] = useState<'signup' | 'login'>('signup')
@@ -167,14 +173,24 @@ export default function WelcomePage() {
         <p className="landing-pitch">
           Your goals and your injuries, in <span className="hl">one</span> plan. Finally.
         </p>
-        <div className="landing-cta">
-          <button type="button" className="btn btn-big" onClick={() => join('signup')}>
-            Create my free account
-          </button>
-          <button type="button" className="btn-secondary btn-big" onClick={() => join('login')}>
-            Log in
-          </button>
-        </div>
+        {session ? (
+          // Signed in (here from the logo): the way back into the app, front and center.
+          <div className="landing-cta">
+            <Link to="/" className="btn btn-big">
+              Go to my Dashboard
+            </Link>
+            <p className="landing-signed-in">Signed in as {session.username}</p>
+          </div>
+        ) : (
+          <div className="landing-cta">
+            <button type="button" className="btn btn-big" onClick={() => join('signup')}>
+              Create my free account
+            </button>
+            <button type="button" className="btn-secondary btn-big" onClick={() => join('login')}>
+              Log in
+            </button>
+          </div>
+        )}
       </section>
 
       <Reveal className="landing-video">
@@ -202,8 +218,20 @@ export default function WelcomePage() {
 
       <Reveal>
         <section className="landing-join" id="join" ref={joinRef} aria-label="Create an account or log in">
-          <h3>{mode === 'signup' ? 'Ready? It takes two minutes.' : 'Welcome back!'}</h3>
-          <AccountForm key={mode} initialMode={mode} />
+          {session ? (
+            <>
+              <h3>You're signed in.</h3>
+              <Link to="/" className="btn btn-big">
+                Go to my Dashboard
+              </Link>
+            </>
+          ) : (
+            <>
+              <h3>{mode === 'signup' ? 'Ready? It takes two minutes.' : 'Welcome back!'}</h3>
+              {/* Signing up or in always lands on the Dashboard, wherever this page was opened (/ or /welcome). */}
+              <AccountForm key={mode} initialMode={mode} onDone={() => navigate('/')} />
+            </>
+          )}
           <p className="hint">
             A Yale SOM class project, not medical advice. <Link to="/about">About</Link> ·{' '}
             <Link to="/legal">Legal &amp; privacy</Link>

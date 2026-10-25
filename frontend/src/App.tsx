@@ -10,6 +10,7 @@ import CalendarPage from './pages/CalendarPage'
 import DashboardPage from './pages/DashboardPage'
 import ExercisesPage from './pages/ExercisesPage'
 import HowWeBuildPage from './pages/HowWeBuildPage'
+import LandingPage from './pages/LandingPage'
 import LegalPage from './pages/LegalPage'
 import PlanPage from './pages/PlanPage'
 import PlanReviewPage from './pages/PlanReviewPage'
@@ -17,6 +18,7 @@ import PregnancySupportPage from './pages/PregnancySupportPage'
 import QuizPage from './pages/QuizPage'
 import SettingsPage from './pages/SettingsPage'
 import { usePath, useRouteKey, useScrollToTopOnRouteChange } from './router'
+import { useSession } from './session'
 import './App.css'
 
 /** An old address that moved: swap it in the address bar, so Back doesn't bounce. */
@@ -28,8 +30,14 @@ function Moved({ to }: { to: string }) {
   return <></>
 }
 
+/** "/": the Dashboard for a signed-in user (always their default), the Landing Page for a signed-out visitor. */
+function HomeRoute() {
+  return useSession() ? <DashboardPage /> : <LandingPage />
+}
+
 const PAGES: Record<string, () => JSX.Element> = {
-  '/': DashboardPage,
+  '/': HomeRoute,
+  '/welcome': LandingPage, // the Landing Page, signed in or not: where the Bee Fit logo goes
   '/plan': PlanPage, // "Your Personalized Plan": the generated week only
   '/content': () => <Moved to="/plan" />, // the old combined "Your Plan & Basics" page (2026-10-23)
   '/build': BuildPage,
@@ -63,6 +71,7 @@ const NAV: { path: string; label: string; also?: (path: string) => boolean }[] =
 export default function App() {
   const path = usePath()
   const routeKey = useRouteKey(path)
+  const signedIn = !!useSession()
   useScrollToTopOnRouteChange(path)
 
   const Page = PAGES[path]
@@ -71,10 +80,10 @@ export default function App() {
     <div className="page">
       <header className="site-header">
         <div className="header-inner">
-          {/* The logo goes home: the Dashboard when signed in, the landing page when signed out (both live at /).
-              From the home page itself it starts the page over at the top (router.ts navigate). */}
+          {/* The logo always opens the Landing Page (/welcome), signed in or not; signed in, that page has "Go to my
+              Dashboard". From the Landing Page itself it starts the page over at the top (router.ts navigate). */}
           <h1 className="brand">
-            <Link to="/" ariaLabel="Bee Fit home">
+            <Link to="/welcome" ariaLabel="Bee Fit home">
               <span className="brand-mark" aria-hidden="true">
                 <BeeLogo size={40} />
               </span>
@@ -85,7 +94,8 @@ export default function App() {
             {NAV.map((p) => {
               // Whichever tab matches the page being viewed (or one of its sub-pages) is highlighted (orange).
               // Dashboard also always carries a green underline, whatever page is active: a fixed marker, not a state.
-              const active = p.path === path || !!p.also?.(path)
+              // Signed out, "/" is the Landing Page, not the Dashboard, so the Dashboard tab isn't highlighted there.
+              const active = (p.path === path && (p.path !== '/' || signedIn)) || !!p.also?.(path)
               const className = ['nav-link', p.path === '/' && 'nav-home', active && 'active'].filter(Boolean).join(' ')
               return (
                 <Link key={p.path} to={p.path} className={className} current={active}>

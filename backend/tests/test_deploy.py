@@ -149,7 +149,7 @@ built = pytest.mark.skipif(not (config.FRONTEND_DIST / "index.html").exists(),
 
 
 @built
-@pytest.mark.parametrize("path", ["/", "/calendar", "/about", "/about/data", "/exercises", "/pregnancy-support",
+@pytest.mark.parametrize("path", ["/", "/welcome", "/calendar", "/about", "/about/data", "/exercises", "/pregnancy-support",
                                   "/how-we-build", "/some/unknown/page"])
 def test_app_routes_get_the_react_app(client, path):
     r = client.get(path)
