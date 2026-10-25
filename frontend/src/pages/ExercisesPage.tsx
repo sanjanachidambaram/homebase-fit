@@ -195,6 +195,7 @@ export default function ExercisesPage({ initialTab = 'all' }: { initialTab?: 'al
       <div className="filters library-questions">
         <QuestionField
           q={FOCUS_QUESTION}
+          className="library-focus"
           value={filters.group || 'all'}
           onChange={(v) => update({ group: v === 'all' ? '' : (v as ExerciseFilters['group']) })}
         />

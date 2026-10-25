@@ -1,6 +1,6 @@
-// About: Sanjana's essay, verbatim (her voice, her caps, her typos; please don't "clean it up"), with her own
-// "HUGE disclaimer" paragraph styled as the page's disclaimer box. The team photos come first, by design; the
-// site-wide footer disclaimer and /legal carry the full medical disclaimer regardless of this page's layout.
+// About: Sanjana's essay, verbatim (her voice, her caps, her typos; please don't "clean it up"), then "Meet the Team
+// Behind Bee Fit" (Sanjana and Summer, bios verbatim), then her own "HUGE disclaimer" paragraph styled as the page's
+// disclaimer box. The site-wide footer disclaimer and /legal carry the full medical disclaimer regardless.
 // The live data and sources section lives on its own page now: /about/data (AboutDataPage.tsx).
 import { useState } from 'react'
 import Link from '../components/Link'
@@ -9,17 +9,19 @@ const TEAM_PHOTOS = '/content/images/team'
 const PHOTO_EXTS = ['jpg', 'png', 'webp']
 
 // Photo files go in content/images/team/ (see its README): <file>.jpg, .png or .webp.
-const TEAM: { file: string; caption: string; name: string }[] = [
-  { file: 'sanjana', name: 'Sanjana', caption: 'Sanjana — creator' },
-  { file: 'summer', name: 'Summer', caption: 'Summer — Personal Trainer & Pilates Instructor' },
+const SUMMER_PHOTOS: { file: string; alt: string }[] = [
+  { file: 'summer-1', alt: 'Summer throwing a punch at pads held by her Muay Thai coach in Thailand' },
+  { file: 'summer-2', alt: 'Summer with her guard up, facing her coach at a Muay Thai gym' },
+  { file: 'summer-3', alt: 'Summer landing a jab on a focus mitt' },
+  { file: 'summer-4', alt: 'Summer in a lunge, punching into her coach’s body shield' },
 ]
 
-/** Tries name.jpg, .png, .webp; shows a drawn placeholder avatar until one exists (never a broken image). */
-function TeamPhoto({ file, name }: { file: string; name: string }) {
+/** Tries file.jpg, .png, .webp; shows a drawn placeholder until one exists (never a broken image). */
+function TeamPhoto({ file, alt, className }: { file: string; alt: string; className: string }) {
   const [attempt, setAttempt] = useState(0)
   if (attempt >= PHOTO_EXTS.length) {
     return (
-      <div className="team-avatar team-avatar-empty" role="img" aria-label={`Photo of ${name} coming soon`}>
+      <div className={`${className} team-photo-empty`} role="img" aria-label={`${alt} (photo coming soon)`}>
         <svg viewBox="0 0 64 64" aria-hidden="true">
           <circle cx="32" cy="24" r="12" />
           <path d="M10 58c2-13 11-20 22-20s20 7 22 20z" />
@@ -29,11 +31,64 @@ function TeamPhoto({ file, name }: { file: string; name: string }) {
   }
   return (
     <img
-      className="team-avatar"
+      className={className}
       src={`${TEAM_PHOTOS}/${file}.${PHOTO_EXTS[attempt]}`}
-      alt={`Photo of ${name}`}
+      alt={alt}
+      loading="lazy"
       onError={() => setAttempt((a) => a + 1)}
     />
+  )
+}
+
+/** "Meet the Team Behind Bee Fit": Sanjana (photo left, text right) and Summer (four photos, then text). */
+function Team() {
+  return (
+    <section className="about-team" aria-labelledby="team-title">
+      <h3 id="team-title" className="team-title">
+        Meet the Team Behind Bee Fit
+      </h3>
+
+      {/* Bios verbatim, 2026-10-25. Please don't edit the wording. */}
+      <article className="team-profile team-profile-side">
+        <TeamPhoto
+          file="sanjana"
+          alt="Sanjana smiling, in a navy Yale School of Management quarter-zip"
+          className="team-photo team-photo-portrait"
+        />
+        <div className="team-profile-text">
+          <h4>Sanjana C, the vibe-coder.</h4>
+          <p>
+            Sanjana C is not a programmer. Sanjana C is a business student at Yale, likes working out, and likes
+            simplifying things. As all good b-school students do, Sanjana started her career in consulting before
+            working in strategy at a community college in Chicago. This is not super important context for the app, but
+            all to say, Sanjana likes making things work better, wants people to be healthy and happy and with endorphins
+            so they don't kill their husbands, and wants to work in inclusive economic development and the public sector
+            long-term. Sanjana's bff is Summer, who she goes to for all things fitness advice. Read about Summer below.
+          </p>
+        </div>
+      </article>
+
+      <article className="team-profile">
+        <div className="team-photo-grid">
+          {SUMMER_PHOTOS.map((ph) => (
+            <TeamPhoto key={ph.file} file={ph.file} alt={ph.alt} className="team-photo team-photo-tall" />
+          ))}
+        </div>
+        <div className="team-profile-text">
+          <h4>Summer A, your new personal trainer.</h4>
+          <p>
+            Summer's idea of a relaxing vacation? Flying to Thailand for a month to learn Muay Thai and get into actual
+            fights (see photographic evidence above). Fortunately, her coaching style is far less intimidating. A
+            competitive tennis player since childhood, fitness has basically been Summer's entire personality for as long
+            as she can remember. Armed with an alphabet of credentials (ACE Personal Trainer, Power Pilates Mat
+            Instructor, and PTR Level 1 Coach) her true superpower is making fitness genuinely fun, accessible, and
+            welcoming. She is fiercely dedicated to helping folks whose bodies aren't traditionally represented in
+            fitness spaces find joy in movement. Whether you're on the court, on the mat, or in the gym, Summer is here to
+            prove that working out can be enjoyable (no international cage matches required).
+          </p>
+        </div>
+      </article>
+    </section>
   )
 }
 
@@ -41,17 +96,6 @@ export default function AboutPage() {
   return (
     <article className="about">
       <h2 className="page-title">About Bee Fit</h2>
-
-      <section className="about-section about-team" aria-label="The team">
-        <ul className="team-grid">
-          {TEAM.map((t) => (
-            <li key={t.file} className="team-card">
-              <TeamPhoto file={t.file} name={t.name} />
-              <strong className="team-name">{t.caption}</strong>
-            </li>
-          ))}
-        </ul>
-      </section>
 
       <div className="about-essay">
         <p>
@@ -124,7 +168,11 @@ export default function AboutPage() {
           with no skills and one kid who's overskilled, right). I'm hoping we can apply a physical therapy lens to the
           AI-drafted injuries, and I'm hoping we can apply a women's health/pregnancy lens to fitness as well.
         </p>
+      </div>
 
+      <Team />
+
+      <div className="about-essay">
         {/* Her own disclaimer, in her words, gets the site's disclaimer-box treatment (design.md 7 rule 1). */}
         <section className="class-disclaimer" role="note" aria-label="Disclaimer">
           <p>

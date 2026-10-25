@@ -7,11 +7,13 @@ export default function Link({
   children,
   className,
   ariaLabel,
+  current,
 }: {
   to: string
   children: ReactNode
   className?: string
   ariaLabel?: string
+  current?: boolean // the page being viewed (a nav tab): announced as the current page
 }) {
   const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
@@ -19,7 +21,7 @@ export default function Link({
     navigate(to)
   }
   return (
-    <a href={to} onClick={onClick} className={className} aria-label={ariaLabel}>
+    <a href={to} onClick={onClick} className={className} aria-label={ariaLabel} aria-current={current ? 'page' : undefined}>
       {children}
     </a>
   )

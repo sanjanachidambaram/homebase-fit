@@ -45,16 +45,15 @@ const PAGES: Record<string, () => JSX.Element> = {
   '/pregnancy-support': PregnancySupportPage, // pregnant / postpartum users are sent here (quiz, Dashboard, blocks)
 }
 
-// Only pages that exist get a nav link. The order (2026-10-25): Dashboard, Personalized Plan, Calendar, Build Your
-// Own, Exercise Library, then About and Settings last (Workout Basics was removed 2026-10-25). My Faves lives inside the Exercise Library
-// (a subtab), not in the nav.
+// Only pages that exist get a nav link. The order (2026-10-25): Dashboard, About, Personalized Plan, Calendar, Build
+// Your Own, Exercise Library, Settings. My Faves lives inside the Exercise Library (a subtab), not in the nav.
 const NAV: { path: string; label: string; also?: (path: string) => boolean }[] = [
   { path: '/', label: 'Dashboard' },
+  { path: '/about', label: 'About', also: (p) => p.startsWith('/about/') },
   { path: '/plan', label: 'Personalized Plan', also: (p) => p === '/plan/review' },
   { path: '/calendar', label: 'Calendar' },
   { path: '/build', label: 'Build Your Own' },
   { path: '/exercises', label: 'Exercise Library', also: (p) => p === '/faves' },
-  { path: '/about', label: 'About', also: (p) => p.startsWith('/about/') },
   { path: '/settings', label: 'Settings' },
 ]
 
@@ -79,15 +78,15 @@ export default function App() {
             </Link>
           </h1>
           <nav aria-label="Main">
-            {NAV.map((p) => (
-              <Link
-                key={p.path}
-                to={p.path}
-                className={p.path === path || p.also?.(path) ? 'nav-link active' : 'nav-link'}
-              >
-                {p.label}
-              </Link>
-            ))}
+            {NAV.map((p) => {
+              // Whichever tab matches the page being viewed (or one of its sub-pages) is highlighted.
+              const active = p.path === path || !!p.also?.(path)
+              return (
+                <Link key={p.path} to={p.path} className={active ? 'nav-link active' : 'nav-link'} current={active}>
+                  {p.label}
+                </Link>
+              )
+            })}
           </nav>
         </div>
       </header>

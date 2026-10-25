@@ -17,11 +17,14 @@ export default function QuestionField({
   q,
   value,
   onChange,
+  className,
 }: {
   q: QuizQuestion
   value: Answer | undefined
   onChange: (v: Answer) => void
+  className?: string // extra class on the question, e.g. the library's even row of focus options
 }) {
+  const fieldsetClass = className ? `question ${className}` : 'question'
   const help = q.help_text && <span className="hint question-help">{q.help_text}</span>
   if (q.type === 'multi_select') {
     const selected = Array.isArray(value) ? value : []
@@ -31,7 +34,7 @@ export default function QuestionField({
       onChange([...selected.filter((x) => x !== q.exclusive), v])
     }
     return (
-      <fieldset className="question">
+      <fieldset className={fieldsetClass}>
         <legend>{q.prompt}</legend>
         {help}
         {q.options.map((o) => {
@@ -53,7 +56,7 @@ export default function QuestionField({
   }
   if (q.type === 'single_select') {
     return (
-      <fieldset className="question">
+      <fieldset className={fieldsetClass}>
         <legend>{q.prompt}</legend>
         {help}
         {q.options.map((o) => (

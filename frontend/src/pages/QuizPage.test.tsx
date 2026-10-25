@@ -102,13 +102,17 @@ describe('the quiz', () => {
 })
 
 describe('the nav', () => {
-  it('lists the tabs in order, with About and Settings last', async () => {
+  it('lists the tabs in order, with About right after Dashboard and Settings last', async () => {
     window.history.replaceState({}, '', '/about')
     render(<App />)
     const nav = screen.getByRole('navigation', { name: 'Main' })
     const labels = Array.from(nav.querySelectorAll('a')).map((a) => a.textContent)
-    expect(labels).toEqual(['Dashboard', 'Personalized Plan', 'Calendar', 'Build Your Own', 'Exercise Library',
-      'About', 'Settings'])
+    expect(labels).toEqual(['Dashboard', 'About', 'Personalized Plan', 'Calendar', 'Build Your Own',
+      'Exercise Library', 'Settings'])
+    // the tab for the page you're on is highlighted and announced as the current page (here: About)
+    const current = Array.from(nav.querySelectorAll('a[aria-current="page"]')).map((a) => a.textContent)
+    expect(current).toEqual(['About'])
+    expect(nav.querySelector('a[aria-current="page"]')?.className).toContain('active')
   })
 
   it('sends the old combined page to the plan', async () => {
