@@ -9,7 +9,6 @@ All tests run against a throwaway copy of the database.
 """
 
 import json
-import sqlite3
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -340,16 +339,11 @@ def test_deleting_a_user_keeps_token_rows_but_unlinks_them(client, use_script):
     assert rows("SELECT user_id FROM agent_runs") == [{"user_id": None}]
 
 
-def test_reset_keeps_the_token_log(client, use_script, test_db, tmp_path, monkeypatch):
-    from app import config
+def test_reset_keeps_the_token_log(client, use_script, test_db):
     from app.db.reset import reset
     a, ha = account(client, "reset")
     use_script(("final", {"encouragement": "Hi!", "fun_fact_comparison": None}))
     client.get("/api/coach/summary", headers=ha)
-    original = tmp_path / "original.db"
-    from app.db import copy_db
-    copy_db(config.ORIGINAL_DB, original)
-    monkeypatch.setattr(config, "ORIGINAL_DB", original)
     assert reset() == 1
     assert rows("SELECT agent_name, user_id FROM agent_runs") == [{"agent_name": "coach", "user_id": None}]
     assert rows("SELECT COUNT(*) AS n FROM users")[0]["n"] == 0

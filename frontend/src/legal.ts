@@ -33,7 +33,7 @@ export const CONSENT_LABEL =
 export const PRIVACY_POINTS: { heading: string; text: string }[] = [
   {
     heading: 'What we store',
-    text: 'Your username, your first name (only to greet you on your Dashboard), and a scrambled (hashed) password; your quiz answers (your goal, experience, equipment, injuries, pregnancy or postpartum status, and, only if your goal is losing weight, your weight and an optional goal weight); your favorite exercises; the workouts and measurements you log; and, if you describe symptoms we redirect to a professional, the words that triggered it.',
+    text: 'Your username, your first name (only to greet you on your Dashboard), and a scrambled (hashed) password; or, if you continue with Google or Microsoft, your email address (only when they confirm it is yours), your first name and an account id from them, so the same account signs you in next time (never your Google or Microsoft password); your quiz answers (your goal, experience, equipment, injuries, pregnancy or postpartum status, and, only if your goal is losing weight, your weight and an optional goal weight); your favorite exercises; the workouts and measurements you log; and, if you describe symptoms we redirect to a professional, the words that triggered it.',
   },
   {
     heading: 'Why',
@@ -41,7 +41,7 @@ export const PRIVACY_POINTS: { heading: string; text: string }[] = [
   },
   {
     heading: 'AI features',
-    text: 'Your weekly plan is built by our own code, not by AI. To explain it and to coach you, the app sends your goal, experience level and injury areas, plus the exercises in your plan, to an AI model provider (OpenAI, through the Portkey gateway). Your username, first name, weight, goal weight, pregnancy or postpartum status, and anything you type in your own words are never sent.',
+    text: 'Your weekly plan is built by our own code, not by AI. To explain it and to coach you, the app sends your goal, experience level and injury areas, plus the exercises in your plan, to an AI model provider (OpenAI, through the Portkey gateway). Your username, first name, email address, weight, goal weight, pregnancy or postpartum status, and anything you type in your own words are never sent.',
   },
   {
     heading: 'Deleting your data',

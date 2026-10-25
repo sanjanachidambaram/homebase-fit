@@ -174,9 +174,15 @@ export interface Account {
   id: number
   username: string
   first_name: string | null // null for accounts made before names were asked for
+  email: string | null // only an address Google / Microsoft verified; null for password accounts
+  has_password: boolean // false for accounts made with Google / Microsoft
+  sign_in_with: SignInProvider[] // Google / Microsoft accounts linked to this one
   created_at: string
   quiz_profile: QuizProfile | null
 }
+
+export type SignInProvider = 'google' | 'microsoft'
+export type SignInProviders = Record<SignInProvider, boolean>
 
 export interface AuthResult {
   user_id: number
@@ -229,6 +235,12 @@ export const signUp = (username: string, firstName: string, password: string) =>
 
 export const logIn = (username: string, password: string) =>
   request<AuthResult>('/api/login', { method: 'POST', body: JSON.stringify({ username, password }) })
+
+/** Which "Continue with ..." buttons to show: a provider is on only when the server has its OAuth keys. */
+export const fetchSignInProviders = () => request<SignInProviders>('/api/auth/providers')
+
+/** A full-page navigation, not a fetch: the server redirects to Google / Microsoft and back (app/oauth.py). */
+export const oauthStartUrl = (provider: SignInProvider) => `/api/auth/${provider}/start`
 
 export const fetchQuizQuestions = () => request<QuizQuestion[]>('/api/quiz/questions')
 

@@ -3,62 +3,91 @@
 Run from backend/:
     .venv\\Scripts\\python.exe -m pytest tests/test_deploy.py -v
 
-- A brand-new instance has no working database (it's not in git): startup must build it from
-  homebase_original.db with every table (calendar_entries, goal_protocols, ...) and the app must work end to end.
+- Everything lives in Postgres at DATABASE_URL (Neon); the service keeps nothing on local disk, so it runs on Render's
+  free plan with no persistent disk. A brand-new, empty database is built on startup (Alembic migrations, then the
+  content from content/), and the app works end to end.
+- A normal redeploy leaves the data alone; a deploy with new content reloads the content and keeps every account.
 - Production reads secrets from real environment variables only, never from a stray .env file.
 - One service serves the API, the media in content/, and the built React app (with client-side routes).
 """
 
-import sqlite3
+import subprocess
 
 import pytest
+import yaml
 from fastapi.testclient import TestClient
 
 from app import config
-from app.db import ensure_working_db
+from app.db import META_KEY, connect, ensure_database, table_counts
 from tests.helpers import quiz_answers
 
 
-def tables(path) -> dict[str, int]:
-    conn = sqlite3.connect(path)
+def counts() -> dict[str, int]:
+    conn = connect()
     try:
-        names = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")]
-        return {n: conn.execute(f'SELECT COUNT(*) FROM "{n}"').fetchone()[0] for n in names}
+        return table_counts(conn)
     finally:
         conn.close()
 
 
-@pytest.fixture
-def fresh_instance(tmp_path, monkeypatch):
-    """No working database at all, like a new deploy (homebase.db is gitignored)."""
-    path = tmp_path / "fresh" / "homebase.db"
-    path.parent.mkdir()
-    monkeypatch.setattr(config, "WORKING_DB", path)
-    monkeypatch.setenv("APP_SECRET_KEY", "deploy-test-secret")
-    assert not path.exists()
-    return path
+def run(sql, *args):
+    conn = connect()
+    try:
+        with conn:
+            return [tuple(r) for r in conn.execute(sql, args).fetchall()]
+    finally:
+        conn.close()
 
 
-def test_working_db_is_not_in_git():
-    ignore = (config.PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
-    assert "backend/app/db/homebase.db" in ignore.splitlines()
+def test_no_database_file_in_the_repo_or_the_config():
+    tracked = subprocess.run(["git", "ls-files"], cwd=config.PROJECT_ROOT, capture_output=True, text=True,
+                             check=True).stdout.splitlines()
+    assert not [f for f in tracked if f.endswith((".db", ".sqlite", ".sqlite3"))]   # no SQLite anywhere
+    assert "backend/app/db/schema.sql" not in tracked                              # the schema is the migrations now
+    for gone in ("WORKING_DB", "ORIGINAL_DB", "DB_DIR"):
+        assert not hasattr(config, gone), gone
+    app_code = "\n".join(f.read_text(encoding="utf-8") for f in (config.BACKEND_DIR / "app").rglob("*.py")
+                         if f.name != "import_sqlite.py")                         # the one-time import reads a file
+    assert "HOMEBASE_DB_PATH" not in app_code and "import sqlite3" not in app_code
 
 
-def test_startup_builds_the_working_db_from_the_original(fresh_instance):
-    assert ensure_working_db() == "created"
-    got, want = tables(fresh_instance), tables(config.ORIGINAL_DB)
-    assert got.pop("app_meta") == 1 and want.pop("app_meta") == 0      # the copy records which original it came from
-    assert got == want                                                  # same tables, same seeded content
-    for t in ("calendar_entries", "goal_protocols", "exercises", "sources", "agent_runs"):
+def test_without_database_url_the_app_says_so(monkeypatch):
+    monkeypatch.setattr(config, "DATABASE_URL_OVERRIDE", None)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(config, "ENV_PATHS", ())
+    with pytest.raises(RuntimeError, match="DATABASE_URL is not set"):
+        config.database_url()
+    monkeypatch.setenv("DATABASE_URL", "postgres://u:p@host/db")                 # Heroku-style scheme is accepted
+    assert config.database_url() == "postgresql://u:p@host/db"
+
+
+def test_startup_builds_an_empty_database(empty_db):
+    assert ensure_database() == "seeded"
+    got = counts()
+    for t in ("users", "oauth_identities", "calendar_entries", "goal_protocols", "exercises", "sources", "agent_runs",
+              "app_meta"):
         assert t in got, t
     assert "basics_articles" not in got                                 # Workout Basics was removed 2026-10-25
     assert got["exercises"] == 903 and got["goal_protocols"] == 9 and got["users"] == 0
+    assert run("SELECT version_num FROM alembic_version") == [("0002",)]
 
 
-def test_a_fresh_instance_works_end_to_end(fresh_instance):
+def test_migrations_go_down_and_up_cleanly(empty_db):
+    from alembic import command
+    from app.db.migrate import alembic_config
+    ensure_database()
+    command.downgrade(alembic_config(), "base")
+    assert set(counts()) == set()                                       # every table gone
+    command.upgrade(alembic_config(), "head")
+    assert {"users", "oauth_identities", "exercises"} <= set(counts())
+
+
+def test_a_fresh_instance_works_end_to_end(empty_db, monkeypatch):
+    monkeypatch.setenv("APP_SECRET_KEY", "deploy-test-secret")
     from app.main import app
-    with TestClient(app) as client:                                     # startup (lifespan) creates the DB
-        assert fresh_instance.exists()
+    from app.security import limiter
+    limiter.reset()
+    with TestClient(app) as client:                                     # startup (lifespan) builds the database
         r = client.post("/api/users", json={"username": "fresh", "first_name": "Tester", "password": "correct horse 1"}).json()
         h = {"Authorization": f"Bearer {r['token']}"}
         assert client.put(f"/api/users/{r['user_id']}/quiz-profile", headers=h, json={
@@ -67,6 +96,31 @@ def test_a_fresh_instance_works_end_to_end(fresh_instance):
         assert len(client.get("/api/calendar", headers=h).json()["entries"]) >= 1
         assert client.post("/api/favorites", headers=h, json={"exercise_id": "glute_bridge"}).status_code == 200
         assert client.get("/api/data-summary").json()["exercises"]["total"] == 903
+
+
+def test_a_normal_redeploy_leaves_the_data_alone(empty_db):
+    ensure_database()
+    run("INSERT INTO users (username, first_name, password_hash) VALUES ('survivor', 'Tester', 'x')")
+    run("INSERT INTO exercise_favorites (user_id, exercise_id) SELECT id, 'glute_bridge' FROM users")
+    before = counts()
+    for _ in range(3):                                                  # three restarts / redeploys, same content
+        assert ensure_database() == "unchanged"
+    assert counts() == before
+
+
+def test_a_deploy_with_new_content_reloads_it_and_keeps_every_account(empty_db):
+    ensure_database()
+    run("INSERT INTO users (username, first_name, password_hash) VALUES ('keepme', 'Tester', 'x')")
+    run("INSERT INTO exercise_favorites (user_id, exercise_id) SELECT id, 'glute_bridge' FROM users")
+    run("UPDATE sources SET name = 'Stale name' WHERE id = 'free-exercise-db'")
+    run("UPDATE app_meta SET value = 'an older deploy' WHERE key = ?", META_KEY)   # as if content/ changed since
+
+    assert ensure_database() == "refreshed"
+    assert run("SELECT username::text FROM users") == [("keepme",)]                # the account survived
+    assert run("SELECT exercise_id FROM exercise_favorites") == [("glute_bridge",)]
+    assert run("SELECT name FROM sources WHERE id = 'free-exercise-db'") != [("Stale name",)]   # content reloaded
+    assert counts()["exercises"] == 903
+    assert ensure_database() == "unchanged"                             # and the next restart leaves it alone
 
 
 def test_production_never_reads_a_dotenv_file(tmp_path, monkeypatch):
@@ -137,114 +191,22 @@ def test_no_files_outside_the_built_app(client):
         assert "get_secret" not in r.text and "PORTKEY" not in r.text, path
 
 
-# ---------------------------------------------------------------- the persistent disk (paid Render instance)
-
-import yaml  # noqa: E402
-
-from app.db import copy_db, original_fingerprint, working_db_stamp  # noqa: E402
-
-
-@pytest.fixture
-def disk(tmp_path, monkeypatch):
-    """A brand-new, empty persistent disk, with HOMEBASE_DB_PATH pointing at a file on it (like /var/data)."""
-    mount = tmp_path / "var" / "data"
-    monkeypatch.setattr(config, "WORKING_DB", mount / "homebase.db")
-    monkeypatch.setenv("APP_SECRET_KEY", "disk-test-secret")
-    return mount
-
-
-def add_user(username):
-    conn = sqlite3.connect(config.WORKING_DB)
-    with conn:
-        conn.execute("INSERT INTO users (username, first_name, password_hash) VALUES (?, 'Tester', 'x')", (username,))
-    conn.close()
-
-
-def users():
-    conn = sqlite3.connect(config.WORKING_DB)
-    try:
-        return [r[0] for r in conn.execute("SELECT username FROM users ORDER BY id")]
-    finally:
-        conn.close()
-
-
-def test_first_use_of_an_empty_disk_builds_the_db_there(disk):
-    assert not disk.exists()                                            # not even the folder yet
-    assert ensure_working_db() == "created"
-    assert (disk / "homebase.db").exists() and working_db_stamp() == original_fingerprint()
-    assert tables(disk / "homebase.db")["exercises"] == 903
-
-
-def test_a_normal_redeploy_leaves_the_data_alone(disk):
-    ensure_working_db()
-    add_user("survivor")
-    before = (disk / "homebase.db").read_bytes()
-    for _ in range(3):                                                  # three restarts / redeploys, same content
-        assert ensure_working_db() == "unchanged"
-    assert (disk / "homebase.db").read_bytes() == before and users() == ["survivor"]
-    assert not list(disk.glob("*before-refresh*"))                      # nothing to back up, nothing touched
-
-
-def test_a_deploy_with_new_content_refreshes_but_keeps_accounts_and_a_backup(disk, tmp_path, monkeypatch):
-    ensure_working_db()
-    add_user("keepme")
-    new_original = tmp_path / "new_original.db"                         # this deploy ships new content
-    copy_db(config.ORIGINAL_DB, new_original)
-    conn = sqlite3.connect(new_original)
-    with conn:
-        conn.execute("UPDATE sources SET name = 'Renamed in a new deploy' WHERE id = 'free-exercise-db'")
-    conn.close()
-    monkeypatch.setattr(config, "ORIGINAL_DB", new_original)
-
-    assert ensure_working_db() == "refreshed"
-    assert users() == ["keepme"]                            # the account survived
-    conn = sqlite3.connect(config.WORKING_DB)
-    assert conn.execute("SELECT name FROM sources WHERE id = 'free-exercise-db'").fetchone()[0] == "Renamed in a new deploy"
-    conn.close()
-    backups = list(disk.glob("homebase.before-refresh-*.db"))
-    assert len(backups) == 1 and "keepme" in [r[0] for r in sqlite3.connect(backups[0]).execute("SELECT username FROM users")]
-    assert ensure_working_db() == "unchanged"                           # and the next restart leaves it alone
-
-
-def test_a_working_db_from_before_this_change_is_upgraded_not_wiped(disk):
-    ensure_working_db()
-    add_user("old-timer")
-    conn = sqlite3.connect(config.WORKING_DB)
-    with conn:
-        conn.execute("DROP TABLE app_meta")                             # what the live DB looked like before
-    conn.close()
-    assert ensure_working_db() == "refreshed" and users() == ["old-timer"]
-    assert working_db_stamp() == original_fingerprint()
-
-
-def test_render_yaml_puts_the_database_on_a_persistent_disk():
+def test_render_yaml_is_free_with_no_disk_and_the_database_in_postgres():
     spec = yaml.safe_load((config.PROJECT_ROOT / "render.yaml").read_text(encoding="utf-8"))
     assert len(spec["services"]) == 1                                   # one service: FastAPI serves the built app
     web = spec["services"][0]
     assert (web["type"], web["name"], web["runtime"]) == ("web", "bee-fit", "python")   # renamed from homebase-fit
-    assert web["plan"] == "starter"                                     # paid: disks aren't available on free
+    assert web["plan"] == "free"                                        # nothing on local disk to keep
+    assert "disk" not in web
     assert web["buildCommand"] == "pip install -r backend/requirements.txt && cd frontend && npm ci && npm run build"
-    assert web["startCommand"] == "cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    assert web["startCommand"] == ("cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT "
+                                   "--proxy-headers --forwarded-allow-ips '*'")   # real client IPs for rate limits
     assert web["healthCheckPath"] == "/api/health"
-    assert web["disk"] == {"name": "bee-fit-data", "mountPath": "/var/data", "sizeGB": 1}
     env = {e["key"]: e for e in web["envVars"]}
-    assert env["HOMEBASE_DB_PATH"]["value"] == "/var/data/homebase.db"  # on the disk, so it survives deploys
-    assert env["HOMEBASE_DB_PATH"]["value"].startswith(web["disk"]["mountPath"] + "/")
+    assert "HOMEBASE_DB_PATH" not in env
     assert env["PUBLIC_BASE_URL"] == {"key": "PUBLIC_BASE_URL", "value": "https://bee-fit.onrender.com"}
     for secret in ("APP_ENV", "APP_SECRET_KEY", "PORTKEY_API_KEY", "DATABASE_URL", "GOOGLE_CLIENT_ID",
                    "GOOGLE_CLIENT_SECRET", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET"):
         assert env[secret] == {"key": secret, "sync": False}              # set in the dashboard, never here
-    # only the two non-secret settings carry a value; nothing else in the file has one
-    assert {k for k, e in env.items() if "value" in e} == {"HOMEBASE_DB_PATH", "PUBLIC_BASE_URL"}
+    assert {k for k, e in env.items() if "value" in e} == {"PUBLIC_BASE_URL"}   # the only non-secret value
     assert "OPENAI_API_KEY" not in env                                  # only set if the project owner asks
-
-
-def test_local_dev_still_uses_the_normal_local_path():
-    """Without HOMEBASE_DB_PATH (local dev), the working DB is backend/app/db/homebase.db, as it always was."""
-    import os
-    import subprocess
-    import sys
-    env = {k: v for k, v in os.environ.items() if k not in ("HOMEBASE_DB_PATH", "APP_ENV")}   # plain local dev
-    out = subprocess.run([sys.executable, "-c", "from app import config; print(config.WORKING_DB)"],
-                         cwd=config.BACKEND_DIR, env=env, capture_output=True, text=True, check=True).stdout.strip()
-    assert out == str(config.DB_DIR / "homebase.db")

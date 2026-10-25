@@ -3,23 +3,23 @@
 Run from backend/:
     .venv\\Scripts\\python.exe -m pytest tests/test_mcp_tools.py -v
 
-Tools are called through a real FastMCP client (in memory), against a throwaway copy of the database.
+Tools are called through a real FastMCP client (in memory), against a throwaway Postgres test database.
 """
 
 import asyncio
-import hashlib
 import json
-import sqlite3
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
+from psycopg import errors
 
 from app import config
 from app.db import connect, connect_readonly
 from app.mcp_server import progress
 from app.mcp_server.server import mcp
+from tests.helpers import db_snapshot
 
 TODAY = datetime.now(timezone.utc).date()
 EXPECTED_TOOLS = {"get_user_profile", "search_exercises",
@@ -103,21 +103,25 @@ def test_exactly_five_tools_all_read_only(test_db):
 
 def test_database_connection_cannot_write(test_db):
     conn = connect_readonly()
-    with pytest.raises(sqlite3.OperationalError, match="readonly"):
+    with pytest.raises(errors.ReadOnlySqlTransaction, match="read-only transaction"):
         conn.execute("DELETE FROM exercises")
+    conn.close()
+    conn = connect_readonly()                       # and a fresh one from the pool is read-only too
+    with pytest.raises(errors.ReadOnlySqlTransaction):
+        conn.execute("INSERT INTO users (username, password_hash) VALUES ('sneaky', 'x')")
     conn.close()
 
 
 def test_running_every_tool_leaves_the_database_unchanged(test_db):
     uid = make_user()
     log(uid, 0)
-    before = hashlib.sha256(test_db.read_bytes()).hexdigest()
+    before = db_snapshot()
     call("get_user_profile", user_id=uid)
     call("search_exercises", muscle_group="legs", injury_flags=["knee"])
     call("get_progress_summary", user_id=uid)
     call("compute_strength_equivalents", total_weight_lifted_lbs=1000)
     call("check_goal_achievement", user_id=uid)
-    assert hashlib.sha256(test_db.read_bytes()).hexdigest() == before
+    assert db_snapshot() == before
 
 
 # ---------------------------------------------------------------- 1. get_user_profile
@@ -175,7 +179,7 @@ def test_injury_filter_excludes_tagged_exercises(test_db):
     assert {"bodyweight_squat", "reverse_lunge", "wall_sit", "goblet_squat"}.isdisjoint(ids)   # drafted knee tags
     conn = connect()
     knee_legs = conn.execute("SELECT COUNT(*) FROM exercises WHERE muscle_group = 'legs' AND EXISTS "
-                             "(SELECT 1 FROM json_each(injury_contraindications) WHERE value = 'knee')").fetchone()[0]
+                             "(SELECT 1 FROM jsonb_array_elements_text(injury_contraindications::jsonb) c(value) WHERE value = 'knee')").fetchone()[0]
     conn.close()
     assert filtered["injury_filter"]["excluded_as_contraindicated"] == plain["total_matching"] - filtered["total_matching"] \
         == knee_legs > 5                                       # every legs exercise tagged knee, imported ones included

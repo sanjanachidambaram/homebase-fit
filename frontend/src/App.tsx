@@ -4,6 +4,7 @@ import { DisclaimerBar } from './components/Legal'
 import Link from './components/Link'
 import AboutDataPage from './pages/AboutDataPage'
 import AboutPage from './pages/AboutPage'
+import AuthCallbackPage from './pages/AuthCallbackPage'
 import BuildPage from './pages/BuildPage'
 import CalendarPage from './pages/CalendarPage'
 import DashboardPage from './pages/DashboardPage'
@@ -43,6 +44,7 @@ const PAGES: Record<string, () => JSX.Element> = {
   '/plan/review': PlanReviewPage, // review mode: swap exercises before the plan goes on the calendar
   '/how-we-build': HowWeBuildPage, // public; linked from the plan on the Dashboard and Your Personalized Plan
   '/pregnancy-support': PregnancySupportPage, // pregnant / postpartum users are sent here (quiz, Dashboard, blocks)
+  '/auth/callback': AuthCallbackPage, // where Google / Microsoft sign-in lands (app/oauth.py); not in the nav
 }
 
 // Only pages that exist get a nav link. The order (2026-10-25): Dashboard, About, Personalized Plan, Calendar, Build

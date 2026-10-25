@@ -106,6 +106,16 @@ export default function SettingsPage() {
             <strong>First name:</strong> {account.first_name}
           </p>
         )}
+        {account && account.sign_in_with.length > 0 && (
+          <p>
+            <strong>Signs in with:</strong>{' '}
+            {[
+              ...(account.has_password ? ['username and password'] : []),
+              ...account.sign_in_with.map((p) => (p === 'google' ? 'Google' : 'Microsoft')),
+            ].join(', ')}
+            {account.email && <> ({account.email})</>}
+          </p>
+        )}
         {account && (
           <p>
             <strong>Member since:</strong> {new Date(account.created_at).toLocaleDateString()}

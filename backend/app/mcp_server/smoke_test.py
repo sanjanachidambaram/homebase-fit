@@ -5,8 +5,9 @@ launches it), calls all 6 tools over the MCP protocol, and checks the answers. I
 the injury filter really removes a contraindicated exercise.
 
 Safe by design: user-data tools need a user and logs, and the injury proof needs a tagged exercise, so
-those run against a THROWAWAY COPY of the database (HOMEBASE_DB_PATH). The committed databases are never
-modified. A last step repeats the injury check against the real, unmodified working database.
+those run against a THROWAWAY Postgres database, created on the same server as DATABASE_URL (migrations + content,
+exactly as the app builds one) and dropped at the end. The real database is never modified. A last step repeats the
+injury check against the real, unmodified database.
 
 Run from the project root:
     backend/.venv/Scripts/python.exe backend/app/mcp_server/smoke_test.py
@@ -15,18 +16,20 @@ Run from the project root:
 import asyncio
 import json
 import os
+import secrets
 import sys
-import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import psycopg
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "backend"))
 
 from fastmcp import Client  # noqa: E402
 
-from app.config import ORIGINAL_DB  # noqa: E402
-from app.db import connect, copy_db  # noqa: E402
+from app import config  # noqa: E402
+from app.db import close_pools, connect, ensure_database  # noqa: E402
 
 TEST_EXERCISE = "Adductor"          # an imported exercise we tag for the test (only in the throwaway copy)
 # Every exercise has drafted injury data since 2026-10-24, so the copy marks one as never checked, to show the tool
@@ -47,10 +50,35 @@ def show(title: str) -> None:
     print(f"\n== {title}")
 
 
-def build_throwaway_db(path: Path) -> int:
-    """Copy of the clean DB + one tagged exercise + one test user with 30 days of activity."""
-    copy_db(ORIGINAL_DB, path)
-    conn = connect(path)
+def create_throwaway_db() -> str:
+    """A new, empty database on the DATABASE_URL server; returns its connection string."""
+    real = config.database_url()
+    name = f"beefit_smoke_{secrets.token_hex(4)}"
+    with psycopg.connect(real, autocommit=True) as c:
+        c.execute(f'CREATE DATABASE "{name}"')
+    return psycopg.conninfo.make_conninfo(real, dbname=name)
+
+
+def drop_throwaway_db(url: str) -> None:
+    close_pools(url)
+    name = psycopg.conninfo.conninfo_to_dict(url)["dbname"]
+    with psycopg.connect(config.database_url(), autocommit=True) as c:
+        c.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+
+
+def build_throwaway_db(url: str) -> int:
+    """A freshly built DB + one tagged exercise + one test user with 30 days of activity."""
+    config.DATABASE_URL_OVERRIDE = url
+    try:
+        ensure_database()
+        return _add_test_data()
+    finally:
+        close_pools(url)
+        config.DATABASE_URL_OVERRIDE = None
+
+
+def _add_test_data() -> int:
+    conn = connect()
     today = datetime.now(timezone.utc)
     stamp = (today - timedelta(days=20)).strftime("%Y-%m-%dT%H:%M:%SZ")
     with conn:
@@ -85,11 +113,21 @@ def server_config(env: dict[str, str] | None) -> dict:
 
 async def main() -> None:
     os.chdir(ROOT)   # .mcp.json paths are relative to the project root
-    tmp = Path(tempfile.mkdtemp(prefix="homebase_smoke_")) / "smoke.db"
-    uid = build_throwaway_db(tmp)
-    print(f"Throwaway database: {tmp}\n(test user id {uid}; exercise '{TEST_EXERCISE}' tagged unsafe for knee)")
+    tmp = create_throwaway_db()
+    try:
+        await run_checks(tmp)
+    finally:
+        drop_throwaway_db(tmp)
+    print("\n" + ("ALL CHECKS PASSED" if not failures else f"{len(failures)} CHECK(S) FAILED: {failures}"))
+    sys.exit(1 if failures else 0)
 
-    async with Client(server_config({"HOMEBASE_DB_PATH": str(tmp)})) as c:
+
+async def run_checks(tmp: str) -> None:
+    uid = build_throwaway_db(tmp)
+    print(f"Throwaway database: {psycopg.conninfo.conninfo_to_dict(tmp)['dbname']}\n"
+          f"(test user id {uid}; exercise '{TEST_EXERCISE}' tagged unsafe for knee)")
+
+    async with Client(server_config({"DATABASE_URL": tmp})) as c:
         show("tools/list")
         tools = await c.list_tools()
         names = {t.name for t in tools}
@@ -159,7 +197,7 @@ async def main() -> None:
         check(g["status"] == "on_track", "about 3 sessions/week vs a target of 3, and body weight down: on_track")
 
     show("Repeat of the injury check on the REAL, unmodified working database")
-    async with Client(server_config(None)) as c:
+    async with Client(server_config({"DATABASE_URL": config.database_url()})) as c:   # the real one, read-only
         real = (await c.call_tool("search_exercises", {"muscle_group": "legs", "injury_flags": ["knee"],
                                                        "limit": 50})).data
         real_all = (await c.call_tool("search_exercises", {"muscle_group": "legs", "limit": 50})).data
@@ -167,11 +205,6 @@ async def main() -> None:
         print("    removed for knee:", removed)
         check({"bodyweight_squat", "wall_sit"} <= set(removed), "drafted knee-unsafe exercises excluded in the real DB")
         check(TEST_EXERCISE in {e["id"] for e in real["exercises"]}, f"'{TEST_EXERCISE}' is NOT tagged in the real DB (test tag stayed in the copy)")
-
-    tmp.unlink(missing_ok=True)
-    tmp.parent.rmdir()
-    print("\n" + ("ALL CHECKS PASSED" if not failures else f"{len(failures)} CHECK(S) FAILED: {failures}"))
-    sys.exit(1 if failures else 0)
 
 
 if __name__ == "__main__":

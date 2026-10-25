@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { logIn, signUp } from '../api'
 import { setSession, type Session } from '../session'
 import { PrivacyNote } from './Legal'
+import SignInWith from './SignInWith'
 
 /** Sign up (with the privacy note) or sign in. */
 export default function AccountForm({
@@ -89,6 +90,7 @@ export default function AccountForm({
         >
           {mode === 'signup' ? 'I already have an account' : 'Create a new account instead'}
         </button>
+        <SignInWith />
       </form>
     </div>
   )

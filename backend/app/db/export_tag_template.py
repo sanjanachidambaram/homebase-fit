@@ -17,8 +17,8 @@ reasoning (rationale_tier says ai_drafted) so the PT can confirm or correct it i
 import csv
 import json
 
-from app.config import CONTENT_DIR, ORIGINAL_DB
-from app.db import connect
+from app.config import CONTENT_DIR
+from app.db import connect_readonly
 from app.safety_rules import INJURY_FLAGS
 
 TEMPLATE = CONTENT_DIR / "exercises" / "contraindication_tags_TEMPLATE.csv"
@@ -29,7 +29,7 @@ COLUMNS = ("exercise_id", "name", "source_dataset", "muscle_group", "category", 
 
 
 def export() -> int:
-    conn = connect(ORIGINAL_DB)
+    conn = connect_readonly()
     rows = conn.execute(
         "SELECT * FROM exercises ORDER BY source_dataset = 'free-exercise-db', muscle_group, name"
     ).fetchall()

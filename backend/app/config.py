@@ -20,8 +20,7 @@ PROMPTS_DIR = BACKEND_DIR / "prompts"
 CONTENT_DIR = PROJECT_ROOT / "content"
 FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"   # the built React app (npm run build); served by FastAPI
 
-DB_DIR = BACKEND_DIR / "app" / "db"
-ORIGINAL_DB = DB_DIR / "homebase_original.db"  # clean, seeded; never modified by the app
+MIGRATIONS_DIR = BACKEND_DIR / "migrations"   # Alembic (schema); content is seeded from content/ by app/db/seed.py
 
 ENV_PATHS = (PROJECT_ROOT / ".env", PROJECT_ROOT.parent / ".env")
 
@@ -45,10 +44,18 @@ def get_secret(name: str) -> str | None:
     return value or None
 
 
-# What the app reads and writes. HOMEBASE_DB_PATH (not a secret, but looked up the same way: environment
-# variable, then .env) points it at another file, e.g. a persistent disk on the host, or a throwaway copy
-# for the MCP smoke test.
-WORKING_DB = Path(get_secret("HOMEBASE_DB_PATH") or DB_DIR / "homebase.db")
+# The database: Postgres at DATABASE_URL (Neon in production, since 2026-10-25; it replaced the SQLite file on a Render
+# disk). A secret (it holds the password), looked up like the others. Tests point it at a throwaway database by
+# setting DATABASE_URL_OVERRIDE (tests/conftest.py); nothing else should.
+DATABASE_URL_OVERRIDE: str | None = None
+
+
+def database_url() -> str:
+    url = DATABASE_URL_OVERRIDE or get_secret("DATABASE_URL")
+    if not url:
+        raise RuntimeError("DATABASE_URL is not set. Point it at a Postgres database (see .env.example and README.md).")
+    # Some hosts hand out postgres://...; psycopg wants postgresql://.
+    return "postgresql://" + url[len("postgres://"):] if url.startswith("postgres://") else url
 
 
 _dev_secret: str | None = None

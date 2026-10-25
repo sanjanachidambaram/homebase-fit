@@ -13,11 +13,10 @@ They are placeholders for the physical therapist to review (see THRESHOLDS below
 """
 
 import json
-import sqlite3
 from datetime import date, datetime, timedelta, timezone
 
 from app.agents.context import agent_profile_for
-from app.db import connect_readonly
+from app.db import Connection, connect_readonly
 
 WINDOW_DAYS = 30
 REST_SUGGESTED_AFTER_DAYS = 10     # the Coach agent's overtraining flag: 10+ days in a row
@@ -185,7 +184,7 @@ def _rate(ratio: float, ahead: float, on_track: float) -> str:
     return "ahead" if ratio >= ahead else "on_track" if ratio >= on_track else "behind"
 
 
-def _plan_adherence(conn: sqlite3.Connection, user_id: int, start: date, today: date) -> dict:
+def _plan_adherence(conn: Connection, user_id: int, start: date, today: date) -> dict:
     """Workout days the plan scheduled from `start` up to today, and how many were marked completed. The plan's own
     cardio days count too (done once cardio is logged on them). Today only counts once it's done, so an unfinished
     today isn't a miss. Never reads notes."""

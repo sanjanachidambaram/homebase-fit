@@ -8,12 +8,10 @@ Run from backend/:
 
 import json
 import re
-import sqlite3
 
 import pytest
 
-from app import config
-from app.db import connect_readonly
+from app.db import connect, connect_readonly
 from app.safety_rules import INJURY_FLAGS
 from app.services import program_generator as gen
 from app.services.program_generator import (BLOCK_WEEKS, DEFAULT_WEIGHT_LB, NEEDS_BAR, generate, suggested_weight,
@@ -311,7 +309,7 @@ def test_every_injury_flag_filters_every_goal(test_db, search_spy, goal):
 def test_a_newly_tagged_exercise_is_excluded_too(test_db):
     before = {x.exercise_id for x in exercises_in(generate(LOWER_BACK_REHAB))}
     assert "glute_bridge" in before
-    conn = sqlite3.connect(config.WORKING_DB)
+    conn = connect()
     with conn:
         conn.execute("UPDATE exercises SET injury_contraindications = '[\"lower_back\"]' WHERE id = 'glute_bridge'")
     conn.close()
@@ -332,8 +330,8 @@ def test_pregnant_or_postpartum_gets_no_plan(test_db, search_spy, status):
 
 # ================================================================ 6. the protocol content
 
-def test_seeded_protocols_cover_every_goal_and_level():
-    conn = sqlite3.connect(config.ORIGINAL_DB)
+def test_seeded_protocols_cover_every_goal_and_level(test_db):
+    conn = connect_readonly()
     rows = conn.execute("SELECT goal, experience_level, session_length_minutes, status, citations "
                         "FROM goal_protocols").fetchall()
     conn.close()
@@ -349,11 +347,11 @@ def test_seed_rejects_a_missing_protocol(tmp_path, monkeypatch):
         " sets_range: '2-3', reps_range: '8-12', rest_seconds: 90, progression_note: x}\n", encoding="utf-8")
     monkeypatch.setattr(seed, "CONTENT_DIR", tmp_path)
     monkeypatch.setattr(seed, "PROJECT_ROOT", tmp_path)
-    conn = sqlite3.connect(":memory:")
-    conn.executescript((config.DB_DIR / "schema.sql").read_text(encoding="utf-8"))
-    conn.execute("INSERT INTO sources VALUES ('placeholder-authored', 0, 'p', NULL, 'x', 'x', 'placeholder')")
+    class Sink:                                   # the check runs before anything is written
+        def execute(self, *a):
+            pass
     errors: list[str] = []
-    seed.seed_goal_protocols(conn, {"placeholder-authored"}, errors)
+    seed.seed_goal_protocols(Sink(), {"placeholder-authored"}, errors)
     assert errors and "missing protocols" in errors[0] and "feel_good/advanced" in errors[0]
 
 

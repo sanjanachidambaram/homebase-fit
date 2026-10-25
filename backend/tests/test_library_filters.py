@@ -117,7 +117,7 @@ def test_the_safety_check_elsewhere_is_unchanged(test_db):
         conn = connect()
         try:
             tagged = {r[0] for r in conn.execute(
-                "SELECT e.id FROM exercises e, json_each(e.injury_contraindications) c WHERE c.value = ?", (flag,))}
+                "SELECT e.id FROM exercises e, jsonb_array_elements_text(e.injury_contraindications::jsonb) c(value) WHERE c.value = ?", (flag,))}
             untagged = {r[0] for r in conn.execute(
                 "SELECT id FROM exercises WHERE contraindication_status = 'untagged'")}
         finally:

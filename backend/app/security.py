@@ -1,30 +1,40 @@
-"""Password hashing and sign-in tokens (standard library only).
+"""Password hashing, sign-in tokens, and rate limits.
 
-Passwords: scrypt with a random per-user salt; only the hash is stored.
-Tokens: "<user_id>.<HMAC-SHA256(APP_SECRET_KEY, user_id)>". They prove which
-user is calling, so one user can't read or delete another's data by changing
-the id in a URL. Deleting the account makes its token useless (user ids are
-never reused). Minimal by design for a class project: no expiry or revocation.
+Passwords: Argon2id via pwdlib (since 2026-10-25), with a random per-user salt; only the hash is stored. Hashes made
+before that are scrypt ("scrypt$n$r$p$salt$digest"): they still verify, and verify_and_update() hands back an Argon2
+replacement so the account is upgraded the first time its owner signs in (app/users.py login).
+Tokens: "<user_id>.<HMAC-SHA256(APP_SECRET_KEY, user_id)>". They prove which user is calling, so one user can't read
+or delete another's data by changing the id in a URL. Deleting the account makes its token useless (user ids are never
+reused). The same token is issued after a password sign-in and after Google / Microsoft sign-in (app/oauth.py).
+Minimal by design for a class project: no expiry or revocation.
+Rate limits (slowapi, per client IP): sign-in, sign-up and the OAuth start routes, so passwords can't be guessed in
+bulk and accounts can't be mass-created. The limits are in-memory, which fits one service instance.
 """
 
 import hashlib
 import hmac
-import secrets
 
 from fastapi import Header, HTTPException
+from pwdlib import PasswordHash
+from pwdlib.hashers.argon2 import Argon2Hasher
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.config import app_secret_key
 
-SCRYPT_N, SCRYPT_R, SCRYPT_P = 2**14, 8, 1
+_argon2 = PasswordHash((Argon2Hasher(),))
+
+LOGIN_LIMIT = "10/minute"     # per IP: plenty for typos, far too few to guess passwords
+SIGNUP_LIMIT = "5/minute"
+OAUTH_LIMIT = "20/minute"
+limiter = Limiter(key_func=get_remote_address)
 
 
 def hash_password(password: str) -> str:
-    salt = secrets.token_bytes(16)
-    digest = hashlib.scrypt(password.encode(), salt=salt, n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P, dklen=32)
-    return f"scrypt${SCRYPT_N}${SCRYPT_R}${SCRYPT_P}${salt.hex()}${digest.hex()}"
+    return _argon2.hash(password)
 
 
-def verify_password(password: str, stored: str) -> bool:
+def _verify_scrypt(password: str, stored: str) -> bool:
     try:
         _, n, r, p, salt, digest = stored.split("$")
         candidate = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=int(n), r=int(r), p=int(p),
@@ -32,6 +42,24 @@ def verify_password(password: str, stored: str) -> bool:
     except ValueError:
         return False
     return hmac.compare_digest(candidate.hex(), digest)
+
+
+def verify_and_update(password: str, stored: str | None) -> tuple[bool, str | None]:
+    """(matches, a new hash to store or None). The new hash is set when an old scrypt hash matched (upgrade it to
+    Argon2) or when Argon2's own settings have changed. An account with no password (Google / Microsoft only) never
+    matches."""
+    if not stored:
+        return False, None
+    if stored.startswith("scrypt$"):
+        return (True, hash_password(password)) if _verify_scrypt(password, stored) else (False, None)
+    try:
+        return _argon2.verify_and_update(password, stored)
+    except Exception:   # a malformed hash: treat it as a wrong password, never a 500
+        return False, None
+
+
+def verify_password(password: str, stored: str | None) -> bool:
+    return verify_and_update(password, stored)[0]
 
 
 def _sign(user_id: int) -> str:

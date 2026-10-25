@@ -21,8 +21,7 @@ from datetime import timedelta
 
 import pytest
 
-from app import calendar, config
-from app.db import copy_db
+from app import calendar
 from tests.helpers import quiz_answers
 from tests.test_agents import rows, use_script  # noqa: F401  (use_script is a fixture)
 
@@ -82,16 +81,7 @@ def test_sign_up_quiz_plan_calendar_and_still_signed_in(client, pregnancy):
 
 # ---------------------------------------------------------------- the actual incident: a content rebuild mid-session
 
-@pytest.fixture
-def private_original(tmp_path, monkeypatch):
-    """Let the seed build its original into a temp file, never over the real homebase_original.db."""
-    original = tmp_path / "original.db"
-    copy_db(config.ORIGINAL_DB, original)
-    monkeypatch.setattr(config, "ORIGINAL_DB", original)
-    return original
-
-
-def test_running_the_seed_mid_session_keeps_the_user_signed_in(client, private_original):
+def test_running_the_seed_mid_session_keeps_the_user_signed_in(client):
     from app.db.seed import main as seed_main
 
     username = "live-session"
@@ -104,16 +94,16 @@ def test_running_the_seed_mid_session_keeps_the_user_signed_in(client, private_o
     before = {t: rows(f"SELECT * FROM {t} WHERE user_id = ? ORDER BY id", uid)
               for t in ("quiz_profiles", "calendar_entries", "exercise_favorites")}
 
-    summary = seed_main([])                     # exactly what was run during the incident: python -m app.db.seed
+    counts = seed_main([])                      # exactly what was run during the incident: python -m app.db.seed
 
-    assert summary["kept"]["users"] == 1 and not any(summary["dropped"].values())
+    assert counts["users"] == 1 and counts["exercises"] == 903
     assert_signed_in(client, uid, h, username)     # same token, same password
     for table, old in before.items():
         assert rows(f"SELECT * FROM {table} WHERE user_id = ? ORDER BY id", uid) == old, table
     assert submit_quiz(client, uid, h, experience_level="advanced").status_code == 200
 
 
-def test_wiping_users_is_now_explicit(client, private_original):
+def test_wiping_users_is_now_explicit(client):
     from app.db.seed import main as seed_main
 
     uid, h = sign_up(client, "demo-wipe")

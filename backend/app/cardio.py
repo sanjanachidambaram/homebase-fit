@@ -27,7 +27,6 @@ Rules (shared_rules.md rule 9):
 """
 
 import json
-import sqlite3
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -38,7 +37,7 @@ from pydantic import BaseModel, Field, model_validator
 from app.agents.safety import log_safety_event, red_flags_in
 from app import calendar as cal   # cal.today(), so a frozen 'today' in tests applies here too
 from app.calendar import COMPLETE_GRACE_DAYS, signed_in
-from app.db import connect
+from app.db import Connection, Row, connect
 from app.safety_rules import CLINICAL_REVIEW_PAGE, profile_needs_clinical_review
 from app.services.cardio_estimate import (CARDIO_TYPES, DISTANCE_TYPES, KM_PER_MILE, LIBRARY_TYPES, STEP_TYPES,
                                           estimate_cardio, types_for_api)
@@ -56,7 +55,7 @@ CARDIO_SUPPORT_PREGNANCY = (
     "trouble breathing, or fainting, get medical help right away.")
 
 
-def estimate_context(conn: sqlite3.Connection, uid: int) -> dict:
+def estimate_context(conn: Connection, uid: int) -> dict:
     """What the calorie math needs: the profile's weight, and whether estimates are off (pregnant / postpartum)."""
     row = conn.execute("SELECT weight, needs_clinical_review FROM quiz_profiles WHERE user_id = ?", (uid,)).fetchone()
     return {"weight_lb": row["weight"] if row else None, "clinical": bool(row and row["needs_clinical_review"])}
@@ -69,7 +68,7 @@ def log_estimate(r, ctx: dict) -> dict:
                            miles=r["distance_miles"], weight_lb=ctx["weight_lb"])
 
 
-def _dict(r: sqlite3.Row, ctx: dict) -> dict:
+def _dict(r: Row, ctx: dict) -> dict:
     return {"id": r["id"], "date": r["date"], "activity": r["activity"], "exercise_id": r["exercise_id"],
             "exercise_name": r["exercise_name"], "cardio_type": r["cardio_type"],
             "cardio_type_label": CARDIO_TYPES.get(r["cardio_type"] or "", {}).get("label"), "measure": r["measure"],
@@ -143,7 +142,7 @@ class CardioIn(BaseModel):
         return self
 
 
-def _sync_day(conn: sqlite3.Connection, uid: int, day: str) -> int | None:
+def _sync_day(conn: Connection, uid: int, day: str) -> int | None:
     """Keep the calendar day on this date in step with its cardio logs. A rest / open / cardio day with a log becomes
     a done cardio day (custom, so it can go back to the plan); a cardio day with no logs left is un-marked. Strength
     days are left alone. Returns the entry id if it changed."""

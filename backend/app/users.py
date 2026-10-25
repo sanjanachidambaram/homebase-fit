@@ -1,8 +1,9 @@
 """Accounts, the onboarding quiz submission, and full data deletion.
 
 Routes:
-  POST   /api/users                       sign up -> {user_id, token}
-  POST   /api/login                       sign in -> {user_id, token}
+  POST   /api/users                       sign up -> {user_id, token}            (rate limited per IP)
+  POST   /api/login                       sign in -> {user_id, token}            (rate limited per IP)
+  (Google / Microsoft sign-in: app/oauth.py. It issues the same token.)
   GET    /api/quiz/questions              the quiz (public)
   GET    /api/users/{id}                  account + quiz profile (own account only)
   PUT    /api/users/{id}/quiz-profile     save quiz answers; REQUIRES consent_accepted = true
@@ -13,15 +14,15 @@ Routes:
 import json
 import logging
 import re
-import sqlite3
 from datetime import date, datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from app.db import connect
-from app.security import hash_password, make_token, require_same_user, token_user_id, verify_password
+from app.db import Connection, IntegrityError, Row, connect
+from app.security import (LOGIN_LIMIT, SIGNUP_LIMIT, hash_password, limiter, make_token, require_same_user,
+                          token_user_id, verify_and_update)
 
 router = APIRouter(prefix="/api")
 log = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ GOAL_DATE_MAX_YEARS = 5
 # Every table holding a user's data. DELETE /api/users/{id} clears all of them.
 # workout_logs goes before calendar_entries (a log can point at a calendar day).
 USER_DATA_TABLES = ("safety_events", "measurements", "workout_logs", "calendar_entries", "cardio_logs",
-                    "built_workouts", "exercise_favorites", "quiz_profiles")
+                    "built_workouts", "exercise_favorites", "quiz_profiles", "oauth_identities")
 
 
 def now_utc() -> str:
@@ -79,7 +80,8 @@ class AuthResult(BaseModel):
 
 
 @router.post("/users", status_code=201)
-def sign_up(body: SignUp, conn: sqlite3.Connection = Depends(db)) -> AuthResult:
+@limiter.limit(SIGNUP_LIMIT)
+def sign_up(request: Request, body: SignUp, conn: Connection = Depends(db)) -> AuthResult:
     username = body.username.strip()
     if not USERNAME_RE.match(username):
         raise HTTPException(422, f"Pick a username of {USERNAME_RULE}.")
@@ -90,21 +92,26 @@ def sign_up(body: SignUp, conn: sqlite3.Connection = Depends(db)) -> AuthResult:
         cur = conn.execute("INSERT INTO users (username, first_name, password_hash) VALUES (?, ?, ?)",
                            (username, first_name, hash_password(body.password)))
         conn.commit()
-    except sqlite3.IntegrityError:   # usernames are unique ignoring case (schema.sql: COLLATE NOCASE)
+    except IntegrityError:   # usernames are unique ignoring case (CITEXT, migrations/versions/0001)
         raise HTTPException(409, "That username is taken. Pick another, or sign in if it's yours.")
     return AuthResult(user_id=cur.lastrowid, token=make_token(cur.lastrowid))
 
 
 @router.post("/login")
-def log_in(body: SignIn, conn: sqlite3.Connection = Depends(db)) -> AuthResult:
-    row = conn.execute("SELECT id, password_hash FROM users WHERE username = ?",   # NOCASE: any capitalization
+@limiter.limit(LOGIN_LIMIT)
+def log_in(request: Request, body: SignIn, conn: Connection = Depends(db)) -> AuthResult:
+    row = conn.execute("SELECT id, password_hash FROM users WHERE username = ?",   # CITEXT: any capitalization
                        (body.username.strip(),)).fetchone()
-    if not row or not verify_password(body.password, row["password_hash"]):
+    ok, new_hash = verify_and_update(body.password, row["password_hash"] if row else None)
+    if not ok:
         raise HTTPException(401, "Username or password is incorrect.")
+    if new_hash:   # an old scrypt hash (or old Argon2 settings): store the up-to-date Argon2 hash
+        with conn:
+            conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, row["id"]))
     return AuthResult(user_id=row["id"], token=make_token(row["id"]))
 
 
-def profile_dict(row: sqlite3.Row | None) -> dict | None:
+def profile_dict(row: Row | None) -> dict | None:
     if row is None:
         return None
     p = dict(row)
@@ -119,19 +126,23 @@ def profile_dict(row: sqlite3.Row | None) -> dict | None:
 
 
 @router.get("/users/{user_id}")
-def get_user(user_id: int, uid: int = Depends(token_user_id), conn: sqlite3.Connection = Depends(db)) -> dict:
+def get_user(user_id: int, uid: int = Depends(token_user_id), conn: Connection = Depends(db)) -> dict:
     require_same_user(user_id, uid)
-    user = conn.execute("SELECT id, username, first_name, created_at FROM users WHERE id = ?", (user_id,)).fetchone()
+    user = conn.execute("SELECT id, username, first_name, email, created_at, password_hash IS NOT NULL AS has_password "
+                        "FROM users WHERE id = ?", (user_id,)).fetchone()
     if not user:
         raise HTTPException(404, "Account not found.")
+    providers = [r[0] for r in conn.execute(
+        "SELECT provider FROM oauth_identities WHERE user_id = ? ORDER BY provider", (user_id,))]
     profile = conn.execute("SELECT * FROM quiz_profiles WHERE user_id = ?", (user_id,)).fetchone()
-    return {**dict(user), "quiz_profile": profile_dict(profile)}
+    return {**dict(user), "username": str(user["username"]), "sign_in_with": providers,
+            "quiz_profile": profile_dict(profile)}
 
 
 @router.delete("/users/{user_id}")
-def delete_user(user_id: int, uid: int = Depends(token_user_id), conn: sqlite3.Connection = Depends(db)) -> dict:
+def delete_user(user_id: int, uid: int = Depends(token_user_id), conn: Connection = Depends(db)) -> dict:
     """Hard delete: the user row and every row of theirs in every user-data table.
-    Explicit deletes (not just the ON DELETE CASCADE in schema.sql) so the code
+    Explicit deletes (not just the ON DELETE CASCADE in the schema) so the code
     states exactly what gets removed, and all of it happens in one transaction."""
     require_same_user(user_id, uid)
     if not conn.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone():
@@ -149,7 +160,7 @@ def delete_user(user_id: int, uid: int = Depends(token_user_id), conn: sqlite3.C
 # ---------------------------------------------------------------- quiz
 
 @router.get("/quiz/questions")
-def quiz_questions(conn: sqlite3.Connection = Depends(db)) -> list[dict]:
+def quiz_questions(conn: Connection = Depends(db)) -> list[dict]:
     rows = conn.execute("SELECT * FROM quiz_questions ORDER BY order_index").fetchall()
     return [
         {"id": r["id"], "prompt": r["prompt"], "type": r["question_type"], "options": json.loads(r["options"]),
@@ -164,7 +175,7 @@ class QuizSubmission(BaseModel):
     answers: dict[str, Any]                                    # question id -> answer
 
 
-def validate_answer(q: sqlite3.Row, value: Any) -> Any:
+def validate_answer(q: Row, value: Any) -> Any:
     settings = json.loads(q["settings"])
     allowed = {o["value"] for o in json.loads(q["options"])}
     qtype, qid = q["question_type"], q["id"]
@@ -206,12 +217,12 @@ def validate_answer(q: sqlite3.Row, value: Any) -> Any:
 
 @router.put("/users/{user_id}/quiz-profile")
 def save_quiz(user_id: int, body: QuizSubmission, uid: int = Depends(token_user_id),
-              conn: sqlite3.Connection = Depends(db)) -> dict:
+              conn: Connection = Depends(db)) -> dict:
     require_same_user(user_id, uid)
     if not conn.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone():
         raise HTTPException(404, "Account not found.")
     # Consent gate: nothing is stored unless the disclaimer was accepted.
-    # (schema.sql enforces the same rule with a CHECK constraint.)
+    # (the schema enforces the same rule with a CHECK constraint.)
     if not body.consent_accepted:
         raise HTTPException(422, "Please read and accept the medical disclaimer before submitting the quiz.")
 
@@ -263,7 +274,7 @@ def save_quiz(user_id: int, body: QuizSubmission, uid: int = Depends(token_user_
 
 
 @router.delete("/users/{user_id}/quiz-profile")
-def reset_quiz(user_id: int, uid: int = Depends(token_user_id), conn: sqlite3.Connection = Depends(db)) -> dict:
+def reset_quiz(user_id: int, uid: int = Depends(token_user_id), conn: Connection = Depends(db)) -> dict:
     """Reset my quiz: back to the no-plan state without retaking it now. Deletes the quiz answers (and the consent
     record that came with them; retaking asks for the disclaimer again) and the planned calendar days that nobody
     touched, from today on: the same days a retake would replace. Kept: the account, completed days, days with

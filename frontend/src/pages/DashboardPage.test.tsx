@@ -91,7 +91,8 @@ describe('Usernames', () => {
     fireEvent.change(screen.getByLabelText(/Password/), { target: { value: 'correct horse 1' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
     await waitFor(() => expect(done).toHaveBeenCalled())
-    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    const calls = fetch.mock.calls as unknown as [string, RequestInit][]
+    const [url, init] = calls.find(([u]) => u === '/api/users')!   // (the form also asks which sign-in buttons to show)
     expect(url).toBe('/api/users')
     expect(JSON.parse(init.body as string)).toEqual({ username: 'sarah_k', first_name: 'Sarah', password: 'correct horse 1' })
     expect(getSession()).toEqual({ userId: 3, token: 'tok', username: 'sarah_k' })

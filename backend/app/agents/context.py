@@ -24,11 +24,10 @@ the model forbids extra fields, so PII can't slip in by accident.
 """
 
 import json
-import sqlite3
 
 from pydantic import BaseModel, ConfigDict
 
-from app.db import connect
+from app.db import Connection, connect
 
 
 class AgentUserProfile(BaseModel):
@@ -55,7 +54,7 @@ assert not (_allowed | set(AgentUserProfile.model_fields)) & EXCLUDED_USER_FIELD
     "an excluded (identifying) field was added to the agent profile"
 
 
-def agent_profile_for(user_id: int, conn: sqlite3.Connection | None = None) -> AgentUserProfile | None:
+def agent_profile_for(user_id: int, conn: Connection | None = None) -> AgentUserProfile | None:
     """The PII-free profile for a user, or None if they haven't taken the quiz.
     user_id is used only for this local lookup; it is not part of the result.
 

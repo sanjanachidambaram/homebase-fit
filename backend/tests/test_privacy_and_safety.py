@@ -3,16 +3,14 @@
 Run from backend/:
     .venv\\Scripts\\python.exe -m pytest -v
 
-Each test runs against a throwaway copy of homebase_original.db, never the real working DB.
+Each test runs against its own throwaway Postgres database (tests/conftest.py), never a real one.
 """
 
 import json
-import sqlite3
 
 import pytest
 
-from app import config
-from app.db import connect
+from app.db import IntegrityError, connect
 from tests.helpers import quiz_answers
 
 ANSWERS = quiz_answers()
@@ -53,7 +51,7 @@ def test_quiz_rejected_without_consent(client):
 def test_database_refuses_profile_without_consent(client):
     uid, _ = sign_up(client, "user_a")
     conn = connect()
-    with pytest.raises(sqlite3.IntegrityError):
+    with pytest.raises(IntegrityError):
         conn.execute("INSERT INTO quiz_profiles (user_id, consent_accepted) VALUES (?, 0)", (uid,))
     conn.close()
 
@@ -74,7 +72,7 @@ def test_password_is_hashed(client):
     conn = connect()
     stored = conn.execute("SELECT password_hash FROM users").fetchone()[0]
     conn.close()
-    assert stored.startswith("scrypt$") and "correct horse" not in stored
+    assert stored.startswith("$argon2id$") and "correct horse" not in stored
 
 
 # ---------------------------------------------------------------- deletion
@@ -108,8 +106,10 @@ def test_delete_removes_user_and_all_related_rows(client):
     assert r.status_code == 200, r.text
     assert r.json()["rows_removed"] == {"safety_events": 1, "measurements": 1, "workout_logs": 2,
                                         "calendar_entries": 28, "cardio_logs": 1, "built_workouts": 1,
-                                        "exercise_favorites": 1, "quiz_profiles": 1, "users": 1}
-    assert len(USER_TABLES) == 8 and set(USER_TABLES) | {"users"} == set(r.json()["rows_removed"])
+                                        "exercise_favorites": 1, "quiz_profiles": 1, "oauth_identities": 0,
+                                        "users": 1}
+    # (+ oauth_identities: Google / Microsoft sign-in links; deleting those is tested in test_oauth.py)
+    assert len(USER_TABLES) == 8 and set(USER_TABLES) | {"users", "oauth_identities"} == set(r.json()["rows_removed"])
 
     for table in USER_TABLES:
         assert count(table, a) == 0, table
@@ -122,10 +122,11 @@ def test_delete_removes_user_and_all_related_rows(client):
 
 # ---------------------------------------------------------------- citations / status
 
-def test_schema_has_citations_and_status():
-    conn = sqlite3.connect(config.ORIGINAL_DB)
+def test_schema_has_citations_and_status(test_db):
+    conn = connect()
     for table in ("goal_protocols", "exercises"):
-        cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+        cols = {r[0] for r in conn.execute("SELECT column_name FROM information_schema.columns "
+                                           "WHERE table_name = ?", (table,))}
         assert {"citations", "status"} <= cols, table
     conn.close()
 
@@ -170,7 +171,8 @@ def test_the_free_text_box_is_gone_and_nothing_is_stored(client):
     assert r.status_code == 200 and "injury_notes" not in r.json()
     conn = connect()
     try:
-        assert "injury_notes" not in {c["name"] for c in conn.execute("PRAGMA table_info(quiz_profiles)")}
+        assert "injury_notes" not in {c[0] for c in conn.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'quiz_profiles'")}
         row = dict(conn.execute("SELECT * FROM quiz_profiles WHERE user_id = ?", (uid,)).fetchone())
     finally:
         conn.close()

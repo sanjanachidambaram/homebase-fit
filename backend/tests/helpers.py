@@ -14,3 +14,14 @@ def quiz_answers(**overrides) -> dict:
         answers.pop("weight", None)
         answers.pop("goal_weight", None)
     return answers
+
+
+def db_snapshot() -> dict[str, str]:
+    """A hash of every table's full contents in the test database, to prove something wrote nothing."""
+    from app.db import connect, table_counts
+    conn = connect()
+    try:
+        return {t: conn.execute(f"SELECT md5(COALESCE(string_agg(x::text, '|' ORDER BY x::text), '')) "
+                                f'FROM "{t}" x').fetchone()[0] for t in table_counts(conn)}
+    finally:
+        conn.close()

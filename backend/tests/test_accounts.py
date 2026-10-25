@@ -13,8 +13,7 @@ import sqlite3
 
 import pytest
 
-from app import config
-from app.db.reset import refresh_content
+from app.db.import_sqlite import import_sqlite
 from app.security import hash_password
 from tests.test_calendar import on_day  # noqa: F401  (fixture: freezes the calendar's today)
 
@@ -37,7 +36,8 @@ def test_sign_up_and_sign_in_with_a_username(client):
     assert login.status_code == 200 and login.json()["user_id"] == uid
     me = client.get(f"/api/users/{uid}", headers={"Authorization": f"Bearer {login.json()['token']}"}).json()
     assert (me["username"], me["first_name"]) == ("sarah_k", "Sarah")
-    assert "email" not in me
+    # A password account has no email: users.email only ever holds an address Google / Microsoft verified (app/oauth.py)
+    assert (me["email"], me["has_password"], me["sign_in_with"]) == (None, True, [])
 
 
 def test_usernames_are_unique_ignoring_case_and_sign_in_ignores_case(client):
@@ -70,21 +70,37 @@ def test_first_name_is_required_and_tidied(client):
     assert me["first_name"] == "Mary Ann"
 
 
-def test_accounts_from_before_usernames_keep_signing_in_with_their_old_email(client):
-    """The working DB on Render's disk (and anyone's local one) has users with an email column. The first start
-    with the new schema refreshes it (app.db.ensure_working_db): the old email becomes the username, so the same
-    sign-in keeps working, and their data stays. They have no first name yet (the greeting falls back)."""
-    conn = sqlite3.connect(config.WORKING_DB)
-    with conn:                                                                  # make it look like the old schema
-        conn.execute("ALTER TABLE users RENAME COLUMN username TO email")
-        conn.execute("ALTER TABLE users DROP COLUMN first_name")
-        uid = conn.execute("INSERT INTO users (email, password_hash) VALUES ('old.timer@example.com', ?)",
+def test_accounts_from_before_usernames_keep_signing_in_with_their_old_email(client, tmp_path):
+    """An old SQLite database (from before usernames: users had an email column) moved into Postgres with the one-time
+    import (app/db/import_sqlite.py): the old email becomes the username, so the same sign-in keeps working, and their
+    data stays. They have no first name yet (the greeting falls back). The unverified old email is NOT stored as the
+    account's email, so a Google / Microsoft sign-in can never be linked to it by email."""
+    old = tmp_path / "homebase.db"
+    conn = sqlite3.connect(old)
+    with conn:                                                                  # the old schema, cut down
+        conn.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, password_hash TEXT, created_at TEXT)")
+        conn.execute("CREATE TABLE exercise_favorites (id INTEGER PRIMARY KEY, user_id INTEGER, exercise_id TEXT)")
+        uid = conn.execute("INSERT INTO users (id, email, password_hash, created_at) "
+                           "VALUES (41, 'old.timer@example.com', ?, '2026-10-01T10:00:00Z')",
                            (hash_password(PASSWORD),)).lastrowid
         conn.execute("INSERT INTO exercise_favorites (user_id, exercise_id) VALUES (?, 'glute_bridge')", (uid,))
+        conn.execute("INSERT INTO exercise_favorites (user_id, exercise_id) VALUES (?, 'no_such_exercise')", (uid,))
     conn.close()
 
-    result = refresh_content()
-    assert result["kept"]["users"] == 1 and not result["dropped"].get("users")
+    result = import_sqlite(old)
+    assert result["imported"]["users"] == 1 and result["imported"]["exercise_favorites"] == 1
+    assert result["skipped"]["exercise_favorites"] == 1                         # pointed at nothing: refused, counted
+
+    login = log_in(client, "Old.Timer@example.com")                             # what they typed before
+    assert login.status_code == 200 and login.json()["user_id"] == uid == 41    # same id, so old tokens still work
+    h = {"Authorization": f"Bearer {login.json()['token']}"}
+    me = client.get(f"/api/users/{uid}", headers=h).json()
+    assert (me["username"], me["first_name"], me["email"]) == ("old.timer@example.com", None, None)
+    assert [f["id"] for f in client.get("/api/favorites", headers=h).json()] == ["glute_bridge"]
+    new = sign_up(client, "after_import").json()                                # the id counter moved past 41
+    assert new["user_id"] > 41
+    with pytest.raises(SystemExit, match="already has accounts"):              # never over a database in use
+        import_sqlite(old)
 
     login = log_in(client, "Old.Timer@example.com")                             # what they typed before
     assert login.status_code == 200 and login.json()["user_id"] == uid

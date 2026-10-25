@@ -21,14 +21,15 @@ Thumbs.db
 .idea/
 .claude/
 
-# SQLite scratch files
+# The data lives in Postgres (DATABASE_URL) since 2026-10-25. Old SQLite files (a local homebase.db, or one downloaded
+# from the old Render disk for app/db/import_sqlite.py) hold real people's data: never commit them.
+*.db
 *.db-journal
 *.db-wal
 *.db-shm
 
-# The working database (accounts, logs, calendars) is created at startup from the committed, clean
-# backend/app/db/homebase_original.db. Never commit it: it can hold real people's data.
-backend/app/db/homebase.db
-
 # Review export: rebuilt any time by backend/scripts/export_exercise_review.py
 content/exercise_review_export.xlsx
+
+# Portable PostgreSQL for the local test suite (downloaded by backend/scripts/get_test_postgres.py; never committed)
+backend/.pg/

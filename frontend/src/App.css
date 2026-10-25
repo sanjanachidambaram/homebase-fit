@@ -273,6 +273,52 @@ main {
   cursor: pointer;
 }
 
+/* "Continue with Google / Microsoft" (components/SignInWith.tsx): white buttons with the providers' own marks */
+.sign-in-with {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.sign-in-with-or {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+.sign-in-with-or::before,
+.sign-in-with-or::after {
+  content: '';
+  flex: 1;
+  border-top: 2px solid var(--honey);
+}
+
+.btn-oauth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  background: #fff;
+  color: var(--ink);
+  border: 2px solid var(--honey);
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.btn-oauth:hover {
+  border-color: var(--orange-deep);
+  box-shadow: var(--shadow);
+}
+
+.btn-oauth:focus-visible {
+  outline: 3px solid var(--orange-deep);
+  outline-offset: 2px;
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;

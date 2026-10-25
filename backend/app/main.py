@@ -3,7 +3,8 @@
 Run locally from backend/ (no auto-reload, so edits never spawn extra servers):
     .venv\\Scripts\\python.exe -m uvicorn app.main:app --port 8000
 
-One service serves everything (how it runs on Render, see render.yaml):
+One service serves everything (how it runs on Render, see render.yaml). The data lives in Postgres at DATABASE_URL
+(Neon); nothing is kept on local disk, so it runs on Render's free plan:
   /api/*      the API
   /content/*  exercise images, videos, team photos (the content/ folder)
   anything else: the built React app (frontend/dist). Real files are served as files; every other path gets
@@ -11,17 +12,18 @@ One service serves everything (how it runs on Render, see render.yaml):
 In development the Vite dev server serves the app instead and proxies /api and /content here.
 """
 
-import json
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi.errors import RateLimitExceeded
 
-from app import config
 from app.config import CONTENT_DIR, FRONTEND_DIST, MODEL_NAME, is_production, llm_provider
-from app.db import connect, ensure_working_db, table_counts
+from app.db import connect, ensure_database, table_counts
+from app.oauth import router as oauth_router
+from app.security import limiter
 from app.agent_routes import router as agent_router
 from app.calendar import router as calendar_router
 from app.cardio import router as cardio_router
@@ -32,14 +34,23 @@ from app.users import router as users_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Builds the working DB on a brand-new disk, leaves it alone on a normal redeploy, and refreshes it (keeping
-    # accounts, with a backup) when a deploy ships new content or schema. See app.db.ensure_working_db.
-    what = ensure_working_db()
-    print(f"Working database {config.WORKING_DB}: {what}.", flush=True)
+    # Brings the Postgres schema up to date (Alembic) and loads the content when a deploy ships new content files,
+    # never touching accounts. See app.db.ensure_database.
+    what = ensure_database()
+    print(f"Database: schema up to date, content {what}.", flush=True)
     yield
 
 
 app = FastAPI(title="Bee Fit API", lifespan=lifespan)
+
+# Rate limits on sign-in, sign-up and OAuth (app/security.py). A 429 reads like every other API error.
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+def too_many(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    return JSONResponse({"detail": "Too many attempts. Please wait a minute and try again."}, status_code=429)
+
 
 # Only the Vite dev server needs CORS: in production the app and the API share one origin.
 app.add_middleware(
@@ -60,6 +71,7 @@ def old_plan_page() -> RedirectResponse:
 app.mount("/content", StaticFiles(directory=CONTENT_DIR), name="content")
 
 app.include_router(users_router)
+app.include_router(oauth_router)
 app.include_router(exercises_router)
 app.include_router(agent_router)
 app.include_router(calendar_router)
@@ -105,11 +117,12 @@ def data_summary() -> dict:
                 "injury_unchecked": one("SELECT COUNT(*) FROM exercises WHERE contraindication_status = 'untagged'"),
                 "injury_pt_reviewed": one("SELECT COUNT(*) FROM exercises WHERE contraindication_status = 'pt_reviewed'"),
                 "with_cautions": one("SELECT COUNT(*) FROM exercises WHERE injury_contraindications <> '[]'"),
-                "cautions": one("SELECT COUNT(*) FROM exercises e, json_each(e.injury_contraindications)"),
-                "reasons_ai_drafted": one("SELECT COUNT(*) FROM exercises e, json_each(e.injury_rationale) r "
-                                          "WHERE json_extract(r.value, '$.tier') = 'ai_drafted'"),
-                "reasons_pt_reviewed": one("SELECT COUNT(*) FROM exercises e, json_each(e.injury_rationale) r "
-                                           "WHERE json_extract(r.value, '$.tier') = 'pt_reviewed'"),
+                "cautions": one("SELECT COUNT(*) FROM exercises e, "
+                                "jsonb_array_elements_text(e.injury_contraindications::jsonb)"),
+                "reasons_ai_drafted": one("SELECT COUNT(*) FROM exercises e, jsonb_each(e.injury_rationale::jsonb) r "
+                                          "WHERE r.value ->> 'tier' = 'ai_drafted'"),
+                "reasons_pt_reviewed": one("SELECT COUNT(*) FROM exercises e, jsonb_each(e.injury_rationale::jsonb) r "
+                                           "WHERE r.value ->> 'tier' = 'pt_reviewed'"),
             },
             "protocols": {
                 "total": one("SELECT COUNT(*) FROM goal_protocols"),
@@ -136,7 +149,7 @@ def debug_tables() -> dict:
         raise HTTPException(404)
     conn = connect()
     try:
-        return {"database": config.WORKING_DB.name, "tables": table_counts(conn)}
+        return {"database": conn.execute("SELECT current_database()").fetchone()[0], "tables": table_counts(conn)}
     finally:
         conn.close()
 

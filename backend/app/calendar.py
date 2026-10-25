@@ -49,7 +49,6 @@ Rules, all enforced here in code:
 
 import json
 import re
-import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from datetime import date as Day   # for the CalendarUpdate.date field, whose name shadows the type
 from typing import Literal
@@ -58,7 +57,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.agents.safety import NOTE_SUPPORT_MESSAGE, log_safety_event, red_flags_in
-from app.db import connect
+from app.db import Connection, Row, connect
 from app.safety_rules import CLINICAL_REVIEW_NO_AI, CLINICAL_REVIEW_PAGE, profile_needs_clinical_review
 from app.security import token_user_id
 from app.services.program_generator import (PLAN_DAYS, PLAN_WEEKS, WEIGHTED_EQUIPMENT, NoProfile, PlanDay,
@@ -172,7 +171,7 @@ def cardio_content(cardio_type: str | None, on: date) -> dict:
             "snapshot_at": now_utc()}
 
 
-def calendar_settings(conn: sqlite3.Connection, user_id: int) -> dict | None:
+def calendar_settings(conn: Connection, user_id: int) -> dict | None:
     row = conn.execute("SELECT calendar_mode, plan_reviewed, plan_started_on FROM quiz_profiles WHERE user_id = ?",
                        (user_id,)).fetchone()
     if row is None:
@@ -186,7 +185,7 @@ def calendar_settings(conn: sqlite3.Connection, user_id: int) -> dict | None:
             "review_pending": mode == "review" and not row["plan_reviewed"]}
 
 
-def _fill(conn: sqlite3.Connection, user_id: int, dates: list[date], plan: WeeklyProgram | None, cfg: dict) -> int:
+def _fill(conn: Connection, user_id: int, dates: list[date], plan: WeeklyProgram | None, cfg: dict) -> int:
     """Create entries for the dates that don't have one, per the calendar mode, inside the 6-month plan (dates before
     it starts or after it ends are skipped). Never touches an existing entry."""
     dates = [d for d in dates if cfg["started"] <= d <= plan_end(cfg["started"])]
@@ -302,7 +301,7 @@ def can_override(day: str, completed: bool) -> bool:
     return not completed and date.fromisoformat(day) >= today()
 
 
-def day_choice(r: sqlite3.Row) -> str:
+def day_choice(r: Row) -> str:
     """Which of the three the day is now: 'plan', 'build' (Workout Builder), 'cardio', or 'open' (nothing yet).
     The plan's own cardio days ("Cardio of your choice") are 'plan'."""
     content = json.loads(r["workout_content"])
@@ -313,7 +312,7 @@ def day_choice(r: sqlite3.Row) -> str:
     return "open" if content.get("open") else "plan"
 
 
-def entry_dict(r: sqlite3.Row, calories: dict | None = None, weights: dict | None = None) -> dict:
+def entry_dict(r: Row, calories: dict | None = None, weights: dict | None = None) -> dict:
     planned = json.loads(r["planned_content"]) if r["planned_content"] else None
     return {
         "id": r["id"],
@@ -382,7 +381,7 @@ def get_calendar(
 
 # ---------------------------------------------------------------- weight suggestions (shared_rules.md rule 8)
 
-def weight_suggestions(conn: sqlite3.Connection, uid: int, rows: list[sqlite3.Row], cfg: dict | None) -> dict:
+def weight_suggestions(conn: Connection, uid: int, rows: list[Row], cfg: dict | None) -> dict:
     """{entry id: {exercise id: {"weighted", "suggested_lb", "logged_reps", "logged_lb"}}}.
     suggested_lb = the anchor (the latest weight logged for that exercise before this day, or else the experience
     level's default in week 1) plus the goal's automatic increases between the anchor's week and this day's week.
@@ -394,7 +393,7 @@ def weight_suggestions(conn: sqlite3.Connection, uid: int, rows: list[sqlite3.Ro
     for r in conn.execute("SELECT exercise_id, date, weight_used FROM workout_logs WHERE user_id = ? "
                           "AND weight_used IS NOT NULL AND exercise_id IS NOT NULL ORDER BY date", (uid,)):
         history.setdefault(r["exercise_id"], []).append((r["date"], r["weight_used"]))
-    done: dict[int, dict[str, sqlite3.Row]] = {}
+    done: dict[int, dict[str, Row]] = {}
     ids = [r["id"] for r in rows]
     if ids:
         for r in conn.execute(f"SELECT calendar_entry_id, exercise_id, reps, weight_used FROM workout_logs "
@@ -450,7 +449,7 @@ def streak(uid: int = Depends(signed_in)) -> dict:
 
 # ---------------------------------------------------------------- calories on done days (code only)
 
-def _weight(conn: sqlite3.Connection, uid: int) -> float | None:
+def _weight(conn: Connection, uid: int) -> float | None:
     row = conn.execute("SELECT weight FROM quiz_profiles WHERE user_id = ?", (uid,)).fetchone()
     return row["weight"] if row else None
 
@@ -465,7 +464,7 @@ def strength_kcal(content: dict, weight_lb: float | None) -> dict | None:
     return est["per_session_kcal"] if est["available"] else None
 
 
-def day_calories(rows: list[sqlite3.Row], cardio_logs: list[dict], weight_lb: float | None) -> dict[str, dict]:
+def day_calories(rows: list[Row], cardio_logs: list[dict], weight_lb: float | None) -> dict[str, dict]:
     """{date: {"low", "high", "parts"}} for every DONE day: the strength session (if it was a done workout day) plus
     each cardio log on that date that has an estimate. Every number comes from the two existing estimators; this only
     adds them up. Cardio logs already carry no estimate for pregnant / postpartum users (who have no entries anyway)."""
@@ -522,7 +521,7 @@ def prescribed(sets: str, reps: str) -> tuple[int | None, int | None, int | None
     return n_sets, first_int(str(reps)), None
 
 
-def weighted_ids(conn: sqlite3.Connection, ids: list[str]) -> set[str]:
+def weighted_ids(conn: Connection, ids: list[str]) -> set[str]:
     """Which of these exercises use weights (dumbbells, kettlebells, ...): only they get a weight field."""
     if not ids:
         return set()
@@ -530,7 +529,7 @@ def weighted_ids(conn: sqlite3.Connection, ids: list[str]) -> set[str]:
     return {r["id"] for r in rows if WEIGHTED_EQUIPMENT & set(json.loads(r["equipment_needed"]))}
 
 
-def log_rows(conn: sqlite3.Connection, uid: int, entry: sqlite3.Row, logged: list | None = None) -> int:
+def log_rows(conn: Connection, uid: int, entry: Row, logged: list | None = None) -> int:
     """One workout_logs row per planned exercise. Without `logged`, the plan's prescription (the low end of the
     sets/reps range) with no weight. With it, the reps and weight the person actually did; weight is stored only for
     exercises that use weights (bodyweight ones stay blank, never a made-up zero). The note is NOT copied."""
@@ -638,7 +637,7 @@ def update_entry(entry_id: int, body: CalendarUpdate, uid: int = Depends(signed_
 
 # ---------------------------------------------------------------- custom days (override + revert)
 
-def _overridable(conn: sqlite3.Connection, uid: int, entry_id: int) -> sqlite3.Row:
+def _overridable(conn: Connection, uid: int, entry_id: int) -> Row:
     entry = conn.execute("SELECT * FROM calendar_entries WHERE id = ? AND user_id = ?", (entry_id, uid)).fetchone()
     if entry is None:
         raise HTTPException(404, "Calendar day not found.")

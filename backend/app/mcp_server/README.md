@@ -26,7 +26,8 @@ backend/.venv/Scripts/python.exe backend/app/mcp_server/smoke_test.py
 ```
 
 The smoke test launches the server from `.mcp.json`, calls all 5 tools, and proves the injury filter removes a
-tagged exercise. It uses a throwaway copy of the database (via `HOMEBASE_DB_PATH`), so no committed data is touched.
+tagged exercise. It builds a throwaway Postgres database next to the one in `DATABASE_URL` (migrations + content, then
+a test user), points the server at it, and drops it at the end, so no real data is touched.
 
 ## Connecting Claude Code
 
@@ -36,8 +37,8 @@ asks you to approve a project server the first time, so open a new session in th
 
 ## Guardrails (and where they live)
 
-- **Read-only:** the tools open SQLite with `mode=ro` (`app/db/__init__.py: connect_readonly`), so even a wrong query
-  cannot change data. All tools carry the MCP `readOnlyHint`. A test asserts the tool list is exactly these 7.
+- **Read-only:** the tools use `connect_readonly()` (`app/db/__init__.py`): every transaction is `READ ONLY`, so
+  Postgres refuses any write and even a wrong query cannot change data. All tools carry the MCP `readOnlyHint`. A test asserts the tool list is exactly these 7.
 - **Injury filter:** `search.py`, `NOT_CONTRAINDICATED`. The model can't switch it off; the agent harness supplies the flags.
 - **Honest about unchecked exercises:** most exercises have no injury tags. They come back with
   `injury_check: "not_yet_checked"` and a note saying so. `checked_only=true` returns only tagged ones; for users with an injury flag the agent harness always sets it (decided 2026-10-22, see `shared_rules.md`).

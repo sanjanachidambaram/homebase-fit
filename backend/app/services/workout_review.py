@@ -19,10 +19,9 @@
 import json
 import math
 import re
-import sqlite3
 from collections import Counter
 
-from app.db import connect_readonly
+from app.db import Connection, connect_readonly
 
 # The 4 workout groups every plan is built from (app/services/program_generator.py), in display order.
 WORKOUT_GROUPS = ("cardio", "upper", "lower", "mobility_core")
@@ -187,7 +186,7 @@ def estimate(minutes: float, weight_lb: float | None, days_per_week: int | None,
 
 # ---------------------------------------------------------------- putting it together
 
-def _citations(conn: sqlite3.Connection, ids: list[str]) -> list[dict]:
+def _citations(conn: Connection, ids: list[str]) -> list[dict]:
     rows = {r["id"]: dict(r) for r in conn.execute(
         f"SELECT id, name, url FROM sources WHERE id IN ({','.join('?' for _ in ids)})", ids)}
     return [rows[i] for i in ids if i in rows]

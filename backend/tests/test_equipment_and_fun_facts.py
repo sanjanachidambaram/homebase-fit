@@ -18,7 +18,7 @@ from app.mcp_server.strength import COMPARISONS, compute_strength_equivalents
 def db_equipment() -> set[str]:
     conn = connect()
     try:
-        return {r[0] for r in conn.execute("SELECT DISTINCT n.value FROM exercises e, json_each(e.equipment_needed) n")}
+        return {r[0] for r in conn.execute("SELECT DISTINCT n.value FROM exercises e, jsonb_array_elements_text(e.equipment_needed::jsonb) n(value)")}
     finally:
         conn.close()
 

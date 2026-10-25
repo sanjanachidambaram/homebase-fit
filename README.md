@@ -1,16 +1,19 @@
 # Bee Fit
 
 (Formerly HomeBase Fit, renamed 2026-10-25. The Render service is now `bee-fit`. Internal names keep `homebase` on
-purpose: the database files `homebase.db` / `homebase_original.db`, `HOMEBASE_DB_PATH`, the GitHub repo, the MCP server
-id and the browser's saved sign-in key. Renaming those would detach the database and sign everyone out.)
+purpose: the GitHub repo, the MCP server id and the browser's saved sign-in key. Renaming those would break links and
+sign everyone out.)
 
 A home workout coach for limited equipment that plans around your goals and your injuries at the same time.
 Class project: not a substitute for professional medical advice.
 
 ## Run it locally
 
-You need Python 3.11+ and Node 20+. Put `PORTKEY_API_KEY` (and optionally `APP_SECRET_KEY`) in a `.env` file in this
-folder or the folder above it; see `.env.example`.
+You need Python 3.11+, Node 20+ and a Postgres database. Put `DATABASE_URL` and `PORTKEY_API_KEY` (and optionally
+`APP_SECRET_KEY`) in a `.env` file in this folder or the folder above it; see `.env.example`. The easiest database is a
+second, free Neon **branch** of the production project (Neon → **Branches → New branch**, then **Connect**): it's a
+separate copy, so local testing never touches live accounts. The app creates the tables and loads the content on its
+first start.
 
 One-time setup:
 
@@ -36,95 +39,110 @@ npm run dev
 
 Open http://localhost:5173, create an account, take the quiz, and you'll land on the Dashboard.
 
-Tests: `cd backend` then `.venv/Scripts/python.exe -m pytest`.
+Tests: `cd backend` then `.venv/Scripts/python.exe -m pytest`. They never use `DATABASE_URL`: each test gets its own
+throwaway Postgres database. On Windows, download a portable PostgreSQL once with
+`.venv/Scripts/python.exe scripts/get_test_postgres.py` (about 300 MB into `backend/.pg`, gitignored; nothing is
+installed) and the tests start and stop it themselves. Elsewhere, set `TEST_DATABASE_ADMIN_URL` to a Postgres server the
+tests may create databases on.
 
 More: `design.md` (visual direction), `backend/prompts/shared_rules.md` (agent rules),
 `backend/app/mcp_server/README.md` (the MCP tools).
 
-## Deployment (Render, paid instance with a persistent disk)
+## Deployment (Render free plan + a free Neon Postgres database)
 
 The whole app runs as **one** Render web service, `bee-fit`: FastAPI serves the API (`/api/*`), the media in `content/`
 (`/content/*`), and the built React app (every other path). The setup is in [`render.yaml`](render.yaml); Python 3.13
 and Node 24 are pinned by `.python-version` and `.node-version`.
 
-**The live site runs on a paid Render instance (`starter`) with a 1 GB persistent disk, so people's accounts and
-data survive redeploys.** This is a deliberate cost tradeoff for reliability. On the free tier the container's
-filesystem is wiped on every deploy and restart, so every account, calendar and log disappeared between visits; a
-persistent disk is only available on paid instances. Check Render's pricing page for the current cost of the
-instance and the disk. (A side benefit: paid instances don't sleep, so there's no slow first visit.)
+**No disk, no SQLite, free plan.** Every account and all user data live in a Postgres database at `DATABASE_URL` (a free
+[Neon](https://neon.tech) project). The service keeps nothing on its own filesystem, so it runs on Render's **free**
+plan with no persistent disk: a redeploy or restart loses nothing. (Until 2026-10-25 the data was a SQLite file on a
+paid instance's disk; that's gone.) Free-plan tradeoff: the service sleeps after about 15 minutes without visits, so
+the first visit after that takes up to a minute; Neon's free database also pauses when idle and wakes in about a second.
 
-How the data is kept:
-- The working database lives on the disk at `/var/data/homebase.db` (`HOMEBASE_DB_PATH`, set in `render.yaml`). Only
-  the disk persists; the code, content and exercise images come from git with each deploy.
-- **First use of an empty disk:** the app builds the working database from the clean
-  `backend/app/db/homebase_original.db`, exactly as it always has, just on the disk.
-- **Normal redeploys:** the database on the disk is left alone.
-- **A deploy with new content or a new schema** (a changed `homebase_original.db`): on startup the app copies the
-  database to `/var/data/homebase.before-refresh-<time>.db` (it keeps the last 3), then refreshes it with the same
-  account-keeping refresh as `python -m app.db.seed`, so the code and the schema always match and nobody loses their
-  account. The startup log says which of the three happened (`Working database ...: created / unchanged /
-  refreshed`).
-- Render also takes a daily snapshot of the disk (kept for at least 7 days).
-- Limits that come with a disk: one instance only, and no zero-downtime deploys (each deploy has a few seconds of
-  downtime while the new version starts).
+How the database is kept up to date (on every start, `backend/app/db/__init__.py: ensure_database`):
+- **The schema** comes from the Alembic migrations in `backend/migrations` (`alembic upgrade head`, run automatically).
+  A schema change is a new migration file; nothing is ever rebuilt from a copied database file.
+- **The content** (exercises, quiz questions, protocols, sources) is loaded from `content/` the first time, and again
+  only when a deploy ships changed content files. Accounts and user data are never touched by it. The startup log
+  says `Database: schema up to date, content seeded / unchanged / refreshed`.
+- **Backups:** Neon can restore the database to an earlier point in time (the free plan keeps a short history; see
+  Neon's plans page).
 
-Local development is unchanged: without `HOMEBASE_DB_PATH`, the working database is `backend/app/db/homebase.db`.
+**Required environment variables** (all read by the code; secrets never go in the repo, and Render asks for each one
+once, in its dashboard). In production (`APP_ENV=production`) the app reads only real environment variables and ignores
+any `.env` file.
 
-**Secrets never go in the repo.** Render asks for them once, in its dashboard (step 4). In production
-(`APP_ENV=production`) the app reads only real environment variables and ignores any `.env` file.
+| Variable | What it is |
+| --- | --- |
+| `DATABASE_URL` | **Required.** The Neon connection string. Without it the app won't start. |
+| `APP_ENV` | `production` |
+| `APP_SECRET_KEY` | **Required.** A long random string; signs sign-in tokens and the Google / Microsoft sign-in cookie. |
+| `PUBLIC_BASE_URL` | Set in `render.yaml` (`https://bee-fit.onrender.com`). The OAuth redirect addresses are built from it. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | **Required for "Continue with Google"** (the button is hidden without them). |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | **Required for "Continue with Microsoft"** (hidden without them). |
+| `PORTKEY_API_KEY` | The course Portkey key (blank = AI features off). Do **not** add `OPENAI_API_KEY`. |
 
-### Steps only you can do (on render.com)
+Sign-in: username and password (Argon2-hashed; accounts with older hashes are upgraded the next time they sign in),
+or Google / Microsoft (OpenID Connect with PKCE, state and nonce: `backend/app/oauth.py`). Sign-in, sign-up and the
+OAuth routes are rate limited per IP address. A Google / Microsoft sign-in joins an existing account only when the
+provider confirms the email address is verified and an account already has that verified address; otherwise it makes a
+new account.
 
-1. **Create an account.** Go to https://render.com, click **Get Started**, and sign up with **GitHub** (easiest, since
-   Render then sees your repos).
-2. **Start a Blueprint.** In the Render dashboard click **New +** (top right) → **Blueprint**.
-3. **Connect the repo.** Click **Connect GitHub** if asked, and in the GitHub window give Render access to the
-   `homebase-fit` repository (for a private repo, choose "Only select repositories" and pick it). Back in Render,
-   select `homebase-fit` and click **Connect**. Render reads `render.yaml` and shows one web service,
-   `bee-fit`, on the **Starter** plan with a disk `bee-fit-data` at `/var/data`. Give the Blueprint any name.
-4. **Enter the environment variables** Render asks for (`PUBLIC_BASE_URL` and `HOMEBASE_DB_PATH` are already set by
-   `render.yaml`):
-   - `APP_ENV` = `production`
-   - `APP_SECRET_KEY` = a long random string. Make one on your computer with
-     `python -c "import secrets; print(secrets.token_hex(32))"` and paste the output. (It signs sign-in tokens;
-     don't reuse it anywhere else.)
-   - `PORTKEY_API_KEY` = your course Portkey key (the same value as in your local `.env`).
-   - `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`:
-     declared for later, but **the app doesn't read them yet** (it has its own sign-in and keeps its data in SQLite at
-     `HOMEBASE_DB_PATH`). Leave them blank unless code that uses them is added.
+### Steps only you can do
 
-   Do **not** add `OPENAI_API_KEY`. Render only asks for these once; to change one later, open the service →
-   **Environment** → edit → **Save Changes** (it redeploys).
-5. **Deploy.** Click **Apply** (or **Deploy Blueprint**). The first build takes about 5 minutes: it installs the
-   Python packages, then runs `npm ci` and `npm run build`. Click into the `bee-fit` service → **Logs** to watch.
-   It's done when the status at the top says **Live** (and the log shows `Uvicorn running`).
-6. **Find the live URL.** It's at the top of the `bee-fit` service page, under the name:
-   `https://bee-fit.onrender.com` (if Render had to add a few characters because the name was taken, change
-   `PUBLIC_BASE_URL` in `render.yaml` to match). Open it and check:
-   - `https://<your-url>/api/health` shows `"status":"ok"` and `"llm_provider":"portkey"`.
-   - The home page loads; sign up, take the quiz, and your plan and calendar appear.
+**1. Create the Neon database (free).**
+1. Go to https://neon.tech → **Sign up** (GitHub works) → **Create project**. Name it `bee-fit`, Postgres **17**, and
+   pick the region closest to your Render region (e.g. *AWS US East (Ohio)* for Render's Ohio, *US West (Oregon)* for
+   Oregon).
+2. On the project dashboard click **Connect**. Leave **Connection pooling** on, copy the connection string (it looks
+   like `postgresql://neondb_owner:...@ep-...-pooler.<region>.aws.neon.tech/neondb?sslmode=require`). That whole string
+   is `DATABASE_URL`. Treat it like a password.
 
-After this, every `git push` to `main` redeploys automatically, and accounts and data stay on the disk.
+**2. Create the Google sign-in app.**
+1. https://console.cloud.google.com → create a project (e.g. `Bee Fit`).
+2. **APIs & Services → OAuth consent screen**: User type **External**, app name `Bee Fit`, your email as support and
+   developer contact. Scopes: `openid`, `email`, `profile` (nothing else). Then **Publish app** (while it says
+   *Testing*, only the test users you list can sign in).
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID**: type **Web application**. Under
+   **Authorized redirect URIs** add exactly `https://bee-fit.onrender.com/api/auth/google/callback` (and, for local
+   testing, `http://localhost:8000/api/auth/google/callback`). **Create**, then copy the **Client ID** and **Client
+   secret**.
 
-### Moving from the old `homebase-fit` service to `bee-fit` (2026-10-25)
+**3. Create the Microsoft sign-in app.**
+1. https://portal.azure.com → **Microsoft Entra ID → App registrations → New registration**. Name `Bee Fit`.
+   Supported account types: **Accounts in any organizational directory and personal Microsoft accounts**. Redirect URI:
+   platform **Web**, `https://bee-fit.onrender.com/api/auth/microsoft/callback`. **Register**.
+2. Copy the **Application (client) ID** from the **Overview** page.
+3. **Certificates & secrets → New client secret** → copy its **Value** right away (it's shown once; note when it
+   expires and make a new one before then).
+4. (Optional, for local testing) **Authentication → Add URI**: `http://localhost:8000/api/auth/microsoft/callback`.
 
-`bee-fit` is a **new** service with its own **new, empty** disk, so it starts with no accounts: the database on the
-old `homebase-fit` disk does not move by itself. The old service also keeps running (and billing) until you suspend or
-delete it; removing it from `render.yaml` doesn't delete it. To keep everyone's accounts:
-1. Deploy `bee-fit` from the Blueprint, but don't share the new URL yet.
-2. Copy `/var/data/homebase.db` from the old service's disk to the new one (Render's SSH / SCP for paid services, from
-   each service's **Shell** or **Connect** menu), into `/var/data/homebase.db` on `bee-fit`, then restart `bee-fit`.
-   The startup log should say `Working database /var/data/homebase.db: unchanged` (or `refreshed`), not `created`.
-3. Check that an existing account can sign in on `bee-fit`, then suspend or delete `homebase-fit`.
-Sign-in tokens are signed with `APP_SECRET_KEY`: use the same value on `bee-fit` so people stay signed in, or a new
-one to sign everyone out once.
+**4. Deploy on Render.**
+1. https://render.com → **New + → Blueprint** → connect the `homebase-fit` GitHub repo. Render reads `render.yaml` and
+   shows one web service, `bee-fit`, on the **Free** plan, with no disk.
+2. Enter the variables from the table above (`PUBLIC_BASE_URL` is already filled in). For `APP_SECRET_KEY` run
+   `python -c "import secrets; print(secrets.token_hex(32))"` and paste the output; if you're moving accounts from the
+   old service, use **the same value it had**, so people stay signed in.
+3. **Apply.** The first build takes about 5 minutes. When the service says **Live**, check:
+   - `https://bee-fit.onrender.com/api/health` shows `"status":"ok"`, and the log shows
+     `Database: schema up to date, content seeded.`
+   - The sign-in form shows **Continue with Google** and **Continue with Microsoft**; both work, and so does a
+     username / password account.
 
-### Moving an existing free service to the paid plan with a disk
+To change a variable later: the service → **Environment** → edit → **Save Changes** (it redeploys). Every `git push` to
+`main` redeploys automatically; the data is in Neon, so nothing is lost.
 
-If the service was first created on the free tier: open the `bee-fit` service → **Settings** → **Instance Type**
-→ choose **Starter** → **Save**. Then **Disks** (left sidebar) → **Add Disk**: name `bee-fit-data`, mount path
-`/var/data`, size `1` GB → **Save**. Then **Environment** → add `HOMEBASE_DB_PATH` = `/var/data/homebase.db` (a Blueprint
-sync also adds it from `render.yaml`). Render redeploys; the startup log shows `Working database /var/data/homebase.db:
-created`, and from then on accounts survive redeploys. Data from the free-tier days is not carried over (it was never
-kept). If a deploy
-fails, the **Logs** tab shows the error; the build log is in the **Events** tab under that deploy.
+### Moving the accounts from the old SQLite database (one time)
+
+The old `homebase-fit` service kept its data in `/var/data/homebase.db` on a paid disk. To bring those accounts across
+**before anyone signs up on the new service** (the import refuses to run on a database that already has accounts):
+1. Download the file from the old service: its **Connect → SSH** menu shows the address; then
+   `scp <service-id>@ssh.<region>.render.com:/var/data/homebase.db .`
+2. On your computer, from `backend/`, with the Neon string in `DATABASE_URL` (in `.env` or the terminal):
+   `.venv/Scripts/python.exe -m app.db.import_sqlite path/to/homebase.db`. It builds the schema and content, copies every
+   account and its data (keeping the ids, so existing sign-ins stay valid with the same `APP_SECRET_KEY`), and prints
+   how many rows of each table came across and how many were skipped.
+3. Check that an old account signs in on `bee-fit`, then **delete the old `homebase-fit` service and its disk** in
+   Render (suspending isn't enough: the disk keeps billing). Delete the downloaded `homebase.db` too; it holds personal
+   data.

@@ -1,30 +1,26 @@
-"""Build homebase_original.db from schema.sql + the files in content/,
-then refresh the working copy (homebase.db) from it.
+"""Load the content in content/ (sources, quiz questions, exercises, goal protocols) into the Postgres content tables.
 
-Run from backend/ whenever you change anything in content/:
-    .venv\\Scripts\\python.exe -m app.db.seed                 rebuild; KEEP every account and its data
-    .venv\\Scripts\\python.exe -m app.db.seed --wipe-users    rebuild and wipe all user data (clean demo DB)
+Run from backend/ whenever you change anything in content/ (the app also does it by itself at startup when the
+content files changed: app/db/__init__.py ensure_database):
+    .venv\\Scripts\\python.exe -m app.db.seed                 migrate the schema, reload the content; KEEP every account
+    .venv\\Scripts\\python.exe -m app.db.seed --wipe-users    the same, then wipe all user data (a clean demo database)
 
-The working copy gets the new content and schema; accounts, quiz answers, logs, calendar and favorites are
-carried over (app/db/reset.py refresh_content), so people who are signed in stay signed in.
-Content problems (missing fields, a bad goal protocol, an unknown source or injury tag, an injury tag
-with no rationale)
-stop the build with
-a list of errors.
+Only the content tables are replaced, inside one transaction: accounts, quiz answers, logs, calendar and favorites are
+never touched (a favorite or log pointing at an exercise that was removed from content is dropped / unlinked).
+Content problems (missing fields, a bad goal protocol, an unknown source or injury tag, an injury tag with no
+rationale) stop the load with a list of errors, and the database is left exactly as it was.
+(Until 2026-10-25 this built a SQLite file, homebase_original.db; the loaders below are unchanged.)
 """
 
+import hashlib
 import json
-import os
-import sqlite3
 import sys
 from pathlib import Path
 
 import yaml
 
-from app import config
-from app.config import CONTENT_DIR, DB_DIR, PROJECT_ROOT
-from app.db import connect, table_counts
-from app.db.reset import refresh_content, reset
+from app.config import CONTENT_DIR, PROJECT_ROOT
+from app.db import META_KEY, connect, table_counts, to_pg, _params
 from app.safety_rules import INJURY_FLAGS, RATIONALE_CITATION_LIKE, RATIONALE_PENDING_SOURCE, RATIONALE_TIERS
 
 MUSCLE_GROUPS = ("legs", "arms", "chest", "shoulders", "back", "core", "full_body")
@@ -114,7 +110,7 @@ def check_source(source_id: str, sources: set[str], where: str, errors: list[str
 
 # ---------------------------------------------------------------- loaders
 
-def seed_sources(conn: sqlite3.Connection, errors: list[str]) -> set[str]:
+def seed_sources(conn, errors: list[str]) -> set[str]:
     path = CONTENT_DIR / "sources.yaml"
     ids: set[str] = set()
     for i, s in enumerate(load_yaml(path).get("sources", [])):
@@ -128,7 +124,7 @@ def seed_sources(conn: sqlite3.Connection, errors: list[str]) -> set[str]:
     return ids
 
 
-def seed_quiz(conn: sqlite3.Connection, errors: list[str]) -> None:
+def seed_quiz(conn, errors: list[str]) -> None:
     path = CONTENT_DIR / "quiz" / "quiz_questions.yaml"
     core = ("id", "prompt", "type", "options", "required")
     for i, q in enumerate(load_yaml(path).get("questions", [])):
@@ -162,7 +158,7 @@ def media_type_for(path: str | None) -> str | None:
     return "video" if ext in VIDEO_EXTS else "image"
 
 
-def insert_exercise(conn: sqlite3.Connection, **ex) -> None:
+def insert_exercise(conn, **ex) -> None:
     ex["media_type"] = media_type_for(ex["demo_media_path"])
     ex.setdefault("status", "placeholder")
     ex.setdefault("citations", "[]")
@@ -208,7 +204,7 @@ def injury_rationale(ex: dict, contra: list[str], where: str, errors: list[str])
             for i in contra if isinstance(rationale.get(i), dict) and set(rationale[i]) == {"reasoning", "tier", "source"}}
 
 
-def seed_authored_exercises(conn: sqlite3.Connection, errors: list[str]) -> dict[str, set[str]]:
+def seed_authored_exercises(conn, errors: list[str]) -> dict[str, set[str]]:
     """Hand-authored drafts in content/exercises/<group>/exercises.yaml.
     Returns {exercise_id: contraindications}."""
     contraindications: dict[str, set[str]] = {}
@@ -258,7 +254,7 @@ def fedb_muscle_group(ex: dict) -> str:
     return "full_body"   # several (or no) primary groups
 
 
-def seed_free_exercise_db(conn: sqlite3.Connection, taken_ids: set[str], errors: list[str]) -> None:
+def seed_free_exercise_db(conn, taken_ids: set[str], errors: list[str]) -> None:
     """Imported library from content/exercises/source_free_exercise_db/ (see ATTRIBUTION.md).
     The dataset has no injury info. Exercises with an entry in injury_tags_ai_drafted.json (the one-time AI drafting,
     app/db/draft_injury_tags.py) get those drafted tags and reasons, status 'draft', validated exactly like the
@@ -312,7 +308,7 @@ def parse_range(text: str) -> tuple[int, int] | None:
     return (lo, hi) if 0 < lo <= hi else None
 
 
-def seed_goal_protocols(conn: sqlite3.Connection, sources: set[str], errors: list[str]) -> None:
+def seed_goal_protocols(conn, sources: set[str], errors: list[str]) -> None:
     """content/protocols/goal_protocols.yaml: exactly one row per goal x experience level."""
     path = CONTENT_DIR / "protocols" / "goal_protocols.yaml"
     fields = ("goal", "experience_level", "session_length_minutes", "sets_range", "reps_range", "rest_seconds",
@@ -356,54 +352,88 @@ def seed_goal_protocols(conn: sqlite3.Connection, sources: set[str], errors: lis
 
 # ---------------------------------------------------------------- build
 
-def build_original(target: Path | None = None) -> None:
-    target = target or config.ORIGINAL_DB
-    tmp = target.with_name(target.stem + ".building.db")
-    tmp.unlink(missing_ok=True)
-    conn = connect(tmp)
+CONTENT_TABLES = ("goal_protocols", "exercises", "quiz_questions", "sources")   # children first
+_TEXT_FILES = {".yaml", ".yml", ".json", ".md", ".csv"}
+
+
+def content_fingerprint() -> str:
+    """Changes whenever a deploy ships different content: every file under content/ (text files by their bytes, media
+    by name and size, since a demo file appearing changes an exercise's media path), plus this loader's own code."""
+    h = hashlib.sha256(Path(__file__).read_bytes())
+    for f in sorted(p for p in CONTENT_DIR.rglob("*") if p.is_file()):
+        h.update(f.relative_to(CONTENT_DIR).as_posix().encode())
+        h.update(f.read_bytes() if f.suffix.lower() in _TEXT_FILES else str(f.stat().st_size).encode())
+    return h.hexdigest()
+
+
+class _Loader:
+    """The loaders call conn.execute(sql, params) once per row; this sends those into a psycopg pipeline (no wait
+    for each reply), so loading ~900 exercises over the network to Neon takes seconds, not minutes."""
+
+    def __init__(self, raw):
+        self._cur = raw.cursor()
+
+    def execute(self, sql, params=None):
+        self._cur.execute(to_pg(sql), _params(params))
+
+
+def seed_content() -> dict[str, int]:
+    """Replace the content tables from content/ in one transaction. Raises ContentError (nothing changed) on bad
+    content. Returns the new row counts of the content tables."""
     errors: list[str] = []
-    ok = False
+    conn = connect()
     try:
-        conn.executescript((DB_DIR / "schema.sql").read_text(encoding="utf-8"))
-        sources = seed_sources(conn, errors)
-        seed_quiz(conn, errors)
-        contraindications = seed_authored_exercises(conn, errors)
-        seed_free_exercise_db(conn, set(contraindications), errors)
-        seed_goal_protocols(conn, sources, errors)
-        if errors:
-            raise ContentError("\n".join(f"  - {e}" for e in errors))
-        conn.commit()
-        ok = True
+        raw = conn.raw
+        with raw.transaction():
+            raw.execute("SET CONSTRAINTS ALL DEFERRED")   # user rows point at exercises; checked again at commit
+            for table in CONTENT_TABLES:
+                raw.execute(f"DELETE FROM {table}")
+            loader = _Loader(raw)
+            with raw.pipeline():
+                sources = seed_sources(loader, errors)
+                seed_quiz(loader, errors)
+                contraindications = seed_authored_exercises(loader, errors)
+                seed_free_exercise_db(loader, set(contraindications), errors)
+                seed_goal_protocols(loader, sources, errors)
+            if errors:
+                raise ContentError("\n".join(f"  - {e}" for e in errors))   # rolls the whole thing back
+            # User data that pointed at an exercise no longer in the library: drop the favorite, unlink the log.
+            raw.execute("DELETE FROM exercise_favorites WHERE exercise_id NOT IN (SELECT id FROM exercises)")
+            raw.execute("UPDATE workout_logs SET exercise_id = NULL "
+                        "WHERE exercise_id IS NOT NULL AND exercise_id NOT IN (SELECT id FROM exercises)")
+            raw.execute("UPDATE cardio_logs SET activity = COALESCE(activity, 'cardio'), exercise_id = NULL "
+                        "WHERE exercise_id IS NOT NULL AND exercise_id NOT IN (SELECT id FROM exercises)")
+            raw.execute("INSERT INTO app_meta (key, value) VALUES (%s, %s) "
+                        "ON CONFLICT (key) DO UPDATE SET value = excluded.value", (META_KEY, content_fingerprint()))
+        counts = table_counts(conn)
     finally:
         conn.close()
-        if not ok:
-            tmp.unlink(missing_ok=True)
-    os.replace(tmp, target)
+    return {t: counts[t] for t in CONTENT_TABLES}
 
 
-def main(argv: list[str]) -> dict | None:
-    """Build the original, then refresh the working copy KEEPING accounts (default) or wipe them (--wipe-users).
-    Returns refresh_content()'s summary, or None after a wipe."""
-    original = config.ORIGINAL_DB
+def main(argv: list[str]) -> dict[str, int]:
+    """Migrate the schema, reload the content (keeping accounts), and with --wipe-users wipe all user data. Returns
+    every table's row count afterwards."""
+    from app.db.migrate import upgrade_to_head
+    from app.db.reset import reset
+    upgrade_to_head()
     try:
-        build_original(original)
+        seed_content()
     except ContentError as e:
-        raise SystemExit(f"Seed failed; {original.name} was not changed:\n{e}")
+        raise SystemExit(f"Seed failed; the database was not changed:\n{e}")
     if "--wipe-users" in argv:
         reset()
-        print(f"Built {original.name} and reset the working copy (all user data wiped).")
-        result = None
+        print("Loaded the content and wiped all user data.")
     else:
-        result = refresh_content()
-        print(f"Built {original.name} and refreshed the working copy, keeping every account.")
-        if any(result["dropped"].values()):
-            print(f"  rows no longer valid under the new content, dropped: {result['dropped']}")
+        print("Loaded the content, keeping every account.")
     conn = connect()
-    counts = table_counts(conn)
-    conn.close()
+    try:
+        counts = table_counts(conn)
+    finally:
+        conn.close()
     for table, n in counts.items():
         print(f"  {table:28} {n}")
-    return result
+    return counts
 
 
 if __name__ == "__main__":

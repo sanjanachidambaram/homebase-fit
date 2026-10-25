@@ -4,9 +4,7 @@ Run from backend/:
     .venv\\Scripts\\python.exe -m pytest -v
 """
 
-import sqlite3
-
-from app import config
+from app.db import IntegrityError
 
 FEDB_ID = "3_4_Sit-Up"   # imported exercise with a real image file
 PLACEHOLDER_ID = "glute_bridge"   # hand-authored; its demo file doesn't exist yet
@@ -49,8 +47,9 @@ def test_media_type_comes_from_the_file_extension():
     assert media_type_for(None) is None
 
 
-def test_media_type_is_stored_for_every_exercise_with_a_path():
-    conn = sqlite3.connect(config.ORIGINAL_DB)
+def test_media_type_is_stored_for_every_exercise_with_a_path(test_db):
+    from app.db import connect
+    conn = connect()
     assert conn.execute("SELECT COUNT(*) FROM exercises WHERE demo_media_path IS NOT NULL AND media_type IS NULL"
                         ).fetchone()[0] == 0
     conn.close()
@@ -100,7 +99,7 @@ def test_favorite_is_idempotent_and_unique(client):
     try:
         conn.execute("INSERT INTO exercise_favorites (user_id, exercise_id) VALUES (?, ?)", (uid, FEDB_ID))
         raise AssertionError("duplicate favorite should be rejected by the UNIQUE constraint")
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         pass
     conn.close()
 

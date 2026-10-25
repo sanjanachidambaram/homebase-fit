@@ -10,11 +10,10 @@ described as safe.
 
 import json
 import re
-import sqlite3
 from typing import Literal, get_args
 
 from app.content import REVIEW_NOTICE
-from app.db import connect_readonly
+from app.db import Row, connect_readonly
 from app.safety_rules import INJURY_FLAGS
 
 MuscleGroup = Literal["legs", "arms", "chest", "shoulders", "back", "core", "full_body"]
@@ -75,7 +74,7 @@ INJURY_CHECK = {
 }
 
 
-def _review(row: sqlite3.Row) -> dict:
+def _review(row: Row) -> dict:
     return {
         "status": row["status"],
         "review_notice": REVIEW_NOTICE if row["status"] == "placeholder" else None,
@@ -87,14 +86,14 @@ def _review(row: sqlite3.Row) -> dict:
 
 # True when NONE of the exercise's contraindications is in the caller's injury flags.
 NOT_CONTRAINDICATED = (
-    "NOT EXISTS (SELECT 1 FROM json_each(e.injury_contraindications) c "
-    "WHERE c.value IN (SELECT value FROM json_each(:flags)))"
+    "NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text(e.injury_contraindications::jsonb) c(value) "
+    "WHERE c.value IN (SELECT jsonb_array_elements_text(:flags::jsonb)))"
 )
 
 # True when every piece of equipment the exercise needs is something the caller has (or is "none").
 EQUIPMENT_AVAILABLE = (
-    "NOT EXISTS (SELECT 1 FROM json_each(e.equipment_needed) n "
-    "WHERE n.value <> 'none' AND n.value NOT IN (SELECT value FROM json_each(:equipment)))"
+    "NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text(e.equipment_needed::jsonb) n(value) "
+    "WHERE n.value <> 'none' AND n.value NOT IN (SELECT jsonb_array_elements_text(:equipment::jsonb)))"
 )
 
 
@@ -142,7 +141,7 @@ def _search(muscle_group, equipment, injury_flags, limit: int | None, checked_on
         rows = conn.execute(
             f"SELECT e.* FROM exercises e WHERE {base}{inj} "
             "ORDER BY (e.contraindication_status = 'untagged'), e.source_dataset = 'free-exercise-db', e.name "
-            "LIMIT :limit", {**params, "limit": -1 if limit is None else limit}).fetchall()
+            "LIMIT :limit", {**params, "limit": limit}).fetchall()   # LIMIT NULL: no limit
         unchecked_in_pool = conn.execute(
             f"SELECT COUNT(*) FROM exercises e WHERE {base}{inj} AND e.contraindication_status = 'untagged'",
             params).fetchone()[0]
@@ -202,7 +201,7 @@ def contraindicated_exercises(injury_flags: list[str], muscle_groups: list[str],
     if not flags or not muscle_groups:
         return []
     params = {"flags": json.dumps(flags), "equipment": json.dumps(have or []), "groups": json.dumps(muscle_groups)}
-    where = ["e.muscle_group IN (SELECT value FROM json_each(:groups))", f"NOT ({NOT_CONTRAINDICATED})"]
+    where = ["e.muscle_group IN (SELECT jsonb_array_elements_text(:groups::jsonb))", f"NOT ({NOT_CONTRAINDICATED})"]
     if have is not None:
         where.append(EQUIPMENT_AVAILABLE)
     if checked_only:

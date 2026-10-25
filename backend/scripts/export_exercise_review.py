@@ -7,7 +7,7 @@ or from backend/:
     .venv\\Scripts\\python.exe scripts\\export_exercise_review.py
 
 Writes content/exercise_review_export.xlsx (gitignored: it's rebuilt from the database, so there's no point
-versioning a binary copy). It reads the working database (backend/app/db/homebase.db, or HOMEBASE_DB_PATH) read-only.
+versioning a binary copy). It reads the database (DATABASE_URL) read-only.
 
 Sheet "Exercises": one row per exercise, sorted by muscle group then name.
 Sheet "Quiz Logic": every quiz question (wording and options read live from the database), the consent gate and the
@@ -50,7 +50,7 @@ def exercise_rows() -> list[list[str]]:
     try:
         rows = conn.execute(
             "SELECT id, name, muscle_group, equipment_needed, difficulty, injury_contraindications, injury_rationale, "
-            "source_dataset, contraindication_status FROM exercises ORDER BY muscle_group, name COLLATE NOCASE").fetchall()
+            "source_dataset, contraindication_status FROM exercises ORDER BY muscle_group, lower(name)").fetchall()
     finally:
         conn.close()
     out = []
@@ -72,7 +72,7 @@ def exercise_rows() -> list[list[str]]:
 # ---------------------------------------------------------------- sheet 2: Quiz Logic
 #
 # Traced from the code on 2026-10-25 (after the quiz and plan rewrite): content/quiz/quiz_questions.yaml, app/users.py (QUIZ_COLUMNS, save_quiz,
-# reset_quiz), app/db/schema.sql (quiz_profiles), app/services/program_generator.py, app/agents/context.py and the
+# reset_quiz), backend/migrations (quiz_profiles), app/services/program_generator.py, app/agents/context.py and the
 # agents, app/mcp_server/progress.py, app/services/workout_review.py, cardio_estimate.py, progress_marker.py,
 # app/calendar.py, and the quiz page (frontend/src/pages/QuizPage.tsx). Wording and options come live from the
 # database; check_quiz_coverage() refuses to write the sheet if a question or a quiz_profiles column has no row here.
@@ -203,7 +203,8 @@ def check_quiz_coverage(conn, questions) -> None:
     stale_q = {k for k in QUIZ_LOGIC if ":" not in k} - ids
     import re
     described = set(re.findall(r"[a-z_]+", " ".join(r["db"] for r in [*QUIZ_LOGIC.values(), *QUIZ_EXTRA_ROWS])))
-    columns = [r[1] for r in conn.execute("PRAGMA table_xinfo(quiz_profiles)")]
+    columns = [r[0] for r in conn.execute("SELECT column_name FROM information_schema.columns WHERE "
+                                           "table_schema = current_schema() AND table_name = 'quiz_profiles'")]
     missing_c = [c for c in columns if c not in described]   # whole names only
     if missing_q or stale_q or missing_c:
         raise SystemExit(f"Quiz Logic sheet is out of date. Questions without a row: {sorted(missing_q)}; rows for "
