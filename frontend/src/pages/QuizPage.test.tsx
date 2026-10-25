@@ -42,7 +42,14 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+/** Past Summer's intro card, straight to the questions (without playing the audio). */
+function skipIntro() {
+  const button = screen.queryByRole('button', { name: 'Continue to quiz' })
+  if (button) fireEvent.click(button)                                            // (already past it: nothing to do)
+}
+
 async function toHealth(goal: string) {
+  skipIntro()
   fireEvent.click(await screen.findByLabelText(new RegExp(`^${goal}`)))
   fireEvent.click(screen.getByRole('button', { name: 'Next' }))
   fireEvent.click(screen.getByRole('checkbox'))                                  // the disclaimer
@@ -50,10 +57,43 @@ async function toHealth(goal: string) {
 }
 
 describe('the quiz', () => {
+  it('starts with a skippable audio message from Summer, before any question', async () => {
+    const play = vi.fn(async () => {})
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(play)
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+    render(<QuizPage />)
+    expect(
+      screen.getByRole('heading', { name: 'Before you take the quiz, a quick word from your personal trainer, Summer...' }),
+    ).toBeTruthy()
+    expect(screen.queryByRole('list')).toBeNull()                                 // the quiz's step list comes after
+    expect(screen.queryByLabelText(/^Losing weight/)).toBeNull()                  // no question yet
+    const audio = document.querySelector('audio')!
+    expect(audio.getAttribute('src')).toBe('/audio/summer-quiz-intro.mp3')
+    expect(audio.controls).toBe(true)                                             // play / pause / progress
+    fireEvent.click(screen.getByRole('button', { name: "Play Summer's message" }))   // the mic bee plays it
+    expect(play).toHaveBeenCalledTimes(1)
+    fireEvent.play(audio)
+    expect(screen.getByRole('button', { name: "Pause Summer's message" }).getAttribute('aria-pressed')).toBe('true')
+    skipIntro()                                                                   // continue (or skip) any time
+    expect(await screen.findByLabelText(/^Losing weight/)).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: /a quick word from your personal trainer/ })).toBeNull()
+    vi.restoreAllMocks()
+  })
+
+  it('can be skipped without playing anything', async () => {
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play')
+    render(<QuizPage />)
+    skipIntro()
+    expect(await screen.findByLabelText(/^Losing weight/)).toBeTruthy()
+    expect(play).not.toHaveBeenCalled()
+    vi.restoreAllMocks()
+  })
+
   it('asks weight only for losing weight, shows a review screen, and starts every step at the top', async () => {
     const scrollTo = vi.fn()
     vi.stubGlobal('scrollTo', scrollTo)
     render(<QuizPage />)
+    skipIntro()
     const bodyweight = (await screen.findByLabelText('Bodyweight (always included)')) as HTMLInputElement
     expect(bodyweight.checked && bodyweight.disabled).toBe(true)                  // always on
     scrollTo.mockClear()

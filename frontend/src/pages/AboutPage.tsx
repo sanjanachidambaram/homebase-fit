@@ -99,7 +99,7 @@ export default function AboutPage() {
 
       <div className="about-essay">
         <p>
-          Omg!! Guys, I literally vibe coded this entire site for my Yale SOM AI Foundations class. I'm shook to my
+          Omg!! Guys, I literally vibe-coded this entire site for my Yale SOM AI Foundations class. I'm shook to my
           core.
         </p>
 

@@ -165,6 +165,10 @@ def test_built_assets_and_root_files_are_served(client):
     r = client.get(js)
     assert r.status_code == 200 and "javascript" in r.headers["content-type"]
     assert client.get("/favicon.svg").headers["content-type"].startswith("image/svg")
+    audio = client.get("/audio/summer-quiz-intro.mp3")                   # Summer's intro before the quiz
+    assert audio.status_code == 200 and audio.headers["content-type"] == "audio/mpeg" and len(audio.content) > 100_000
+    part = client.get("/audio/summer-quiz-intro.mp3", headers={"Range": "bytes=0-99"})   # seeking needs ranges
+    assert part.status_code == 206 and len(part.content) == 100
 
 
 @built

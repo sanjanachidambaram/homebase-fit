@@ -1,5 +1,5 @@
 // The Bee Fit logo: a little bee lifting a dumbbell over its head, drawn in SVG (no image file), the one bee in the
-// app. (The browser tab icon, public/favicon.svg, is separate: the bee emoji on a honey circle.) Colors are fixed hex values matching the tokens in index.css, so it looks the same everywhere.
+// app. holding="microphone" draws the same bee singing into a mic instead (Summer's intro card before the quiz). (The browser tab icon, public/favicon.svg, is separate: the bee emoji on a honey circle.) Colors are fixed hex values matching the tokens in index.css, so it looks the same everywhere.
 // Decorative by default (aria-hidden); pass a title when the logo stands alone and needs a name.
 
 export const BEE_COLORS = {
@@ -11,8 +11,19 @@ export const BEE_COLORS = {
   cheek: '#ff8c1a', // --orange
 }
 
-export default function BeeLogo({ size = 32, title, className }: { size?: number; title?: string; className?: string }) {
+export default function BeeLogo({
+  size = 32,
+  title,
+  className,
+  holding = 'dumbbell',
+}: {
+  size?: number
+  title?: string
+  className?: string
+  holding?: 'dumbbell' | 'microphone'
+}) {
   const c = BEE_COLORS
+  const mic = holding === 'microphone'
   return (
     <svg
       className={className}
@@ -27,8 +38,8 @@ export default function BeeLogo({ size = 32, title, className }: { size?: number
       {/* wings, behind everything */}
       <ellipse cx="18" cy="40" rx="9" ry="6.5" transform="rotate(-25 18 40)" fill={c.wing} stroke={c.wingLine} strokeWidth="2" />
       <ellipse cx="46" cy="40" rx="9" ry="6.5" transform="rotate(25 46 40)" fill={c.wing} stroke={c.wingLine} strokeWidth="2" />
-      {/* arms up to the bar */}
-      <path d="M25 37 L19 10 M39 37 L45 10" stroke={c.ink} strokeWidth="3.2" strokeLinecap="round" fill="none" />
+      {/* arms: up to the bar, or one waving and one holding the mic */}
+      <path d={mic ? 'M25 38 L14 30 M39 41 L46.5 40' : 'M25 37 L19 10 M39 37 L45 10'} stroke={c.ink} strokeWidth="3.2" strokeLinecap="round" fill="none" />
       {/* striped body and stinger */}
       <path d="M32 61 L29.5 57 L34.5 57 Z" fill={c.ink} />
       <ellipse cx="32" cy="46" rx="12" ry="12.5" fill={c.body} stroke={c.ink} strokeWidth="2.5" />
@@ -43,10 +54,22 @@ export default function BeeLogo({ size = 32, title, className }: { size?: number
       <circle cx="26.4" cy="29.6" r="1.6" fill={c.cheek} opacity="0.7" />
       <circle cx="37.6" cy="29.6" r="1.6" fill={c.cheek} opacity="0.7" />
       <path d="M29.5 30.4 Q32 33 34.5 30.4" stroke={c.ink} strokeWidth="1.6" strokeLinecap="round" fill="none" />
-      {/* the dumbbell */}
-      <rect x="8" y="7.5" width="48" height="4" rx="2" fill={c.ink} />
-      <rect x="3" y="2.5" width="7" height="14" rx="2.5" fill={c.plate} stroke={c.ink} strokeWidth="1.5" />
-      <rect x="54" y="2.5" width="7" height="14" rx="2.5" fill={c.plate} stroke={c.ink} strokeWidth="1.5" />
+      {mic ? (
+        <>
+          {/* the microphone, held beside the bee's smile, with sound waves */}
+          <path d="M46.5 43 L44.8 34" stroke={c.ink} strokeWidth="3.5" strokeLinecap="round" />
+          <circle cx="44.2" cy="30.5" r="4.4" fill={c.plate} stroke={c.ink} strokeWidth="1.8" />
+          <path d="M41.4 29.2 L46.6 32 M42.4 27.4 L47.2 30" stroke={c.ink} strokeWidth="1" opacity="0.6" />
+          <path d="M51.5 25 Q54.5 30.5 51.5 36 M55.5 21 Q61 30.5 55.5 40" stroke={c.plate} strokeWidth="2" strokeLinecap="round" fill="none" />
+        </>
+      ) : (
+        <>
+          {/* the dumbbell */}
+          <rect x="8" y="7.5" width="48" height="4" rx="2" fill={c.ink} />
+          <rect x="3" y="2.5" width="7" height="14" rx="2.5" fill={c.plate} stroke={c.ink} strokeWidth="1.5" />
+          <rect x="54" y="2.5" width="7" height="14" rx="2.5" fill={c.plate} stroke={c.ink} strokeWidth="1.5" />
+        </>
+      )}
     </svg>
   )
 }

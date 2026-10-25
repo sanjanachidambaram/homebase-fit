@@ -1,6 +1,6 @@
-// Onboarding quiz: account -> general questions (goal, experience, equipment) -> REQUIRED medical disclaimer
-// acknowledgment -> health questions (injuries, pregnancy; weight and goal weight only if the goal is losing weight)
-// -> review your answers -> submit.
+// Onboarding quiz: account -> a word from Summer (an optional, skippable audio message) -> general questions (goal,
+// experience, equipment) -> REQUIRED medical disclaimer acknowledgment -> health questions (injuries, pregnancy;
+// weight and goal weight only if the goal is losing weight) -> review your answers -> submit.
 // Health questions (health: true in quiz_questions.yaml) stay hidden until the disclaimer is accepted, and the API
 // rejects any submission without consent. Questions with ask_if are only shown (and only sent) when that answer
 // matches; the API ignores them otherwise too.
@@ -14,8 +14,9 @@ import Link from '../components/Link'
 import { navigate } from '../router'
 import { setSession, useSession } from '../session'
 import QuestionField, { type Answer } from '../components/QuestionField'
+import SummerIntro from '../components/SummerIntro'
 
-type Step = 'general' | 'consent' | 'health' | 'review' | 'done'
+type Step = 'intro' | 'general' | 'consent' | 'health' | 'review' | 'done'
 
 function isAnswered(q: QuizQuestion, value: Answer | undefined): boolean {
   if (q.type === 'multi_select') return Array.isArray(value) && value.length > 0
@@ -81,7 +82,7 @@ function shown(q: QuizQuestion, value: Answer | undefined): string {
 export default function QuizPage() {
   const session = useSession()
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
-  const [step, setStep] = useState<Step>('general')
+  const [step, setStep] = useState<Step>('intro')
   const [answers, setAnswers] = useState<Record<string, Answer>>({})
   const [consent, setConsent] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -180,13 +181,17 @@ export default function QuizPage() {
     <>
       <h2 className="page-title">Your fitness quiz</h2>
       <p className="meta">Signed in as {session.username}</p>
-      <ol className="steps">
-        <li className={step === 'general' ? 'current' : ''}>Goal</li>
-        <li className={step === 'consent' ? 'current' : ''}>Disclaimer</li>
-        <li className={step === 'health' ? 'current' : ''}>Health</li>
-        <li className={step === 'review' ? 'current' : ''}>Review</li>
-        <li className={step === 'done' ? 'current' : ''}>Done</li>
-      </ol>
+      {/* The intro card comes before the quiz itself, so the quiz's step list appears once the questions start. */}
+      {step === 'intro' && <SummerIntro onContinue={() => setStep('general')} />}
+      {step !== 'intro' && (
+        <ol className="steps">
+          <li className={step === 'general' ? 'current' : ''}>Goal</li>
+          <li className={step === 'consent' ? 'current' : ''}>Disclaimer</li>
+          <li className={step === 'health' ? 'current' : ''}>Health</li>
+          <li className={step === 'review' ? 'current' : ''}>Review</li>
+          <li className={step === 'done' ? 'current' : ''}>Done</li>
+        </ol>
+      )}
 
       {step === 'general' && (
         <div className="quiz-step">
