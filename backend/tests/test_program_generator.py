@@ -156,7 +156,6 @@ def test_backbone_moves_come_first(test_db):
     names = lambda cat: " ".join(x.name.lower() for d in training(plan) if d.category == cat for x in d.exercises)  # noqa: E731
     assert re.search(r"push-?up", names("upper")) and re.search(r"squat", names("lower"))
     assert re.search(r"bridge|butt lift", names("lower"))
-    assert re.search(r"march|step jack", names("cardio"))                            # low-impact options for beginners
     fg = generate(profile("feel_good", "beginner", ["bodyweight", "mat"]))
     mobility = " ".join(x.name.lower() for d in training(fg) if d.category == "mobility" for x in d.exercises)
     assert re.search(r"plank|dead bug", mobility) and re.search(r"bird dog|cat", mobility)
@@ -167,8 +166,21 @@ def test_days_are_15_to_60_minutes_and_never_over_the_session_length(test_db):
         for exp in gen.EXPERIENCE:
             plan = generate(profile(goal, exp))
             for d in training(plan):
+                if d.category == "cardio":                                  # cardio of your choice: no set length
+                    continue
                 assert 15 <= d.est_minutes <= 60, (goal, exp, d.day, d.category, d.est_minutes)
                 assert d.est_minutes <= plan.protocol.session_length_minutes, (goal, exp, d.day, d.est_minutes)
+
+
+@pytest.mark.parametrize("goal", gen.GOALS)
+def test_cardio_days_prescribe_nothing(test_db, search_spy, goal):
+    """Every goal's cardio days read "Cardio of your choice": no exercise from the library, and no cardio search."""
+    for flags in ((), ("knee",)):
+        plan = generate(profile(goal, flags=flags))
+        cardio = [d for d in training(plan) if d.category == "cardio"]
+        assert len(cardio) == {"stronger": 1, "lose_weight": 2, "feel_good": 1}[goal] * plan.block_weeks
+        assert all(d.focus == "Cardio of your choice" and d.exercises == [] for d in cardio)
+    assert not any(c["muscle_group"] == "full_body" for c in search_spy)            # the old cardio pool
 
 
 def test_no_day_repeats_a_near_duplicate_move(test_db):

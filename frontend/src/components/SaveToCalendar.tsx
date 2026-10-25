@@ -12,7 +12,9 @@ const nice = (s: string) => new Date(`${s}T12:00:00`).toLocaleDateString(undefin
 function label(e: CalendarEntry) {
   const what =
     e.day_type === 'cardio'
-      ? 'cardio day'
+      ? e.source === 'generated'
+        ? 'cardio of your choice'
+        : 'cardio day'
       : e.source === 'custom'
         ? 'your own workout'
         : e.workout.open

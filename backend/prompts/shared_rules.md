@@ -170,22 +170,26 @@ level, 9 rows, PT-reviewable); the generator never invents them. The old multi-g
   whichever goal is picked, unchanged: every candidate comes from the same tested SQL as the MCP tool.
 - **The week is fixed by the goal**: always 4 training days (Monday, Wednesday, Friday, Saturday), built from 4 kinds
   of day: Upper body (chest, back, shoulders, arms), Lower body (legs), Mobility + core, Cardio.
+  - **Cardio days prescribe nothing (decided 2026-10-25).** The generator never picks a cardio exercise from the
+    library: a cardio day reads "Cardio of your choice", with no activity, no length, and no injury-filtered pick. On
+    the calendar it's a cardio day that counts as done once the person logs what they did (app/cardio.py: free text
+    or a library cardio exercise they choose, by minutes, steps or distance, with a code-only Compendium calorie
+    estimate, rule 9). It counts toward plan adherence like a strength day.
   - Getting stronger: 3 strength days, each Upper OR Lower (never mixed), + 1 cardio. A 2-week block: odd weeks
     repeat the same exercises (week 1 = 3 = 5...), and even weeks repeat theirs.
   - Losing weight: 2 strength days (Upper, Lower) + 2 cardio. A 4-week block: weeks 1-4 each different, weeks 5-8
     repeat them, and so on.
   - Just feeling good: 2 mobility/core days + 1 strength day (Upper and Lower alternate) + 1 cardio. An 8-week block
     (weeks 9-16 repeat 1-8).
-  - Days are 15 to 60 minutes. The protocol's session length is the cap: cardio and mobility days are circuits
-    repeated to fill it (never under 15 minutes); strength days stop at 6 exercises, so with short rests (Losing
-    weight) they run shorter, about 20 minutes. The plan shows each day's real estimate, not the cap.
+  - Strength and mobility days are 15 to 60 minutes. The protocol's session length is the cap: mobility days are
+    circuits repeated to fill it (never under 15 minutes); strength days stop at 6 exercises, so with short rests
+    (Losing weight) they run shorter, about 20 minutes. The plan shows each day's real estimate, not the cap.
 - **What goes into a day.** A strength day hits at least two muscle groups in its category (Upper: a push and a pull,
   e.g. chest AND back; Lower: a knee-dominant and a hip-dominant move) plus at least two accessory exercises. When
   equipment or the injury filter leaves a slot empty, it falls back to the category's other groups so a day still
   reaches two groups. Each slot prefers a backbone of effective, easy-at-home moves (push-ups, band/dumbbell rows,
   overhead press, pull-aparts, curls, dips; squats, lunges, glute bridges, Romanian deadlifts, step-ups, calf raises;
-  plank, dead bug, bird dog, cat-cow, hip mobility; jumping jacks, step-ups at pace, marching) matched against the real
-  library, never invented ("high knees" isn't in the library, so it isn't used). These are candidate pools, not an
+  plank, dead bug, bird dog, cat-cow, hip mobility) matched against the real library, never invented. These are candidate pools, not an
   override of the safety filter. Also: matched to experience level; no Olympic lifts, strongman, powerlifting or
   plyometrics on strength days; no jumping/landing moves for beginners or anyone with an injury; no pull-up-bar moves
   unless the person has a full gym.
@@ -193,8 +197,8 @@ level, 9 rows, PT-reviewable); the generator never invents them. The old multi-g
   protocol's status and citations. It has no tools and never sees weight, pregnancy status, notes, or the user id.
 
 **Enforced in code and tested:** `tests/test_program_generator.py` (the week by goal, the repeating blocks, two muscle
-groups plus two accessories, the backbone, 15-60 minutes, equipment, the injury filter for every goal and flag,
-pregnancy), `tests/test_calendar_push_pull.py` (the calendar lays out exactly those days), `tests/test_plan_agent.py`
+groups plus two accessories, the backbone, 15-60 minutes, cardio days prescribing nothing, equipment, the injury filter
+for every goal and flag, pregnancy), `tests/test_calendar_push_pull.py` (the calendar lays out exactly those days), `tests/test_plan_agent.py`
 (the quiz, and the agent's inputs).
 
 ## 7. Numbers come from code (the Workout Reviewer, and any agent that narrates a calculation)

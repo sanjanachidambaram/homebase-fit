@@ -344,11 +344,16 @@ function DayCard({
       ) : entry.day_type === 'cardio' ? (
         <>
           <p className="rest-text">
-            {entry.completed ? 'Cardio done. Nice work showing up!' : 'Cardio day: log what you did and it counts as done.'}
+            {entry.completed
+              ? 'Cardio done. Nice work showing up!'
+              : entry.source === 'generated'
+                ? 'Any cardio you like: walk, run, bike, dance. Log what you did and it counts as done.'
+                : 'Cardio day: log what you did and it counts as done.'}
           </p>
-          <span className={`chip-check day-done-toggle${entry.completed ? ' chip-on' : ''}`} aria-live="polite">
-            {entry.completed ? 'Done!' : 'Not logged yet'}
-          </span>
+          {/* A status line, not a toggle: a cardio day is done by logging cardio, so it shouldn't look clickable. */}
+          <p className={`day-cardio-status${entry.completed ? ' is-done' : ''}`} aria-live="polite">
+            {entry.completed ? 'Logged ✓' : 'Not logged yet'}
+          </p>
           {cardio}
         </>
       ) : (

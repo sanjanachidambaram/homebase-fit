@@ -52,7 +52,7 @@ def test_override_replaces_the_day_and_keeps_the_injury_filter(client, on_day, u
     assert entry["id"] == wed["id"] and entry["source"] == "custom" and entry["day_type"] == "workout"
     assert [x["exercise_id"] for x in entry["workout"]["exercises"]] == ["dead_bug", "pelvic_tilt"]
     assert entry["workout"]["focus"] == "Your own: core" and entry["workout"]["built_by"] == "workout_builder"
-    assert entry["planned"] == {"day_type": "workout", "focus": wed["workout"]["focus"]}
+    assert entry["planned"] == {"day_type": wed["day_type"], "focus": wed["workout"]["focus"]}
 
     # injury safety: the same enforcement as /workouts/build
     searches = [args for tool, args in mcp_calls if tool == "search_exercises"]

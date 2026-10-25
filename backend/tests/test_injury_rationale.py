@@ -140,9 +140,10 @@ def test_plan_lists_what_the_injury_filter_left_out(test_db):
         assert [c.injury for c in x.cautions] == ["lower_back"]          # only the user's own flag
         assert x.cautions[0].reasoning and x.cautions[0].tier == "ai_drafted"
     # the hand-authored ones tagged lower_back that fit mat / band / bodyweight in the muscle groups this plan draws
-    # from are among them (imported ones too). A losing-weight plan has no core days, so crunch isn't listed.
+    # from are among them (imported ones too). A losing-weight plan has no core days, so crunch isn't listed, and
+    # its cardio days prescribe nothing, so no cardio move (burpee, mountain climber) is searched or listed either.
     left = {x.exercise_id for x in left_out}
-    assert {"burpee", "mountain_climber", "superman_hold"} <= left and "crunch" not in left
+    assert "superman_hold" in left and not {"crunch", "burpee", "mountain_climber"} & left
 
 
 def test_no_injury_means_nothing_left_out(test_db):

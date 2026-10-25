@@ -16,6 +16,8 @@ Rules, all enforced here in code:
     and never for pregnant / postpartum users (403).
   * Moving a day onto a date that already has one swaps the two. A completed day can't be moved (its
     workout_logs rows are dated), and nothing can be swapped onto a completed day.
+  * The plan's cardio days prescribe nothing: they're cardio days ("Cardio of your choice") that count as done once
+    cardio is logged on their date (app/cardio.py, with a code-only calorie estimate), like an "Add cardio" day.
   * The plan repeats in a 2-, 4- or 8-week block (by goal). Each date's day comes from that week of the block
     (plan_day_on), counted from quiz_profiles.plan_started_on.
   * Marking a workout day completed writes one workout_logs row per exercise (calendar_entry_id set), with the reps
@@ -104,6 +106,13 @@ def appears_in(plan: WeeklyProgram) -> dict[str, list[int]]:
     return {k: sorted(v) for k, v in out.items()}
 
 
+def plan_day_type(day: PlanDay) -> str:
+    """The calendar day type for a plan day: its cardio days are cardio days (nothing prescribed, done when logged)."""
+    if day.kind != "training":
+        return "rest"
+    return "cardio" if day.category == "cardio" else "workout"
+
+
 def snapshot(plan: WeeklyProgram, day: PlanDay, on: date | None = None, started: date | None = None) -> dict:
     """What the day widget shows, frozen at creation so later generator changes can't rewrite it. Weights aren't
     frozen: they're suggested live from what's been logged (weight_suggestions), so each exercise carries what that
@@ -124,6 +133,7 @@ def snapshot(plan: WeeklyProgram, day: PlanDay, on: date | None = None, started:
         "protocol_status": plan.protocol.status if plan.protocol else None,
         "review_notice": plan.protocol.review_notice if plan.protocol else None,
         "snapshot_at": now_utc(),
+        **({"cardio": {"type": None, "your_choice": True}} if day.category == "cardio" else {}),
     }
 
 
@@ -174,7 +184,7 @@ def _fill(conn: sqlite3.Connection, user_id: int, dates: list[date], plan: Weekl
             continue
         else:
             pd = plan_day_on(plan, d, cfg["started"])
-            day_type = "workout" if pd.kind == "training" else "rest"
+            day_type = plan_day_type(pd)
             content = snapshot(plan, pd, d, cfg["started"])
         conn.execute("INSERT INTO calendar_entries (user_id, date, day_type, workout_content) VALUES (?, ?, ?, ?)",
                      (user_id, d.isoformat(), day_type, json.dumps(content)))
@@ -247,10 +257,11 @@ def can_override(day: str, completed: bool) -> bool:
 
 
 def day_choice(r: sqlite3.Row) -> str:
-    """Which of the three the day is now: 'plan', 'build' (Workout Builder), 'cardio', or 'open' (nothing yet)."""
+    """Which of the three the day is now: 'plan', 'build' (Workout Builder), 'cardio', or 'open' (nothing yet).
+    The plan's own cardio days ("Cardio of your choice") are 'plan'."""
     content = json.loads(r["workout_content"])
     if r["day_type"] == "cardio":
-        return "cardio"
+        return "plan" if r["source"] == "generated" else "cardio"
     if r["source"] == "custom":
         return "build"
     return "open" if content.get("open") else "plan"
@@ -726,7 +737,7 @@ def use_plan(entry_id: int, uid: int = Depends(signed_in)) -> dict:
             raise HTTPException(409, plan.blocked_reason or "There's no generated plan to use.")
         day = date.fromisoformat(entry["date"])
         pd = plan_day_on(plan, day, cfg["started"] if cfg else today())
-        day_type = "workout" if pd.kind == "training" else "rest"
+        day_type = plan_day_type(pd)
         content = snapshot(plan, pd, day, cfg["started"] if cfg else None)
     conn = connect()
     try:

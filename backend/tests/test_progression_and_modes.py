@@ -43,7 +43,7 @@ def test_getting_stronger_repeats_every_two_weeks_on_the_calendar(client, on_day
     days = workout_days(weeks(client, h, 4))
     by = {(e["workout"]["week"], e["weekday"]): e for e in days}
     assert {e["workout"]["block_weeks"] for e in days} == {2}
-    for wd in ("mon", "wed", "fri", "sat"):
+    for wd in ("mon", "wed", "fri"):                                    # Saturday is cardio of your choice
         ids = lambda w: [x["exercise_id"] for x in by[(w, wd)]["workout"]["exercises"]]  # noqa: E731
         assert ids(1) == ids(3) and ids(2) == ids(4)                    # week 1 = week 3, week 2 = week 4
     assert by[(1, "mon")]["workout"]["focus"] == "Upper body" and by[(2, "mon")]["workout"]["focus"] == "Lower body"

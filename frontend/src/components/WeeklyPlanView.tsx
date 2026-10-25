@@ -85,7 +85,8 @@ export default function WeeklyPlanView({ plan, startOpen = true }: { plan: Weekl
   }
   const p = plan.protocol!
   const days = plan.weeks[week - 1]?.days ?? plan.days
-  // The real day lengths, not the protocol's target: strength days can run shorter than the circuits.
+  // The real day lengths, not the protocol's target: strength days can run shorter than the mobility circuits.
+  // Cardio days have no exercises (cardio of your choice), so they aren't counted.
   const minutes = days.filter((d) => d.exercises.length).map((d) => Math.round(d.est_minutes))
   const [shortest, longest] = [Math.min(...minutes), Math.max(...minutes)]
 
@@ -140,8 +141,18 @@ export default function WeeklyPlanView({ plan, startOpen = true }: { plan: Weekl
             .map((d) => (
               <section key={d.day} className="plan-day">
                 <h4>
-                  {DAY_NAMES[d.day]} <span className="hint">· {d.focus} · about {Math.round(d.est_minutes)} min</span>
+                  {DAY_NAMES[d.day]}{' '}
+                  <span className="hint">
+                    · {d.focus}
+                    {d.category !== 'cardio' && <> · about {Math.round(d.est_minutes)} min</>}
+                  </span>
                 </h4>
+                {d.category === 'cardio' && (
+                  <p className="plan-cardio-note">
+                    Walk, run, bike, dance, swim: any cardio you enjoy. Log what you did on your calendar and the day
+                    counts as done.
+                  </p>
+                )}
                 <ol className="session-list">
                   {d.exercises.map((x, i) => (
                     <li key={x.exercise_id} className={`session-item group-${x.muscle_group}`}>

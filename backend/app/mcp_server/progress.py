@@ -144,11 +144,13 @@ def _rate(ratio: float, ahead: float, on_track: float) -> str:
 
 
 def _plan_adherence(conn: sqlite3.Connection, user_id: int, start: date, today: date) -> dict:
-    """Workout days the plan scheduled from `start` up to today, and how many were marked completed.
-    Today only counts once it's done, so an unfinished today isn't a miss. Never reads notes."""
+    """Workout days the plan scheduled from `start` up to today, and how many were marked completed. The plan's own
+    cardio days count too (done once cardio is logged on them). Today only counts once it's done, so an unfinished
+    today isn't a miss. Never reads notes."""
     row = conn.execute(
         "SELECT COUNT(*) AS scheduled, COALESCE(SUM(completed), 0) AS completed FROM calendar_entries "
-        "WHERE user_id = ? AND day_type = 'workout' AND date >= ? AND (date < ? OR (date = ? AND completed = 1))",
+        "WHERE user_id = ? AND (day_type = 'workout' OR (day_type = 'cardio' AND source = 'generated')) "
+        "AND date >= ? AND (date < ? OR (date = ? AND completed = 1))",
         (user_id, start.isoformat(), today.isoformat(), today.isoformat())).fetchone()
     return {"plan_workouts_scheduled": row["scheduled"], "plan_workouts_completed": row["completed"]}
 

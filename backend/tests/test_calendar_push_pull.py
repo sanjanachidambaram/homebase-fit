@@ -58,7 +58,7 @@ def test_a_retake_into_another_goal_lays_out_its_pattern(client, on_day):
     retake(client, uid, h, goal="lose_weight", experience_level="intermediate", equipment=["dumbbells"], injuries=["none"])
     entries = four_weeks(client, h, MONDAY + timedelta(days=2))
     assert_matches_the_generator(uid, entries)
-    cats = [e["workout"].get("category") for e in entries if e["day_type"] == "workout"]
+    cats = [e["workout"].get("category") for e in entries if e["day_type"] in ("workout", "cardio")]
     assert "mobility" not in cats and cats.count("cardio") == 2 * cats.count("upper")   # losing weight: 2 + 2
 
 

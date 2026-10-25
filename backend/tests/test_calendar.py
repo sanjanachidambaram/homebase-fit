@@ -84,11 +84,17 @@ def test_quiz_lays_out_four_weeks_of_the_plan(client, on_day):
     assert len(entries) == 28 and [e["date"] for e in entries] == [d(i) for i in range(28)]
     for e in entries:   # each date gets that week of the plan's repeating pattern
         planned = calendar.plan_day_on(plan, date.fromisoformat(e["date"]), MONDAY)
-        assert e["day_type"] == ("workout" if planned.kind == "training" else "rest")
+        assert e["day_type"] == calendar.plan_day_type(planned)
         assert [x["exercise_id"] for x in e["workout"]["exercises"]] == [x.exercise_id for x in planned.exercises]
         assert e["completed"] is False and e["notes"] is None
-    workout_days = {e["weekday"] for e in entries if e["day_type"] == "workout"}
-    assert workout_days == {"mon", "wed", "fri", "sat"}   # every goal: 4 training days, Mon/Wed/Fri/Sat
+    training = {e["weekday"] for e in entries if e["day_type"] in ("workout", "cardio")}
+    assert training == {"mon", "wed", "fri", "sat"}   # every goal: 4 training days, Mon/Wed/Fri/Sat
+    # losing weight: Wednesday and Saturday are cardio of your choice, with nothing prescribed
+    cardio = [e for e in entries if e["day_type"] == "cardio"]
+    assert {e["weekday"] for e in cardio} == {"wed", "sat"} and len(cardio) == 8
+    for e in cardio:
+        assert e["workout"]["focus"] == "Cardio of your choice" and e["workout"]["exercises"] == []
+        assert e["source"] == "generated" and e["choice"] == "plan" and e["can_complete"] is False
     assert get_days(client, h, MONDAY + timedelta(days=28), MONDAY + timedelta(days=34))["entries"] == []
 
 
@@ -137,7 +143,7 @@ def test_retake_keeps_logged_and_noted_days_and_refreshes_only_untouched_future_
             continue
         assert e["id"] not in {x["id"] for x in before.values()}, d(i)
         planned = calendar.plan_day_on(new_plan, date.fromisoformat(e["date"]), new_start)
-        assert e["day_type"] == ("workout" if planned.kind == "training" else "rest"), d(i)
+        assert e["day_type"] == calendar.plan_day_type(planned), d(i)
         assert [x["exercise_id"] for x in e["workout"]["exercises"]] == [x.exercise_id for x in planned.exercises]
     assert len(after) == 30                                   # Mon 10-19 .. Tue 11-17: one entry per date
 
@@ -332,8 +338,9 @@ def test_goal_check_compares_completed_days_with_the_plan(client, on_day):
     conn.close()
     on_day(today)
     days = by_date(get_days(client, h, MONDAY, today))
-    workouts = [e for e in days.values() if e["day_type"] == "workout"]     # Mon/Wed/Fri/Sat x 2 = 8
-    assert len(workouts) == 8
+    workouts = [e for e in days.values() if e["day_type"] == "workout"]     # Mon/Fri x 2 = 4 strength days
+    cardio = [e for e in days.values() if e["day_type"] == "cardio"]        # Wed/Sat x 2 = 4 cardio of your choice
+    assert len(workouts) == 4 and len(cardio) == 4
     for e in workouts[:2]:
         assert patch(client, h, e["id"], completed=True).status_code == 200
 
@@ -344,5 +351,9 @@ def test_goal_check_compares_completed_days_with_the_plan(client, on_day):
 
     for e in workouts[2:]:
         patch(client, h, e["id"], completed=True)
+    for e in cardio:                                         # a cardio day is done once cardio is logged on it
+        r = client.post("/api/cardio", headers=h, json={"date": e["date"], "activity": "brisk walk",
+                                                         "cardio_type": "walking", "duration_minutes": 30})
+        assert r.status_code == 201 and r.json()["calendar_entry_updated"] == e["id"]
     adherence = next(c for c in check_goal_achievement(uid, today)["checks"] if c["check"] == "plan_adherence")
     assert adherence["status"] == "on_track" and adherence["detail"].startswith("8 of 8")

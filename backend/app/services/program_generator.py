@@ -14,7 +14,9 @@ covers a whole repeating block of weeks. Rules: backend/prompts/shared_rules.md,
         Losing weight      2 strength days (Upper, Lower) + 2 cardio; a 4-week block: weeks 1-4 each different,
                            weeks 5-8 repeat them, and so on.
         Feeling good       2 mobility/core days + 1 strength day + 1 cardio; an 8-week block (weeks 9-16 repeat 1-8).
-  3. Each day is filled from slots. A strength day always hits at least two different muscle groups in its category
+  3. Cardio days prescribe nothing: they read "Cardio of your choice" and the person logs whatever they did
+     (app/cardio.py, with a code-only Compendium calorie estimate). No cardio exercise is ever picked from the library.
+     Strength and mobility days are filled from slots. A strength day always hits at least two different muscle groups in its category
      (Upper: a push and a pull; Lower: a knee-dominant and a hip-dominant move) plus at least two accessories. Each
      slot prefers a short "backbone" list of effective, easy-at-home moves (push-ups, rows, squats, glute bridges,
      planks...) matched against the real library, never invented, and rotates through the pool so each day in the
@@ -45,7 +47,8 @@ GOAL_LABELS = {"stronger": "Getting stronger", "lose_weight": "Losing weight",
 EXPERIENCE = ("beginner", "intermediate", "advanced")
 WEEK = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 Category = Literal["upper", "lower", "mobility", "cardio"]
-CATEGORY_LABELS = {"upper": "Upper body", "lower": "Lower body", "mobility": "Mobility + core", "cardio": "Cardio"}
+CATEGORY_LABELS = {"upper": "Upper body", "lower": "Lower body", "mobility": "Mobility + core",
+                   "cardio": "Cardio of your choice"}
 STRENGTH = ("upper", "lower")
 
 # The week by goal: for each week of the repeating block, weekday -> category. Always 4 training days, on Monday,
@@ -97,7 +100,6 @@ CLINICAL_REVIEW_MESSAGE = (
     "pregnancy needs guidance from a clinician, and ours is still waiting on review by an OB-GYN. Please talk "
     "with your OB-GYN or midwife about what's right for you."
 )
-CARDIO_WORK_SECONDS, CARDIO_EASY_SECONDS = 40, 20
 MOBILITY_HOLD = "20-30s hold"
 MOBILITY_REST = 15
 
@@ -137,19 +139,16 @@ SLOTS: dict[str, list[Slot]] = {
                  Slot("hips", ("legs",), (r"hip (circle|flexor)|90/90|pigeon",), r"hip|glute|piriformis|groin",
                       stretch_ok=True),
                  Slot("core", ("core",), (r"dead bug", r"plank", r"pelvic tilt"), None, accessory=True)],
-    "cardio": [Slot("cardio", ("full_body", "legs"), (r"jumping jack", r"step.?up", r"march", r"step jack"),
-                    r"jumping jack|march|step.?up|step jack|high knee|jog|run|skip|rope")] * 4,
-}
+}   # no cardio slots: cardio days are "Cardio of your choice" (see build_day)
 # When a required slot has nothing that fits (equipment, injury filter), try these, in order, so a strength day still
 # reaches a second muscle group: the same groups with any movement, then the category's other groups not used yet.
 CATEGORY_GROUPS = {"upper": ("chest", "back", "shoulders", "arms"), "lower": ("legs",),
-                   "mobility": ("core", "back", "legs"), "cardio": ("full_body", "legs")}
-MIN_SLOTS = {"upper": 4, "lower": 4, "mobility": 5, "cardio": 4}   # strength: 2 main + at least 2 accessories
-MAX_EXERCISES = {"upper": 6, "lower": 6, "mobility": 5, "cardio": 4}
-CIRCUIT_MIN_MINUTES = 15   # cardio and mobility days are circuits repeated to fill the session, never under 15 min
+                   "mobility": ("core", "back", "legs")}
+MIN_SLOTS = {"upper": 4, "lower": 4, "mobility": 5}   # strength: 2 main + at least 2 accessories
+MAX_EXERCISES = {"upper": 6, "lower": 6, "mobility": 5}
+CIRCUIT_MIN_MINUTES = 15   # mobility days are circuits repeated to fill the session, never under 15 min
 EXTRA_SLOTS = {"upper": [SLOTS["upper"][3], SLOTS["upper"][0], SLOTS["upper"][1]],
-               "lower": [SLOTS["lower"][2], SLOTS["lower"][3]], "mobility": [SLOTS["mobility"][4]],
-               "cardio": [SLOTS["cardio"][0]]}
+               "lower": [SLOTS["lower"][2], SLOTS["lower"][3]], "mobility": [SLOTS["mobility"][4]]}
 
 
 class NoProfile(Exception):
@@ -391,17 +390,14 @@ class Picker:
                 if e["id"] in seen:
                     continue
                 cat = e["category"]
-                if category == "cardio":     # the library's cardio moves, or ones that are cardio by name
-                    ok = cat == "cardio" or (cat in (None, "plyometrics", "strength")
-                                             and bool(re.search(slot.match, e["name"].lower())))
-                elif category == "mobility":   # core work, and stretches where the slot is about mobility
+                if category == "mobility":   # core work, and stretches where the slot is about mobility
                     ok = (cat in (None, "strength") or (slot.stretch_ok and cat == "stretching")) and \
                          (slot.match is None or bool(re.search(slot.match, _movement(e))))
                 else:
                     ok = cat not in NEVER_IN_STRENGTH and (slot.match is None or re.search(slot.match, _movement(e)))
                 if self.equipment is not None and NEEDS_BAR.search(e["name"]):
                     ok = False
-                if category in ("cardio", "mobility") and WEIGHTED_EQUIPMENT & set(e["equipment_needed"]):
+                if category == "mobility" and WEIGHTED_EQUIPMENT & set(e["equipment_needed"]):
                     ok = False
                 if ok:
                     seen.add(e["id"])
@@ -440,10 +436,7 @@ class Picker:
 
 def _exercise(e: dict, category: str, slot: Slot, p: Protocol, goal: str, experience: str) -> tuple[PlanExercise, int]:
     """One planned exercise and its time in seconds."""
-    if category == "cardio":       # one round; build_day sets how many rounds fill the session
-        seconds = CARDIO_WORK_SECONDS + CARDIO_EASY_SECONDS
-        sets, reps, rest = "1", f"{CARDIO_WORK_SECONDS}s on, {CARDIO_EASY_SECONDS}s easy", CARDIO_EASY_SECONDS
-    elif category == "mobility":   # one round; build_day sets how many rounds fill the session
+    if category == "mobility":   # one round; build_day sets how many rounds fill the session
         hold = bool(HOLD.search(e["name"])) or e["category"] == "stretching"
         sets, reps, rest = "1", MOBILITY_HOLD if hold else "8-10 slow", MOBILITY_REST
         seconds = (30 if hold else e["est_time_seconds"]) + MOBILITY_REST
@@ -464,12 +457,10 @@ def _exercise(e: dict, category: str, slot: Slot, p: Protocol, goal: str, experi
 
 
 def relaxed_slots(category: str, slot: Slot, groups_used: set[str]) -> list[Slot]:
-    if category == "cardio":     # cardio stays cardio: no "any movement" fallback
-        return []
     stretch = category == "mobility"
     others = tuple(g for g in CATEGORY_GROUPS[category] if g not in groups_used and g not in slot.groups)
     out = [Slot(slot.name, slot.groups, slot.backbone, None, slot.accessory, stretch)]
-    if others and category != "cardio":
+    if others:
         out.append(Slot(slot.name, others, (), None, slot.accessory, stretch))
     return out
 
@@ -477,6 +468,9 @@ def relaxed_slots(category: str, slot: Slot, groups_used: set[str]) -> list[Slot
 def build_day(day: str, category: str, picker: Picker, p: Protocol, goal: str, experience: str,
               slots_used: dict) -> PlanDay:
     """Fill the required slots (strength: 2 main + 2 accessories), then extras while there's time."""
+    if category == "cardio":   # nothing prescribed: the person does whatever cardio they like and logs it
+        return PlanDay(day=day, kind="training", category="cardio", focus=CATEGORY_LABELS["cardio"], exercises=[],
+                       est_minutes=0)
     budget = p.session_length_minutes * 60
     exercises: list[PlanExercise] = []
     used: set[str] = set()
@@ -505,7 +499,7 @@ def build_day(day: str, category: str, picker: Picker, p: Protocol, goal: str, e
         slots_used[(day, len(exercises))] = slot
         exercises.append(x)
         total += seconds
-    if category in ("cardio", "mobility") and exercises:
+    if category == "mobility" and exercises:
         # A circuit: go round all the moves as many whole rounds as fit in the session, but at least 2 rounds and
         # at least 15 minutes.
         per_round = max(1, total)
@@ -547,7 +541,7 @@ def _apply_swaps(weeks: list[PlanWeek], slots: dict, picker: Picker, p: Protocol
                     exercises.append(x)
                     continue
                 new, _ = _exercise(choice, d.category, slot, p, goal, experience)
-                if d.category in ("cardio", "mobility"):   # a circuit: keep the day's number of rounds
+                if d.category == "mobility":   # a circuit: keep the day's number of rounds
                     new = new.model_copy(update={"sets": x.sets, "est_minutes": x.est_minutes})
                 exercises.append(new.model_copy(update={"swapped_from": x.exercise_id}))
                 used.add(choice["id"])

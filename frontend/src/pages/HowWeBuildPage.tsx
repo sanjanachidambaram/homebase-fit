@@ -13,7 +13,7 @@ const DAY_NAMES: Record<string, string> = {
 const STEPS = [
   {
     title: 'Your goal sets the shape of your week',
-    text: 'Every plan has 4 training days, built from 4 kinds of day: upper body, lower body, mobility and core, and cardio. Getting stronger: 3 strength days (each one upper OR lower body, never mixed) and 1 cardio day, in a 2-week pattern that repeats. Losing weight: 2 strength days and 2 cardio days, in a 4-week pattern. Just feeling good: 2 mobility and core days, 1 strength day and 1 cardio day, in an 8-week pattern. Your goal and experience level pick the sets, reps, rest and session length (15 to 60 minutes). Those are starting values waiting on review by a physical therapist, and they are labeled that way.',
+    text: 'Every plan has 4 training days, built from 4 kinds of day: upper body, lower body, mobility and core, and cardio. Getting stronger: 3 strength days (each one upper OR lower body, never mixed) and 1 cardio day, in a 2-week pattern that repeats. Losing weight: 2 strength days and 2 cardio days, in a 4-week pattern. Just feeling good: 2 mobility and core days, 1 strength day and 1 cardio day, in an 8-week pattern. Cardio days are cardio of your choice: we don’t pick an exercise, you do whatever you enjoy and log it. Your goal and experience level pick the sets, reps, rest and session length (15 to 60 minutes). Those are starting values waiting on review by a physical therapist, and they are labeled that way.',
   },
   {
     title: 'If you flagged an injury, keep only exercises checked for it',
@@ -25,7 +25,7 @@ const STEPS = [
   },
   {
     title: 'Fill each day from what’s left, starting with the basics',
-    text: 'Each strength day works at least two muscle groups (upper: a push and a pull; lower: a squat-type and a hip-hinge move) plus at least two extra exercises for variety. We reach first for effective, easy-at-home moves (push-ups, rows, squats, glute bridges, planks, marching) from our real library, matched to your experience level, with jumping moves left out of gentle plans. Days change from week to week within the pattern.',
+    text: 'Each strength day works at least two muscle groups (upper: a push and a pull; lower: a squat-type and a hip-hinge move) plus at least two extra exercises for variety. We reach first for effective, easy-at-home moves (push-ups, rows, squats, glute bridges, planks, bird dogs) from our real library, matched to your experience level, with jumping moves left out of gentle plans. Days change from week to week within the pattern.',
   },
   {
     title: 'Weights start as suggestions and build on what you log',

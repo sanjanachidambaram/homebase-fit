@@ -1962,6 +1962,7 @@ fieldset.question {
 
 .day-card {
   position: relative;
+  container-type: inline-size;   /* lets the choice buttons and cardio form adapt to the card's own width */
   padding: 0.6rem;
   border-radius: var(--radius-input);
   background: #fff;
@@ -2068,6 +2069,7 @@ fieldset.question {
 
 .day-notes-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   margin-top: 0.35rem;
@@ -2917,8 +2919,18 @@ fieldset.question {
   font-weight: 700;
 }
 
+.cardio-form > *,
+.cardio-form label {
+  min-width: 0;   /* grid items default to their content's width; let them shrink to the card */
+}
+
 .cardio-form input,
 .cardio-form select {
+  /* Fit the day card: in the 7-day grid a card is narrow, and the selects' long option text would push them out. */
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   min-height: 36px;
   padding: 0.2rem 0.4rem;
   border: 2px solid var(--lavender);
@@ -2981,7 +2993,7 @@ fieldset.question {
 /* The day-type selector: three plain choices on every day that isn't done or past. */
 .day-choice {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));   /* minmax: "Add cardio" mustn't push past a narrow card */
   gap: 0.25rem;
   margin: 0.45rem 0;
   padding: 0.2rem;
@@ -2990,6 +3002,7 @@ fieldset.question {
 }
 
 .day-choice-btn {
+  min-width: 0;
   min-height: 36px;
   padding: 0.25rem 0.3rem;
   border: 2px solid transparent;
@@ -3198,4 +3211,45 @@ fieldset.question {
 
 .calibration-tag {
   font-weight: 700;
+}
+
+/* In the 7-day grid a day card is only ~130px wide: stack the three day choices instead of squeezing them side by
+   side, and keep the cardio form's rows to the card's width (the form used to stretch the card). */
+@container (max-width: 220px) {
+  .day-choice {
+    grid-template-columns: 1fr;
+  }
+
+  .day-choice-btn {
+    min-height: 30px;
+  }
+
+  .cardio-form .number-row input {
+    width: 100%;
+  }
+
+  .cardio-list li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+  }
+}
+
+/* The day-type chip in a card's head: when its label wraps (e.g. "Cardio of your choice" in a narrow card), keep it a
+   tidy rounded box instead of a tall stretched pill. */
+.day-card-head .chip {
+  border-radius: 10px;
+  line-height: 1.2;
+  padding: 0.15rem 0.5rem;
+}
+
+.day-cardio-status {
+  margin: 0.25rem 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.day-cardio-status.is-done {
+  color: var(--mint-deep);
 }
