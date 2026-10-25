@@ -32,6 +32,7 @@ import {
   type CalendarEntry,
   type CalendarProgress,
   type CalendarRange,
+  type PlanWindow,
 } from '../api'
 import AccountForm from '../components/AccountForm'
 import CardioForm, { CardioList } from '../components/CardioLog'
@@ -167,6 +168,50 @@ function mondayOf(d: Date): string {
 }
 const dayName = (s: string) => DAY_NAMES[(parse(s).getDay() + 6) % 7] // Monday first
 const shortDate = (s: string) => parse(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+const longDate = (s: string) => parse(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+/** The plan week a date falls in (week 1 = the 7 days from the day the plan started). */
+const planWeekOf = (date: string, started: string) =>
+  Math.floor((parse(date).getTime() - parse(started).getTime()) / (7 * 86400000)) + 1
+
+/** Where the shown week sits in the 6-month plan, and a jump to any of its 26 weeks. */
+function PlanBar({ plan, weekStart, onJump }: { plan: PlanWindow; weekStart: string; onJump: (date: string) => void }) {
+  const weekEnd = addDays(weekStart, 6)
+  const first = Math.max(1, planWeekOf(weekStart, plan.started_on))
+  const last = Math.min(plan.weeks, planWeekOf(weekEnd, plan.started_on))
+  let where: ReactNode
+  if (weekEnd < plan.started_on) where = <>Your plan starts {longDate(plan.started_on)}.</>
+  else if (weekStart > plan.ends_on)
+    where = (
+      <>
+        Your 6-month plan ended {longDate(plan.ends_on)}. <Link to="/quiz">Retake the quiz</Link> to start a new one.
+      </>
+    )
+  else where = first === last ? `Week ${first} of ${plan.weeks}` : `Weeks ${first}–${last} of ${plan.weeks}`
+  return (
+    <div className="plan-bar">
+      <p>
+        <strong>Your 6-month plan</strong> · {where}{' '}
+        <span className="hint">
+          ({longDate(plan.started_on)} – {longDate(plan.ends_on)})
+        </span>
+      </p>
+      <label>
+        Jump to{' '}
+        <select value="" onChange={(e) => e.target.value && onJump(e.target.value)}>
+          <option value="">a week of the plan…</option>
+          {Array.from({ length: plan.weeks }, (_, i) => {
+            const d = addDays(plan.started_on, 7 * i)
+            return (
+              <option key={i} value={d}>
+                Week {i + 1} ({shortDate(d)})
+              </option>
+            )
+          })}
+        </select>
+      </label>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------- one day
 
@@ -680,6 +725,7 @@ function Calendar({ session }: { session: Session }) {
           This week
         </button>
       </div>
+      {data?.plan && <PlanBar plan={data.plan} weekStart={weekStart} onJump={(d) => setWeekStart(mondayOf(parse(d)))} />}
 
       {progress?.available && progress.items && (
         <section className="dash-card progress-marker" aria-labelledby="progress-title">
@@ -744,7 +790,7 @@ function Calendar({ session }: { session: Session }) {
       {data?.needs_quiz && (
         <section className="dash-card quiz-prompt">
           <h3>Take the quiz to fill your calendar</h3>
-          <p>We'll lay out four weeks of your plan here, built from your goals, time, equipment and any injuries.</p>
+          <p>We'll lay out your 6-month plan here, built from your goal, experience, equipment and any injuries.</p>
           <Link to="/quiz" className="btn btn-big">
             Take the quiz
           </Link>
@@ -808,7 +854,7 @@ function Calendar({ session }: { session: Session }) {
           )}
           {data.entries.length === 0 && (
             <p className="hint">
-              Your calendar covers four weeks from when you took the quiz. Retake it any time for a fresh four weeks;
+              Your plan covers 6 months from when you took the quiz. Retake it any time for a fresh 6 months;
               days you've marked done or written notes on are kept.
             </p>
           )}

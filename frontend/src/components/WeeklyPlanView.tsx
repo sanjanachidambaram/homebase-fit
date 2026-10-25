@@ -13,15 +13,30 @@ const DAY_NAMES: Record<string, string> = {
 }
 const words = (s: string) => s.replace(/_/g, ' ')
 const lb = (n: number | null) => (n === null ? 'your pick' : `${n} lb`)
+const nice = (s: string) =>
+  new Date(`${s}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
 function repsText(x: PlanExercise) {
   return x.reps_your_call ? `${x.sets} sets × your call (about ${x.reps})` : `${x.sets} × ${x.reps}`
 }
 
-/** The weights table: suggested starting weights and how they climb, from the defaults (before anything is logged). */
+/** The 6 months of the plan as week ranges (weeks 1-26 split into six roughly 4-and-a-bit-week months). */
+function months(totalWeeks: number): { label: string; from: number; to: number }[] {
+  const out = []
+  for (let m = 0; m < 6; m++) {
+    const from = Math.floor((m * totalWeeks) / 6) + 1
+    const to = Math.floor(((m + 1) * totalWeeks) / 6)
+    out.push({ label: `Month ${m + 1}`, from, to })
+  }
+  return out
+}
+
+/** The weights table: suggested weights month by month across the 6-month plan, from the defaults (before anything
+ *  is logged). The data has every week; a month shows its range (e.g. 10 to 12.5 lb). */
 function WeightTable({ plan }: { plan: WeeklyProgram }) {
   const w = plan.weights
   if (!w) return null
+  const cols = months(w.schedule_weeks)
   return (
     <section className="progression" aria-label="How the weights go up">
       <h4>How the weights go up</h4>
@@ -33,9 +48,10 @@ function WeightTable({ plan }: { plan: WeeklyProgram }) {
             <thead>
               <tr>
                 <th scope="col">Exercise</th>
-                {Array.from({ length: w.schedule_weeks }, (_, i) => (
-                  <th key={i} scope="col">
-                    Wk {i + 1}
+                {cols.map((c) => (
+                  <th key={c.label} scope="col">
+                    {c.label}
+                    <span className="hint"> wk {c.from}–{c.to}</span>
                   </th>
                 ))}
               </tr>
@@ -44,9 +60,12 @@ function WeightTable({ plan }: { plan: WeeklyProgram }) {
               {w.schedule.map((row) => (
                 <tr key={row.exercise_id}>
                   <th scope="row">{row.name}</th>
-                  {Array.from({ length: w.schedule_weeks }, (_, i) => {
-                    const at = row.weeks.indexOf(i + 1)
-                    return <td key={i}>{at === -1 ? '·' : lb(row.weight_lb[at])}</td>
+                  {cols.map((c) => {
+                    const here = row.weeks.flatMap((wk, i) => (wk >= c.from && wk <= c.to ? [row.weight_lb[i]] : []))
+                    if (!here.length) return <td key={c.label}>·</td>
+                    const lo = here[0]
+                    const hi = here[here.length - 1]
+                    return <td key={c.label}>{lo === hi ? lb(lo) : `${lo ?? '?'}–${lb(hi)}`}</td>
                   })}
                 </tr>
               ))}
@@ -92,10 +111,26 @@ export default function WeeklyPlanView({ plan, startOpen = true }: { plan: Weekl
 
   return (
     <div className="weekly-plan">
+      {plan.window && (
+        <p className="plan-window">
+          {plan.window.ended ? (
+            <>
+              Your 6-month plan ended {nice(plan.window.ends_on)}. <Link to="/quiz">Retake the quiz</Link> to start a new one.
+            </>
+          ) : (
+            <>
+              You're in <strong>week {plan.window.current_week} of {plan.window.weeks}</strong>. Your plan runs from{' '}
+              {nice(plan.window.started_on)} to {nice(plan.window.ends_on)}; the {plan.block_weeks}-week pattern below repeats the
+              whole way, with the weights going up as you go.
+            </>
+          )}
+        </p>
+      )}
       <div className="chip-row">
         <span className="chip">{plan.goal_label}</span>
         <span className="chip">{plan.training_days} days a week</span>
-        <span className="chip">repeats every {plan.block_weeks} weeks</span>
+        <span className="chip">6-month plan ({plan.plan_weeks} weeks)</span>
+        <span className="chip">pattern repeats every {plan.block_weeks} weeks</span>
         {minutes.length > 0 && (
           <span className="chip">
             {shortest === longest ? `about ${shortest}` : `${shortest} to ${longest}`} min a day

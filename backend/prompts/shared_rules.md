@@ -170,6 +170,13 @@ level, 9 rows, PT-reviewable); the generator never invents them. The old multi-g
   `/pregnancy-support`. One check, `app/safety_rules.py: profile_needs_clinical_review`, decides it. Any injury flag:
   `checked_only=true` on every exercise search, no exceptions (rule 4). The injury filter applies on top of
   whichever goal is picked, unchanged: every candidate comes from the same tested SQL as the MCP tool.
+- **Every plan runs 6 months (decided 2026-10-25): 26 weeks, 182 days**, from `quiz_profiles.plan_started_on`
+  (`PLAN_WEEKS` in the generator). The goal's block below repeats the whole way, and the weights keep climbing by the
+  goal's rule (rule 8) for all 26 weeks; nothing new is invented for the longer horizon. Only the pattern and the start
+  date are stored. The calendar lays out the first 4 weeks when the quiz is saved and any other day of the 6 months
+  the first time it's viewed (`app/calendar.py: fill_range`), so there are no gaps and no 182 rows written up front;
+  today's workout (Dashboard) comes from the same lookup. After week 26 the plan has ended: no more generated days,
+  and the app says so (a retake starts a new 6 months). Tests: `tests/test_six_month_plan.py`.
 - **The week is fixed by the goal**: always 4 training days (Monday, Wednesday, Friday, Saturday), built from 4 kinds
   of day: Upper body (chest, back, shoulders, arms), Lower body (legs), Mobility + core, Cardio.
   - **Cardio days prescribe nothing (decided 2026-10-25).** The generator never picks a cardio exercise from the
@@ -264,7 +271,9 @@ no promises ("you will lose..."). Tests: `tests/test_workout_review.py`.
   suggestion they can lower, and the plan keeps telling them to stop anything that hurts. Worth revisiting once a PT
   has reviewed the protocols and injury tags.
 - Weeks count from `quiz_profiles.plan_started_on` (set whenever the quiz is saved; a retake is a new plan and starts
-  week 1 again). Suggestions are computed live from the logs (`app/calendar.py: weight_suggestions`), not frozen in
+  week 1 again), for the plan's 26 weeks. With nothing logged, an exercise's default weight applies the first time it
+  comes up (week 1, or week 2 for an even-week exercise), and it goes up from there (fixed 2026-10-25: it used to be
+  anchored at week 1 for every exercise, so even-week exercises started one step above the default). Suggestions are computed live from the logs (`app/calendar.py: weight_suggestions`), not frozen in
   the calendar snapshot. Sets, reps and exercise choice never change with the weeks.
 
 **Enforced in code:** `DEFAULT_WEIGHT_LB`, `WEIGHT_STEP_LB`, `weight_steps`, `suggested_weight` in

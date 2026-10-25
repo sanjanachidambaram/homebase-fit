@@ -314,6 +314,15 @@ export interface WeightPlan {
   schedule: { exercise_id: string; name: string; load: 'arms' | 'legs'; weeks: number[]; weight_lb: (number | null)[] }[]
 }
 
+/** Where a date sits in the 6-month plan (26 weeks from the day the quiz was saved). */
+export interface PlanWindow {
+  started_on: string
+  ends_on: string
+  weeks: number // 26
+  current_week: number // today's week of the plan, 1-26
+  ended: boolean // past the last day: retake the quiz for a new 6 months
+}
+
 export interface WeeklyProgram {
   swap_options?: Record<string, { id: string; name: string; injury_check: string }[]> | null
   generated: boolean
@@ -324,6 +333,8 @@ export interface WeeklyProgram {
   experience_level: string
   training_days: number
   block_weeks: number // the pattern repeats every this many weeks
+  plan_weeks: number // how long the plan runs: 26 weeks (6 months)
+  window?: PlanWindow | null // GET /api/plan: where today sits in the 6 months
   weeks: { week_in_block: number; days: PlanDay[] }[]
   days: PlanDay[] // week 1
   weights: WeightPlan | null
@@ -497,6 +508,7 @@ export interface CalendarRange {
   cardio: CardioLog[] // the user's own activity log, shown even when there's no plan
   calendar_mode: CalendarMode | null
   needs_review: boolean // review mode, plan not reviewed yet: nothing is laid out
+  plan?: PlanWindow | null // the 6-month plan's dates
 }
 
 export const fetchCalendar = (token: string, start: string, end: string) =>

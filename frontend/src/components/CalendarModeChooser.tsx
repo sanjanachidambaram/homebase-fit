@@ -6,7 +6,7 @@ import { setSession } from '../session'
 import Link from './Link'
 
 const OPTIONS: { mode: CalendarMode; title: string; text: string }[] = [
-  { mode: 'generated', title: 'Use my quiz plan', text: 'We lay out your generated plan for the next 4 weeks. You can still change any day.' },
+  { mode: 'generated', title: 'Use my quiz plan', text: 'We lay out your generated 6-month plan, day by day. You can still change any day.' },
   {
     mode: 'review',
     title: 'Let me review it first',

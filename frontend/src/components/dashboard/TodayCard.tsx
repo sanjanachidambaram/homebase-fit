@@ -1,5 +1,6 @@
-// "Plan for today": today's day from your calendar (GET /api/calendar, the plan laid out on dates). Code only, no
-// AI. Logging and ticking it off happen on the Calendar, so this card links there.
+// "Plan for today": today's day from your calendar (GET /api/calendar, the plan laid out on dates), from anywhere in
+// the 6-month plan (the server lays out a day the first time it's asked for). Code only, no AI. Logging and ticking
+// it off happen on the Calendar, so this card links there.
 import { useEffect, useState } from 'react'
 import { fetchCalendar, isSignInGone, MUSCLE_GROUP_LABELS, type CalendarEntry, type CalendarRange } from '../../api'
 import { setSession } from '../../session'
@@ -86,6 +87,11 @@ export default function TodayCard({ token }: { token: string }) {
     <section className="dash-card today-card" aria-labelledby="today-title">
       <div className="dash-card-head">
         <h3 id="today-title">Plan for today</h3>
+        {data?.plan && !data.plan.ended && (
+          <span className="hint">
+            Week {data.plan.current_week} of {data.plan.weeks}
+          </span>
+        )}
       </div>
       {!data && !error && <Loading text="Checking today's plan…" />}
       {error && <p className="error">{error}</p>}
@@ -97,7 +103,13 @@ export default function TodayCard({ token }: { token: string }) {
           </Link>
         </>
       )}
-      {data && !data.needs_quiz && (entry ? <TodayBody entry={entry} /> : <p>Nothing is on your calendar today.</p>)}
+      {data?.plan?.ended && !entry && (
+        <p>
+          You finished your 6-month plan. <Link to="/quiz">Retake the quiz</Link> to start the next 6 months.
+        </p>
+      )}
+      {data && !data.needs_quiz && !(data.plan?.ended && !entry) &&
+        (entry ? <TodayBody entry={entry} /> : <p>Nothing is on your calendar today.</p>)}
       {data && !data.needs_quiz && (
         <Link to="/calendar" className="btn">
           {entry?.day_type === 'workout' && !entry.completed ? 'Log it on my calendar' : 'Open my calendar'}

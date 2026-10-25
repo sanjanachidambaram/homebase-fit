@@ -50,7 +50,8 @@ def plain_explanation(plan: WeeklyProgram) -> str:
     kinds = [d.focus.lower() for d in plan.days if d.kind == "training"]
     return (f"This plan is built around your goal, {plan.goal_label.lower()}: {plan.training_days} days a week "
             f"({', '.join(kinds)}), about {p.session_length_minutes} minutes each, with rest days in between, and a "
-            f"{plan.block_weeks}-week pattern that repeats. Its training settings are still pending expert review, so "
+            f"{plan.block_weeks}-week pattern that repeats across the {plan.plan_weeks}-week (6-month) plan. Its "
+            "training settings are still pending expert review, so "
             "we can't point to verified evidence yet.")
 
 
@@ -74,6 +75,7 @@ def plan_for_model(plan: WeeklyProgram) -> str:
         "plan": {
             "training_days_per_week": plan.training_days,
             "repeats_every_weeks": plan.block_weeks,
+            "plan_length_weeks": plan.plan_weeks,
             "session_minutes": p.session_length_minutes,
             "sets": p.sets_range, "reps": p.reps_range, "rest_seconds": p.rest_seconds,
             "how_weights_go_up": plan.weights.rule if plan.weights else None,

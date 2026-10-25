@@ -3300,3 +3300,38 @@ fieldset.question {
 .plan-approach {
   margin-bottom: 1.25rem;
 }
+
+/* The 6-month plan: where you are in it (Plan page) and where the shown week sits (Calendar). */
+.plan-window {
+  margin: 0 0 0.75rem;
+}
+
+.plan-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin: 0.25rem 0 1rem;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-input);
+  background: var(--honey-tint);
+}
+
+.plan-bar p {
+  margin: 0;
+}
+
+.plan-bar select {
+  min-height: 40px;
+  padding: 0.2rem 0.6rem;
+  border: 2px solid var(--honey);
+  border-radius: var(--radius-input);
+  background: #fff;
+  font: inherit;
+}
+
+.weight-table th .hint {
+  display: block;
+  font-weight: 400;
+}

@@ -17,6 +17,8 @@ Run from backend/:
     .venv\\Scripts\\python.exe -m pytest tests/test_signin_flow.py -v
 """
 
+from datetime import timedelta
+
 import pytest
 
 from app import calendar, config
@@ -137,7 +139,11 @@ def test_quiz_save_survives_a_calendar_failure(client):
     # ...and once the calendar works again,
     me = assert_signed_in(client, uid, h, username)                          # the user is still signed in,
     assert me["quiz_profile"]["goal"] == "lose_weight"
-    assert rows("SELECT COUNT(*) AS n FROM calendar_entries WHERE user_id = ?", uid) == [{"n": 28}]   # filled on visit
+    start = calendar.today()                                              # and viewing the calendar lays it out
+    shown = client.get("/api/calendar", headers=h, params={"start": start.isoformat(),
+                                                           "end": (start + timedelta(days=27)).isoformat()}).json()
+    assert len(shown["entries"]) == 28
+    assert rows("SELECT COUNT(*) AS n FROM calendar_entries WHERE user_id = ?", uid) == [{"n": 28}]
 
 
 # ---------------------------------------------------------------- an account deleted while the AI runs

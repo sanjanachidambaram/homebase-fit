@@ -1,7 +1,10 @@
 """Deterministic plan generator. Plain Python: there is NO LLM call anywhere in this module.
 
-Input: the user's quiz profile (one goal, experience level, equipment, injury flags). Output: a WeeklyProgram that
-covers a whole repeating block of weeks. Rules: backend/prompts/shared_rules.md, rules 6 and 8. Rewritten 2026-10-25.
+Input: the user's quiz profile (one goal, experience level, equipment, injury flags). Output: a WeeklyProgram for a
+6-month plan (PLAN_WEEKS = 26 weeks, decided 2026-10-25): the goal's repeating block of weeks (2, 4 or 8) is the
+pattern for all 26, and the weights climb across all 26 by the goal's rule. Only the pattern is stored; any date's
+day and weights are worked out from it (app/calendar.py: plan_day_on, weight_suggestions). Rules:
+backend/prompts/shared_rules.md, rules 6 and 8. Rewritten 2026-10-25.
 
   1. Safety first. Pregnant / postpartum -> no plan (needs OB-GYN-reviewed guidance first). Any injury flag ->
      checked_only for every exercise search (app/safety_rules.py), no exceptions. Every candidate comes from the
@@ -16,9 +19,9 @@ covers a whole repeating block of weeks. Rules: backend/prompts/shared_rules.md,
         Feeling good       2 mobility/core days + 1 strength day + 1 cardio; an 8-week block (weeks 9-16 repeat 1-8).
   3. Cardio days prescribe nothing: they read "Cardio of your choice" and the person logs whatever they did
      (app/cardio.py, with a code-only Compendium calorie estimate). No cardio exercise is ever picked from the library.
-     Strength and mobility days are filled from slots. A strength day always hits at least two different muscle groups in its category
-     (Upper: a push and a pull; Lower: a knee-dominant and a hip-dominant move) plus at least two accessories. Each
-     slot prefers a short "backbone" list of effective, easy-at-home moves (push-ups, rows, squats, glute bridges,
+     Strength and mobility days are filled from slots. A strength day always hits at least two different muscle
+     groups in its category (Upper: a push and a pull; Lower: a knee-dominant and a hip-dominant move) plus at
+     least two accessories. Each slot prefers a short "backbone" list of effective, easy-at-home moves (push-ups, rows, squats, glute bridges,
      planks...) matched against the real library, never invented, and rotates through the pool so each day in the
      block gets different exercises where the pool allows.
   4. Sets, reps, rest and session length come from the goal_protocols row (goal x experience level).
@@ -62,6 +65,9 @@ STRUCTURES: dict[str, list[dict[str, str]]] = {
 }
 BLOCK_WEEKS = {g: len(s) for g, s in STRUCTURES.items()}   # 2, 4, 8
 TRAINING_DAYS = 4
+# Every plan runs 6 months: 26 weeks (182 days) from the day the quiz is saved, the goal's block repeating throughout.
+PLAN_WEEKS = 26
+PLAN_DAYS = PLAN_WEEKS * 7
 
 # ---------------------------------------------------------------- weights (shared_rules.md rule 8)
 WEIGHTED_EQUIPMENT = {"dumbbells", "kettlebells", "barbell", "ez_curl_bar", "cable", "machine", "medicine_ball"}
@@ -250,6 +256,7 @@ class WeeklyProgram(BaseModel):
     experience_level: str
     training_days: int = 0
     block_weeks: int = 0
+    plan_weeks: int = 0                  # how long the plan runs: 26 weeks (6 months), the block repeating throughout
     weeks: list[PlanWeek] = []
     days: list[PlanDay] = []             # week 1 (the same as weeks[0].days), for single-week views
     protocol: ProtocolSummary | None = None
@@ -318,6 +325,11 @@ def weight_steps(goal: str, block_weeks: int, appears_in: set[int], anchor_week:
     if goal == "lose_weight":
         return (week - 1) // LOSE_WEIGHT_STEP_WEEKS - (anchor_week - 1) // LOSE_WEIGHT_STEP_WEEKS
     return 0
+
+
+def first_week(appears_in: set[int]) -> int:
+    """The plan week an exercise first appears in (its default weight's anchor: the first time isn't "again")."""
+    return min(appears_in) + 1 if appears_in else 1
 
 
 def suggested_weight(goal: str, load: str, base: float | None, steps: int) -> float | None:
@@ -559,9 +571,9 @@ def _apply_swaps(weeks: list[PlanWeek], slots: dict, picker: Picker, p: Protocol
 
 def weight_plan(goal: str, experience: str, weeks: list[PlanWeek]) -> WeightPlan:
     """Suggested weights week by week from the defaults (before anything is logged), so the plan can show the climb.
-    Covers two full blocks, at least 8 weeks."""
+    Covers the whole 6-month plan (PLAN_WEEKS)."""
     block = len(weeks)
-    n_weeks = max(8, 2 * block)
+    n_weeks = PLAN_WEEKS
     appears: dict[str, tuple[PlanExercise, set[int]]] = {}
     for w in weeks:
         for d in w.days:
@@ -574,7 +586,8 @@ def weight_plan(goal: str, experience: str, weeks: list[PlanWeek]) -> WeightPlan
         base = default_weight(experience, x.load)
         rows.append(WeightScheduleRow(
             exercise_id=ex_id, name=x.name, load=x.load, weeks=on,
-            weight_lb=[suggested_weight(goal, x.load, base, weight_steps(goal, block, variants, 1, wk)) for wk in on]))
+            weight_lb=[suggested_weight(goal, x.load, base,
+                                        weight_steps(goal, block, variants, first_week(variants), wk)) for wk in on]))
     return WeightPlan(rule=WEIGHT_RULES[goal], calibration=CALIBRATION_NOTE, defaults_lb=DEFAULT_WEIGHT_LB[experience],
                       step_lb=WEIGHT_STEP_LB[goal], schedule_weeks=n_weeks, schedule=rows)
 
@@ -627,7 +640,8 @@ def generate(profile: dict, swaps: dict[str, str] | None = None, with_swap_optio
 
     return WeeklyProgram(
         generated=True, goal=goal, goal_label=GOAL_LABELS[goal], experience_level=experience,
-        training_days=TRAINING_DAYS, block_weeks=BLOCK_WEEKS[goal], weeks=weeks, days=weeks[0].days, notes=notes,
+        training_days=TRAINING_DAYS, block_weeks=BLOCK_WEEKS[goal], plan_weeks=PLAN_WEEKS, weeks=weeks,
+        days=weeks[0].days, notes=notes,
         protocol=ProtocolSummary(
             goal=goal, experience_level=experience, session_length_minutes=p.session_length_minutes,
             sets_range=fmt_range(*p.sets), reps_range=fmt_range(*p.reps), rest_seconds=p.rest_seconds,

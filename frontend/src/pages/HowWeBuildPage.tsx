@@ -13,7 +13,7 @@ const DAY_NAMES: Record<string, string> = {
 const STEPS = [
   {
     title: 'Your goal sets the shape of your week',
-    text: 'Every plan has 4 training days, built from 4 kinds of day: upper body, lower body, mobility and core, and cardio. Getting stronger: 3 strength days (each one upper OR lower body, never mixed) and 1 cardio day, in a 2-week pattern that repeats. Losing weight: 2 strength days and 2 cardio days, in a 4-week pattern. Just feeling good: 2 mobility and core days, 1 strength day and 1 cardio day, in an 8-week pattern. Cardio days are cardio of your choice: we don’t pick an exercise, you do whatever you enjoy and log it. Your goal and experience level pick the sets, reps, rest and session length (15 to 60 minutes). Those are starting values waiting on review by a physical therapist, and they are labeled that way.',
+    text: 'Every plan runs 6 months (26 weeks) and has 4 training days a week, built from 4 kinds of day: upper body, lower body, mobility and core, and cardio. Getting stronger: 3 strength days (each one upper OR lower body, never mixed) and 1 cardio day, in a 2-week pattern that repeats. Losing weight: 2 strength days and 2 cardio days, in a 4-week pattern. Just feeling good: 2 mobility and core days, 1 strength day and 1 cardio day, in an 8-week pattern. Cardio days are cardio of your choice: we don’t pick an exercise, you do whatever you enjoy and log it. Your goal and experience level pick the sets, reps, rest and session length (15 to 60 minutes). Those are starting values waiting on review by a physical therapist, and they are labeled that way.',
   },
   {
     title: 'If you flagged an injury, keep only exercises checked for it',

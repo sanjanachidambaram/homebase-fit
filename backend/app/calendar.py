@@ -5,8 +5,12 @@ Routes (sign-in required; the user always comes from the token):
   PATCH /api/calendar/{id}          {date?, notes?, completed?}
 
 Rules, all enforced here in code:
-  * materialize_plan() runs when the quiz is saved: 4 weeks of entries from today, one per date, following the
-    plan's weekly pattern. Each entry's workout_content is a snapshot of that day of the plan.
+  * Every plan runs 6 months: 26 weeks from quiz_profiles.plan_started_on (plan_window; PLAN_WEEKS in the generator).
+    Only the pattern is stored; days become calendar entries lazily. materialize_plan() runs when the quiz is saved
+    and lays out the first 4 weeks; any other date of the 6 months is laid out the first time it's asked for
+    (GET /api/calendar -> fill_range), so the whole plan is there, with no gaps, without writing 182 rows up front.
+    Each entry's workout_content is a snapshot of that day of the plan. After week 26 the plan has ended: no more
+    generated days (the response says so, and a retake starts a new 6 months).
     A retake REFRESHES only entries dated today or later that are not completed, have no notes, and are not
     custom. Past days, completed days, days with notes, and days the user built themselves are never touched.
   * Custom days: POST /api/calendar/{id}/custom (in app/agent_routes.py, with the other AI routes) builds a
@@ -57,12 +61,13 @@ from app.agents.safety import NOTE_SUPPORT_MESSAGE, log_safety_event, red_flags_
 from app.db import connect
 from app.safety_rules import CLINICAL_REVIEW_NO_AI, CLINICAL_REVIEW_PAGE, profile_needs_clinical_review
 from app.security import token_user_id
-from app.services.program_generator import (WEIGHTED_EQUIPMENT, NoProfile, PlanDay, WeeklyProgram, default_weight,
-                                             generate_for_user, suggested_weight, variant_of, weight_steps)
+from app.services.program_generator import (PLAN_DAYS, PLAN_WEEKS, WEIGHTED_EQUIPMENT, NoProfile, PlanDay,
+                                             WeeklyProgram, default_weight, first_week, generate_for_user,
+                                             suggested_weight, variant_of, weight_steps)
 
 router = APIRouter(prefix="/api")
 
-WEEKS = 4
+WEEKS = 4             # laid out right away when the quiz is saved; the rest of the 6 months on demand
 MAX_RANGE_DAYS = 62
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 NOTES_MAX = 2000
@@ -88,6 +93,21 @@ MAX_AHEAD_DAYS = 182   # "Save to calendar" can extend the calendar this far (ab
 def plan_week(day: date, started: date) -> int:
     """Week number of the plan on a date (week 1 = the 7 days from the day the plan started)."""
     return max(1, (day - started).days // 7 + 1)
+
+
+def plan_end(started: date) -> date:
+    """The last day of the 6-month plan."""
+    return started + timedelta(days=PLAN_DAYS - 1)
+
+
+def plan_window(cfg: dict | None, on: date | None = None) -> dict | None:
+    """Where a date sits in the 6-month plan, for the UI: start, end, which week, and whether it's over."""
+    if not cfg:
+        return None
+    on, started = on or today(), cfg["started"]
+    ends = plan_end(started)
+    return {"started_on": started.isoformat(), "ends_on": ends.isoformat(), "weeks": PLAN_WEEKS,
+            "current_week": min(PLAN_WEEKS, plan_week(on, started)), "ended": on > ends}
 
 
 def plan_day_on(plan: WeeklyProgram, on: date, started: date) -> PlanDay:
@@ -167,7 +187,9 @@ def calendar_settings(conn: sqlite3.Connection, user_id: int) -> dict | None:
 
 
 def _fill(conn: sqlite3.Connection, user_id: int, dates: list[date], plan: WeeklyProgram | None, cfg: dict) -> int:
-    """Create entries for the dates that don't have one, per the calendar mode. Never touches an existing entry."""
+    """Create entries for the dates that don't have one, per the calendar mode, inside the 6-month plan (dates before
+    it starts or after it ends are skipped). Never touches an existing entry."""
+    dates = [d for d in dates if cfg["started"] <= d <= plan_end(cfg["started"])]
     if not dates:
         return 0
     taken = {r[0] for r in conn.execute(
@@ -214,6 +236,30 @@ def materialize_plan(user_id: int, start: date | None = None) -> dict:
     finally:
         conn.close()
     return {"created": created, "refreshed": refreshed, "kept": kept, "generated": plan.generated, "mode": cfg["mode"]}
+
+
+def fill_range(user_id: int, start: date, end: date, cfg: dict | None) -> int:
+    """Lay out every missing day of the plan between start and end (clipped to the 6-month window). Cheap when
+    nothing is missing: one COUNT, and the plan is only generated when there's a gap to fill."""
+    if not cfg:
+        return 0
+    lo, hi = max(start, cfg["started"]), min(end, plan_end(cfg["started"]))
+    if lo > hi:
+        return 0
+    conn = connect()
+    try:
+        have = conn.execute("SELECT COUNT(*) FROM calendar_entries WHERE user_id = ? AND date BETWEEN ? AND ?",
+                            (user_id, lo.isoformat(), hi.isoformat())).fetchone()[0]
+        if have >= (hi - lo).days + 1:
+            return 0
+        try:
+            plan = generate_for_user(user_id)
+        except NoProfile:
+            return 0
+        with conn:
+            return _fill(conn, user_id, [lo + timedelta(days=i) for i in range((hi - lo).days + 1)], plan, cfg)
+    finally:
+        conn.close()
 
 
 def ensure_through(user_id: int, target: date) -> int:
@@ -313,14 +359,13 @@ def get_calendar(
     conn = connect()
     try:
         has_quiz = conn.execute("SELECT 1 FROM quiz_profiles WHERE user_id = ?", (uid,)).fetchone() is not None
-        upcoming = conn.execute("SELECT COUNT(*) FROM calendar_entries WHERE user_id = ? AND date >= ?",
-                                (uid, today().isoformat())).fetchone()[0]
         cfg = calendar_settings(conn, uid)
     finally:
         conn.close()
-    base.update(calendar_mode=cfg["mode"] if cfg else None, needs_review=bool(cfg and cfg["review_pending"]))
-    if has_quiz and not upcoming:   # accounts from before the calendar, or the 4 weeks ran out: top up
-        materialize_plan(uid)
+    base.update(calendar_mode=cfg["mode"] if cfg else None, needs_review=bool(cfg and cfg["review_pending"]),
+                plan=plan_window(cfg))
+    if has_quiz:   # any day of the 6 months not laid out yet is laid out now (the first visit to that week)
+        fill_range(uid, start, end, cfg)
 
     conn = connect()
     try:
@@ -375,9 +420,9 @@ def weight_suggestions(conn: sqlite3.Connection, uid: int, rows: list[sqlite3.Ro
                 before = [h for h in history.get(ex_id, []) if h[0] < r["date"]]
                 if before:
                     anchor_lb, anchor_week = before[-1][1], plan_week(date.fromisoformat(before[-1][0]), started)
-                else:
-                    anchor_lb, anchor_week = default_weight(profile["experience_level"] if profile else "beginner",
-                                                            x["load"]), 1
+                else:   # the default applies the first time the exercise comes up (week 1, or 2 for even weeks)
+                    anchor_lb = default_weight(profile["experience_level"] if profile else "beginner", x["load"])
+                    anchor_week = first_week(set(x.get("appears_in_weeks") or []))
                 steps = weight_steps(goal, content.get("block_weeks") or 1, set(x.get("appears_in_weeks") or []),
                                      anchor_week, week)
                 info["suggested_lb"] = suggested_weight(goal, x["load"], anchor_lb, steps)

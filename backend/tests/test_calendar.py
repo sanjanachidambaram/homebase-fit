@@ -95,7 +95,9 @@ def test_quiz_lays_out_four_weeks_of_the_plan(client, on_day):
     for e in cardio:
         assert e["workout"]["focus"] == "Cardio of your choice" and e["workout"]["exercises"] == []
         assert e["source"] == "generated" and e["choice"] == "plan" and e["can_complete"] is False
-    assert get_days(client, h, MONDAY + timedelta(days=28), MONDAY + timedelta(days=34))["entries"] == []
+    # the quiz lays out 4 weeks; week 5 (like any day of the 6 months) is laid out the first time it's viewed
+    fifth = get_days(client, h, MONDAY + timedelta(days=28), MONDAY + timedelta(days=34))["entries"]
+    assert len(fifth) == 7 and {e["workout"]["week"] for e in fifth if e["day_type"] != "rest"} == {5}
 
 
 def test_snapshot_does_not_change_when_the_content_changes_later(client, on_day):

@@ -269,10 +269,9 @@ def test_weights_build_on_a_logged_anchor_not_just_the_default():
 def test_the_plan_shows_the_weight_schedule(test_db):
     plan = generate(profile("lose_weight", "intermediate", HOME))
     w = plan.weights
-    assert w.schedule_weeks == 8 and w.defaults_lb == {"arms": 10, "legs": 20} and "5 lb every 4 weeks" in w.rule
-    row = w.schedule[0]
-    assert row.weight_lb == [row.weight_lb[0]] * len([wk for wk in row.weeks if wk <= 4]) + \
-        [row.weight_lb[0] + 5] * len([wk for wk in row.weeks if wk > 4])
+    assert w.schedule_weeks == 26 and w.defaults_lb == {"arms": 10, "legs": 20} and "5 lb every 4 weeks" in w.rule
+    for row in w.schedule:                                     # the whole 6 months: +5 lb each time the 4 weeks restart
+        assert row.weight_lb == [row.weight_lb[0] + 5 * ((wk - 1) // 4) for wk in row.weeks], row.name
 
 
 # ================================================================ 5. safety: unchanged, on top of every goal
