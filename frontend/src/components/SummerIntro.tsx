@@ -55,7 +55,6 @@ export default function SummerIntro({ onContinue }: { onContinue: () => void }) 
         <button type="button" className="btn" onClick={onContinue}>
           Continue to quiz
         </button>
-        <span className="hint">Listening is optional.</span>
       </div>
     </section>
   )
