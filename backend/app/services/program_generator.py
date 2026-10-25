@@ -75,11 +75,18 @@ DEFAULT_WEIGHT_LB = {"beginner": None, "intermediate": {"arms": 10, "legs": 20},
 WEIGHT_STEP_LB = {"stronger": {"arms": 2.5, "legs": 5}, "lose_weight": {"arms": 5, "legs": 5},
                   "feel_good": {"arms": 0, "legs": 0}}
 LOSE_WEIGHT_STEP_WEEKS = 4
+# The cap on automatic increases (decided 2026-10-25, for the 6-month plan): at most one increase every 2 weeks per
+# exercise, and at most 2 increases past the anchor (the last weight the person logged, or the default if nothing's
+# logged). Suggestions then hold until they log again, so they stay tied to what was actually lifted.
+MIN_WEEKS_BETWEEN_STEPS = 2
+MAX_STEPS_PAST_ANCHOR = 2
+_CAP_NOTE = (" Suggestions go at most 2 increases past the last weight you logged, then wait for you to log again, "
+             "so they keep pace with what you actually lift.")
 WEIGHT_RULES = {
-    "stronger": "The weight goes up each time a day repeats: +2.5 lb for arm exercises and +5 lb for leg exercises. "
-                "How many reps you do is your call (going to failure is your judgment during the set, not "
-                "something the app works out).",
-    "lose_weight": "Weights go up 5 lb every 4 weeks, when the 4-week pattern starts again.",
+    "stronger": "The weight goes up each time a day repeats, at most once every 2 weeks: +2.5 lb for arm exercises "
+                "and +5 lb for leg exercises." + _CAP_NOTE + " How many reps you do is your call (going to failure "
+                "is your judgment during the set, not something the app works out).",
+    "lose_weight": "Weights go up 5 lb every 4 weeks, when the 4-week pattern starts again." + _CAP_NOTE,
     "feel_good": "Weights stay wherever you set them. There are no automatic increases.",
 }
 CALIBRATION_NOTE = ("Week 1 is a calibration week: the weights shown are only starting suggestions, so log what you "
@@ -315,16 +322,21 @@ def variant_of(week: int, block_weeks: int) -> int:
 
 
 def weight_steps(goal: str, block_weeks: int, appears_in: set[int], anchor_week: int, week: int) -> int:
-    """How many automatic increases between the anchor (where the weight was last set: the default in week 1, or a
-    logged weight) and `week`. Getting stronger: one per time this exercise's day comes round again. Losing weight:
-    one per new 4-week block. Feeling good: none."""
+    """How many automatic increases between the anchor (where the weight was last set: the default the first time
+    the exercise comes up, or a logged weight) and `week`. Getting stronger: one each time this exercise's day comes
+    round again, but at most one every 2 weeks. Losing weight: one per new 4-week block. Feeling good: none. Either
+    way, never more than MAX_STEPS_PAST_ANCHOR past the anchor: logging a weight resets the anchor and the climb."""
     if week <= anchor_week:
         return 0
+    steps = 0
     if goal == "stronger":
-        return sum(1 for w in range(anchor_week + 1, week + 1) if variant_of(w, block_weeks) in appears_in)
-    if goal == "lose_weight":
-        return (week - 1) // LOSE_WEIGHT_STEP_WEEKS - (anchor_week - 1) // LOSE_WEIGHT_STEP_WEEKS
-    return 0
+        last = anchor_week
+        for w in range(anchor_week + 1, week + 1):
+            if variant_of(w, block_weeks) in appears_in and w - last >= MIN_WEEKS_BETWEEN_STEPS:
+                steps, last = steps + 1, w
+    elif goal == "lose_weight":
+        steps = (week - 1) // LOSE_WEIGHT_STEP_WEEKS - (anchor_week - 1) // LOSE_WEIGHT_STEP_WEEKS
+    return min(steps, MAX_STEPS_PAST_ANCHOR)
 
 
 def first_week(appears_in: set[int]) -> int:

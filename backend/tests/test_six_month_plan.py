@@ -3,8 +3,8 @@
 The plan is stored as its repeating pattern plus the day it started; calendar days are laid out the first time
 they're viewed. These tests walk the whole 6 months through the real calendar API and check: every one of the 182
 days is there (no gaps, nothing before or after), every week has its 4 training days and none is empty, the
-rotation keeps cycling (not week 1 forever), the suggested weights climb by the goal's rule across all 26 weeks
-with no reset, today's workout comes from anywhere in the plan, and nothing is pre-expanded or oversized.
+rotation keeps cycling (not week 1 forever), the suggested weights follow the goal's rule with its cap (at most one
+increase every 2 weeks, at most 2 past the last logged weight) across all 26 weeks with no reset, today's workout comes from anywhere in the plan, and nothing is pre-expanded or oversized.
 
 Run from backend/:
     .venv\\Scripts\\python.exe -m pytest tests/test_six_month_plan.py -v
@@ -94,27 +94,29 @@ def climb(entries) -> dict[str, list[tuple[int, float]]]:
     return out
 
 
-def test_getting_stronger_climbs_every_time_a_day_comes_round_for_26_weeks(client, on_day):
+def test_getting_stronger_climbs_up_to_the_cap_and_holds_for_26_weeks(client, on_day):
     uid, h = account(client, "climb-stronger", **PROFILES["stronger"])
     loads = {x.exercise_id: x.load for w in gen.generate_for_user(uid).weeks for d in w.days for x in d.exercises}
     for ex_id, seen in climb(whole_plan(client, h)).items():
         by_week = dict(seen)                                         # twice in one week (Mon and Fri): same weight
         assert all(by_week[wk] == lb for wk, lb in seen), (ex_id, seen)
-        lbs = [by_week[wk] for wk in sorted(by_week)]
-        step = gen.WEIGHT_STEP_LB["stronger"][loads[ex_id]]
-        assert all(b - a == step for a, b in zip(lbs, lbs[1:])), (ex_id, seen)   # up each week it's on, no reset
-        assert lbs[0] == gen.DEFAULT_WEIGHT_LB["intermediate"][loads[ex_id]]
-        assert seen[-1][0] >= PLAN_WEEKS - 1                         # carried right to the end of the 6 months
+        weeks = sorted(by_week)
+        base, step = gen.DEFAULT_WEIGHT_LB["intermediate"][loads[ex_id]], gen.WEIGHT_STEP_LB["stronger"][loads[ex_id]]
+        assert by_week[weeks[0]] == base                             # starts at the default
+        rises = [b for a, b in zip(weeks, weeks[1:]) if by_week[b] != by_week[a]]
+        assert all(by_week[b] - by_week[a] in (0, step) for a, b in zip(weeks, weeks[1:])), (ex_id, seen)  # no drop
+        assert len(rises) == 2 and rises[1] - rises[0] >= 2          # two increases, at least 2 weeks apart
+        assert by_week[weeks[-1]] == base + 2 * step                 # then it holds to the end of the 6 months
+        assert weeks[-1] >= PLAN_WEEKS - 1
 
 
-def test_losing_weight_adds_5_lb_each_new_block_for_26_weeks(client, on_day):
+def test_losing_weight_adds_5_lb_each_new_block_up_to_the_cap(client, on_day):
     uid, h = account(client, "climb-lose", **PROFILES["lose_weight"])
     for ex_id, seen in climb(whole_plan(client, h)).items():
         first = seen[0][1]
         for week, lb in seen:
-            assert lb == first + 5 * ((week - 1) // 4), (ex_id, week, lb)   # weeks 25-26 are block 7: +30 lb
-        assert [b - a for a, b in zip([lb for _, lb in seen], [lb for _, lb in seen][1:])] == \
-            [5] * (len(seen) - 1) or all(b >= a for (_, a), (_, b) in zip(seen, seen[1:]))   # never goes down
+            assert lb == first + 5 * min(2, (week - 1) // 4), (ex_id, week, lb)   # +5 at weeks 5 and 9, then holds
+        assert all(b >= a for (_, a), (_, b) in zip(seen, seen[1:]))   # never goes down
 
 
 def test_feeling_good_stays_where_it_starts_for_26_weeks(client, on_day):
@@ -140,7 +142,8 @@ def test_a_logged_weight_in_month_4_carries_forward_without_a_reset(client, on_d
                 if x.exercise_id == ex_id)
     step = gen.WEIGHT_STEP_LB["stronger"][load]
     assert after and after[0][1] == 12.0 + step                      # builds on the logged 12 lb, not the default
-    assert all(b - a == step for (_, a), (_, b) in zip(after, after[1:]))
+    assert all(b - a in (0, step) for (_, a), (_, b) in zip(after, after[1:]))   # no reset, no drop
+    assert after[-1][1] == 12.0 + 2 * step                           # the cap counts from the new anchor
 
 
 def test_todays_workout_comes_from_anywhere_in_the_six_months(client, on_day):

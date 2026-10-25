@@ -29,7 +29,7 @@ const STEPS = [
   },
   {
     title: 'Weights start as suggestions and build on what you log',
-    text: 'Beginners start with bodyweight only; otherwise we suggest 10 lb (arms) and 20 lb (legs), or 20 and 40 if you’re very experienced. Week 1 is a calibration week: log what you actually did, and later suggestions build on it. Getting stronger adds a little each time a day comes back round; losing weight adds 5 lb every 4 weeks; feeling good leaves your weights where you set them. You can always change any weight.',
+    text: 'Beginners start with bodyweight only; otherwise we suggest 10 lb (arms) and 20 lb (legs), or 20 and 40 if you’re very experienced. Week 1 is a calibration week: log what you actually did, and later suggestions build on it. Getting stronger adds a little each time a day comes back round (at most once every 2 weeks); losing weight adds 5 lb every 4 weeks; feeling good leaves your weights where you set them. Suggestions go at most 2 increases past the last weight you logged, then wait for you to log again, so they keep pace with what you actually lift. You can always change any weight.',
   },
 ]
 

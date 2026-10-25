@@ -79,7 +79,8 @@ function WeightTable({ plan }: { plan: WeeklyProgram }) {
         {w.defaults_lb
           ? `Starting suggestions for your level: ${w.defaults_lb.arms} lb for arm exercises, ${w.defaults_lb.legs} lb for leg exercises.`
           : 'At your level we start with bodyweight only, so pick your own weights; once you log one, the suggestions build on it.'}{' '}
-        Every weight is a suggestion you can change.
+        These numbers assume nothing is logged yet, so they stop 2 increases up; log what you lift and the
+        suggestions keep climbing from there. Every weight is a suggestion you can change.
       </p>
     </section>
   )

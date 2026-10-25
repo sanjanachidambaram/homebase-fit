@@ -260,11 +260,20 @@ no promises ("you will lose..."). Tests: `tests/test_workout_review.py`.
   suggestion builds on the latest weight logged for that exercise (the anchor); with nothing logged, on the default.
 - **How weights go up**, applied automatically from the anchor, unless the person logs a different weight (that becomes
   the new anchor, i.e. a manual override):
-  - Getting stronger: up each time that exercise's day comes round again (every 2 weeks per exercise, so the plan
-    gets heavier every week): +2.5 lb for arm exercises, +5 lb for leg exercises (decided with the project owner).
+  - Getting stronger: up each time that exercise's day comes round again (at most once every 2 weeks per exercise,
+    and within the cap below): +2.5 lb for arm exercises, +5 lb for leg exercises (decided with the project owner).
     Reps are the person's own call ("to failure" is their judgment during the set, not something the app computes).
   - Losing weight: +5 lb every 4 weeks, when the 4-week block starts again (weeks 5-8 are weeks 1-4, 5 lb heavier).
   - Just feeling good: no automatic increase; weights stay wherever the person sets them.
+- **The cap (decided 2026-10-25 with the project owner, for the 6-month plan; option A of three proposed).** Without
+  it, 26 weeks of "Getting stronger" took arms from 10 to 40 lb, and an exercise on both weeks of the pattern from 10
+  to about 72 lb. Now: (1) at most one increase every 2 weeks per exercise (`MIN_WEEKS_BETWEEN_STEPS`); (2) at most 2
+  increases past the anchor, the last weight the person logged or the default if nothing's logged
+  (`MAX_STEPS_PAST_ANCHOR`). Suggestions then hold until they log again, so they keep pace with what was actually
+  lifted: with nothing logged, intermediate arms go 10 -> 12.5 -> 15 and hold; log 15 and they go 17.5 -> 20. Losing
+  weight: 10 -> 15 -> 20 (weeks 5 and 9), then hold. Both in `weight_steps`, so the calendar and the Plan page's table
+  follow the same rule. Tests: `test_getting_stronger_adds_weight_each_time_a_day_comes_round_up_to_the_cap`,
+  `test_logging_a_weight_restarts_the_climb_past_the_cap`, and the 26-week climbs in `tests/test_six_month_plan.py`.
 - **DECISION (2026-10-25, project owner): the goal's rule applies to everyone, including people with an injury
   flag.** This reverses the 2026-10-23 rule that held injured / rehab profiles flat. Reasoning: there's no rehab goal
   any more; the injury filter alone still decides which exercises they get (unchanged, rule 4), every weight is only a

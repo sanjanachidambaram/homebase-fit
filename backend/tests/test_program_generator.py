@@ -240,19 +240,20 @@ def test_bodyweight_moves_never_get_a_weight(test_db):
             assert x.default_weight_lb is None and x.load is None
 
 
-def test_getting_stronger_adds_weight_each_time_a_day_comes_round():
+def test_getting_stronger_adds_weight_each_time_a_day_comes_round_up_to_the_cap():
     # an exercise on odd weeks (variant 0): weeks 1, 3, 5... From a 10 lb start in week 1:
-    steps = [weight_steps("stronger", 2, {0}, 1, w) for w in (1, 3, 5, 7)]
-    assert steps == [0, 1, 2, 3]
-    assert [suggested_weight("stronger", "arms", 10, s) for s in steps] == [10, 12.5, 15, 17.5]   # +2.5 lb arms
-    assert [suggested_weight("stronger", "legs", 20, s) for s in steps] == [20, 25, 30, 35]       # +5 lb legs
-    assert weight_steps("stronger", 2, {0, 1}, 1, 4) == 3                       # on both patterns: every week
+    steps = [weight_steps("stronger", 2, {0}, 1, w) for w in (1, 3, 5, 7, 25)]
+    assert steps == [0, 1, 2, 2, 2]                                             # at most 2 steps past the anchor
+    assert [suggested_weight("stronger", "arms", 10, s) for s in steps] == [10, 12.5, 15, 15, 15]   # +2.5 lb arms
+    assert [suggested_weight("stronger", "legs", 20, s) for s in steps] == [20, 25, 30, 30, 30]     # +5 lb legs
+    # on both weeks of the pattern: still at most one increase every 2 weeks (weeks 3 and 5, not 2, 3, 4, 5)
+    assert [weight_steps("stronger", 2, {0, 1}, 1, w) for w in (2, 3, 4, 5)] == [0, 1, 1, 2]
 
 
 def test_losing_weight_adds_5_lb_every_4_weeks():
     weights = [suggested_weight("lose_weight", "arms", 10, weight_steps("lose_weight", 4, {0}, 1, w))
-               for w in (1, 4, 5, 8, 9, 12, 13)]
-    assert weights == [10, 10, 15, 15, 20, 20, 25]                              # weeks 5-8 repeat 1-4, 5 lb heavier
+               for w in (1, 4, 5, 8, 9, 12, 13, 25)]
+    assert weights == [10, 10, 15, 15, 20, 20, 20, 20]                          # +5 at weeks 5 and 9, then the cap
 
 
 def test_feeling_good_never_raises_a_weight():
@@ -266,12 +267,22 @@ def test_weights_build_on_a_logged_anchor_not_just_the_default():
     assert suggested_weight("stronger", "arms", None, 5) is None                # no anchor (beginner, nothing logged)
 
 
+def test_logging_a_weight_restarts_the_climb_past_the_cap():
+    """The cap is "2 steps past the LAST LOGGED weight": logging what you lifted lets the suggestions climb again."""
+    held = [suggested_weight("stronger", "arms", 10, weight_steps("stronger", 2, {0}, 1, w)) for w in (5, 9, 13)]
+    assert held == [15, 15, 15]                                                 # nothing logged: holds at 15
+    logged_15_in_week_9 = [suggested_weight("stronger", "arms", 15, weight_steps("stronger", 2, {0}, 9, w))
+                           for w in (9, 11, 13, 15)]
+    assert logged_15_in_week_9 == [15, 17.5, 20, 20]
+    assert gen.MAX_STEPS_PAST_ANCHOR == 2 and gen.MIN_WEEKS_BETWEEN_STEPS == 2
+
+
 def test_the_plan_shows_the_weight_schedule(test_db):
     plan = generate(profile("lose_weight", "intermediate", HOME))
     w = plan.weights
     assert w.schedule_weeks == 26 and w.defaults_lb == {"arms": 10, "legs": 20} and "5 lb every 4 weeks" in w.rule
-    for row in w.schedule:                                     # the whole 6 months: +5 lb each time the 4 weeks restart
-        assert row.weight_lb == [row.weight_lb[0] + 5 * ((wk - 1) // 4) for wk in row.weeks], row.name
+    for row in w.schedule:         # the whole 6 months: +5 lb when the 4 weeks restart, up to 2 steps (no logs yet)
+        assert row.weight_lb == [row.weight_lb[0] + 5 * min(2, (wk - 1) // 4) for wk in row.weeks], row.name
 
 
 # ================================================================ 5. safety: unchanged, on top of every goal
