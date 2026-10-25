@@ -1,5 +1,5 @@
-// The logo goes home (the Dashboard when signed in, the landing page when signed out), and the Dashboard no longer
-// repeats Build Your Own (it has its own page in the nav).
+// The logo goes home (the Dashboard when signed in, the landing page when signed out), and the Dashboard shows only
+// the plan for today and the streak.
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -23,7 +23,7 @@ describe('the logo', () => {
     expect(await screen.findByRole('button', { name: 'Create my free account' })).toBeTruthy()
   })
 
-  it('goes to the Dashboard when signed in, without the Build Your Own section', async () => {
+  it('goes to the Dashboard when signed in, which shows only the plan for today and the streak', async () => {
     window.localStorage.setItem('homebase.session', JSON.stringify({ userId: 1, token: 't', username: 'sarah_k' }))
     mockFetch({ '/api/users/1': { id: 1, username: 'sarah_k', first_name: 'Sarah', created_at: '', quiz_profile: null } })
     window.history.replaceState({}, '', '/settings')
@@ -31,8 +31,11 @@ describe('the logo', () => {
     fireEvent.click(logo())
     await waitFor(() => expect(window.location.pathname).toBe('/'))
     expect(await screen.findByRole('heading', { level: 2, name: 'Hi Sarah' })).toBeTruthy()
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Ask Workout Basics' })).toBeTruthy())
-    expect(screen.queryByRole('heading', { name: /build your own workout/i })).toBeNull()
+    const cards = await screen.findAllByRole('heading', { level: 3 })
+    expect(cards.map((h) => h.textContent)).toEqual(['Plan for today', 'Your streak'])
+    for (const gone of [/build your own workout/i, /Ask Workout Basics/, /Your coach/, /Recommended for you/]) {
+      expect(screen.queryByRole('heading', { name: gone })).toBeNull()
+    }
     expect(screen.getByRole('link', { name: 'Build Your Own' }).getAttribute('href')).toBe('/build')   // still in the nav
   })
 

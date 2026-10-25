@@ -395,6 +395,14 @@ def calendar_progress(week_start: date | None = Query(None, description="Monday 
     return build(uid, start, today())
 
 
+@router.get("/progress/streak")
+def streak(uid: int = Depends(signed_in)) -> dict:
+    """The Dashboard's streak card: current and longest streak, active days in the last 30, milestone badges.
+    Code only (app/mcp_server/progress.py: streak_stats, the same streak the Coach's tools compute), no AI."""
+    from app.mcp_server.progress import streak_stats
+    return streak_stats(uid, today())
+
+
 # ---------------------------------------------------------------- calories on done days (code only)
 
 def _weight(conn: sqlite3.Connection, uid: int) -> float | None:

@@ -58,7 +58,7 @@ def test_media_type_is_stored_for_every_exercise_with_a_path():
 
 def test_detail_404_and_list_uses_the_same_shape(client):
     assert client.get("/api/exercises/not_a_real_exercise").status_code == 404
-    items = client.get("/api/exercises?muscle_group=chest").json()
+    items = client.get("/api/exercises?group=upper").json()
     assert items and all("media_type" in i and "source" in i and "citations" in i for i in items)
 
 

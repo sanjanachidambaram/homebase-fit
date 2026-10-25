@@ -5,15 +5,6 @@ import type { Exercise, InjuryRationale } from './api'
 
 export const words = (values: string[]) => values.map((v) => v.replace(/_/g, ' ')).join(', ')
 
-export type InjuryStatus = Exercise['contraindication_status']
-
-/** Filter options for GET /api/exercises?injury_status= */
-export const INJURY_STATUS_OPTIONS: { value: InjuryStatus; label: string }[] = [
-  { value: 'untagged', label: 'No cautions drafted (not checked)' },
-  { value: 'draft', label: 'Cautions drafted, not PT-reviewed' },
-  { value: 'pt_reviewed', label: 'PT-reviewed' },
-]
-
 /** One line per exercise, as shown on library cards and in the detail view. */
 export function injuryStatusLabel(ex: Pick<Exercise, 'contraindication_status' | 'injury_contraindications'>): string {
   const tags = ex.injury_contraindications

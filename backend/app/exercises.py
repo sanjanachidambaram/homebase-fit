@@ -1,12 +1,19 @@
 """Exercise library and favorites.
 
 Routes:
-  GET    /api/exercises?muscle_group=&source=&equipment=&difficulty=&injury_status=
-                                                the library (full detail for each exercise). equipment,
-                                                difficulty and injury_status can repeat (?difficulty=beginner
-                                                &difficulty=intermediate); values within one filter are ORed,
-                                                different filters are ANDed. equipment matches exercises that
-                                                USE any of the chosen items (none = bodyweight).
+  GET    /api/exercises?group=&avoid=&equipment=&source=
+                                                the library (full detail for each exercise), filtered like the
+                                                quiz reads: a workout group to focus on (upper | lower |
+                                                mobility_core, the plans' own groups) and body areas to avoid
+                                                because of an injury (the quiz's injury flags; can repeat). avoid
+                                                runs through the SAME safety search as the plan generator
+                                                (app.mcp_server.search.search_all_exercises with checked_only):
+                                                exercises tagged risky for any of those areas are left out, and so
+                                                is every untagged exercise, because untagged is never assumed safe.
+                                                equipment (can repeat) matches exercises that USE any of the chosen
+                                                items (none = bodyweight). Different filters are ANDed. The old
+                                                muscle_group, difficulty and injury_status filters were removed
+                                                2026-10-25.
   GET    /api/exercises/equipment              every equipment value used by any exercise (live, from the data);
                                                 what Build Your Own and the library filter offer, so the pickers
                                                 can never drift from the exercises themselves
@@ -25,21 +32,23 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.content import media_url, review_info
+from app.mcp_server.search import InjuryFlag, search_all_exercises
+from app.safety_rules import checked_only_for
 from app.security import token_user_id
+from app.services.workout_review import workout_groups
 from app.users import db
 
 router = APIRouter(prefix="/api")
 
-MuscleGroup = Literal["legs", "arms", "chest", "shoulders", "back", "core", "full_body"]
+# The library's focus filter: the groups the generated plans are built from (cardio days prescribe no exercise).
+# Each exercise's group comes from app.services.workout_review.workout_groups, the Workout Reviewer's sorting.
+WorkoutGroup = Literal["upper", "lower", "mobility_core"]
 # Friendlier names for a few equipment values; any other value is shown as itself ("dumbbells" -> "Dumbbells").
 EQUIPMENT_LABELS = {
     "none": "Bodyweight", "resistance_band": "Resistance band", "ez_curl_bar": "EZ curl bar",
     "exercise_ball": "Exercise ball", "medicine_ball": "Medicine ball", "foam_roller": "Foam roller",
     "kettlebells": "Kettlebell", "chair": "Sturdy chair", "other": "Other equipment",
 }
-Difficulty = Literal["beginner", "intermediate", "advanced"]
-# untagged = nobody has checked it; draft = cautions drafted, not PT-reviewed; pt_reviewed = confirmed by a PT
-InjuryStatus = Literal["untagged", "draft", "pt_reviewed"]
 
 # One query shape for every exercise response; the source registry entry comes along for the credit line.
 SELECT_EXERCISE = """
@@ -59,6 +68,8 @@ def exercise_dict(r: sqlite3.Row) -> dict:
         "difficulty": r["difficulty"],
         "force": r["force"],   # push | pull | static | None (no single direction)
         "category": r["category"],
+        # which of the plans' groups it counts toward: cardio | upper | lower | mobility_core
+        "workout_groups": list(workout_groups(dict(r))),
         "primary_muscles": json.loads(r["primary_muscles"]),
         "secondary_muscles": json.loads(r["secondary_muscles"]),
         "injury_contraindications": json.loads(r["injury_contraindications"]),
@@ -79,18 +90,14 @@ def exercise_dict(r: sqlite3.Row) -> dict:
 
 @router.get("/exercises")
 def list_exercises(
-    muscle_group: MuscleGroup | None = None,
+    group: WorkoutGroup | None = Query(None, description="upper | lower | mobility_core"),
+    avoid: list[InjuryFlag] = Query([], description="body areas to avoid because of an injury (quiz flags)"),
     source: str | None = Query(None, description="source_dataset id, e.g. free-exercise-db"),
     equipment: list[str] = Query([], description="exercises that use any of these (none = bodyweight); "
                                                  "valid values: GET /api/exercises/equipment"),
-    difficulty: list[Difficulty] = Query([]),
-    injury_status: list[InjuryStatus] = Query([], description="untagged | draft | pt_reviewed"),
     conn: sqlite3.Connection = Depends(db),
 ) -> list[dict]:
     sql, args = SELECT_EXERCISE + " WHERE 1 = 1", []
-    if muscle_group:
-        sql += " AND e.muscle_group = ?"
-        args.append(muscle_group)
     if source:
         sql += " AND e.source_dataset = ?"
         args.append(source)
@@ -102,14 +109,18 @@ def list_exercises(
         sql += (" AND EXISTS (SELECT 1 FROM json_each(e.equipment_needed) n"
                 " WHERE n.value IN (SELECT value FROM json_each(?)))")
         args.append(json.dumps(sorted(set(equipment))))
-    if difficulty:
-        sql += " AND e.difficulty IN (SELECT value FROM json_each(?))"
-        args.append(json.dumps(sorted(set(difficulty))))
-    if injury_status:
-        sql += " AND e.contraindication_status IN (SELECT value FROM json_each(?))"
-        args.append(json.dumps(sorted(set(injury_status))))
     sql += " ORDER BY e.source_dataset = 'free-exercise-db', e.name"
-    return [exercise_dict(r) for r in conn.execute(sql, args).fetchall()]
+    items = [exercise_dict(r) for r in conn.execute(sql, args).fetchall()]
+    if avoid:
+        # Not a second, library-only check: the exact search the plan generator and the MCP tool use, with
+        # checked_only forced on for any flag (safety_rules.checked_only_for), so untagged exercises drop out too.
+        flags = sorted(set(avoid))
+        safe = {e["id"] for e in search_all_exercises(injury_flags=flags,
+                                                      checked_only=checked_only_for(flags))["exercises"]}
+        items = [e for e in items if e["id"] in safe]
+    if group:
+        items = [e for e in items if group in e["workout_groups"]]
+    return items
 
 
 def equipment_values(conn: sqlite3.Connection) -> list[str]:

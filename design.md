@@ -166,10 +166,10 @@ Examples:
 | Page | Personality |
 |---|---|
 | Quiz | One question per screen, big tappable answer cards with emoji-style SVG icons, springy progress bar. The consent step is calm and clear (rule 1) |
-| Dashboard | A warm greeting (no name needed; we don't collect one), today's workout as one big orange card, streak star, a fun strength fact |
+| Dashboard | A greeting, then exactly two cards (2026-10-25): "Plan for today" (today's day from the calendar) and "Your streak" (current and longest streak, active days, day-streak badges). Code only, no AI |
 | Programs | Cards with a colored goal ribbon, weekly strip of rounded day circles |
 | Workout Basics hub | Honey-tinted article cards with a friendly icon; review tag visible |
-| Exercise library + faves | Candy-colored cards per muscle group, hearts, bottom-sheet detail |
+| Exercise library + faves | Candy-colored cards per muscle group, hearts, bottom-sheet detail. Filters read like the quiz (its own question component): what to work on (upper body, lower body, core / mobility) and areas to avoid because of an injury |
 | Calendar | Rounded day cells, green check for done days, yellow star for goal days |
 | Progress | Rings and thick bars, the "3 full-size trees" style fun stats, confetti on milestones |
 | Settings / Legal | Same look, plainest copy (rule 1). The delete button stays clearly labeled in the error red |

@@ -1,38 +1,60 @@
+// The Exercise Library. Its filters read like the onboarding quiz (and use the quiz's own question component):
+// "What do you want to work on?" (the plans' groups: upper body, lower body, core / mobility) and "Any areas to
+// avoid because of an injury?" (the quiz's injury list). The API does the filtering; avoiding an area runs through
+// the same safety search as the plan generator, so exercises tagged risky for it, and every unchecked exercise, are
+// left out. The faves tab shows only faves that are in that same filtered result, never a second, local check.
 import { useCallback, useEffect, useState } from 'react'
 import {
   fetchExercises,
+  fetchQuizQuestions,
   MUSCLE_GROUP_LABELS,
-  type Exercise,
+  WORKOUT_GROUP_LABELS,
   type ExerciseFilters,
-  type MuscleGroup,
+  type QuizQuestion,
+  type Exercise,
 } from '../api'
 import DemoMedia from '../components/DemoMedia'
 import ExerciseDetail from '../components/ExerciseDetail'
 import FavoriteButton from '../components/FavoriteButton'
 import Link from '../components/Link'
+import QuestionField from '../components/QuestionField'
 import { useEquipmentOptions } from '../equipment'
 import { useFavorites, type Favorites } from '../favorites'
-import { INJURY_STATUS_OPTIONS, injuryStatusLabel } from '../injurySafety'
+import { injuryStatusLabel } from '../injurySafety'
 
 function label(value: string): string {
   return value.replace(/_/g, ' ')
 }
 
-const LEVEL_OPTIONS: { value: Exercise['difficulty']; label: string }[] = [
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'intermediate', label: 'Intermediate' },
-  { value: 'advanced', label: 'Advanced' },
-]
-const NO_FILTERS: ExerciseFilters = { muscleGroup: '', equipment: [], difficulty: [], injuryStatus: [] }
+const NO_FILTERS: ExerciseFilters = { group: '', avoid: [], equipment: [] }
 
-/** Same rules as the API, for the (small, already-loaded) faves list. */
-function matches(ex: Exercise, f: ExerciseFilters): boolean {
-  return (
-    (!f.muscleGroup || ex.muscle_group === f.muscleGroup) &&
-    (!f.equipment.length || ex.equipment_needed.some((e) => f.equipment.includes(e))) &&
-    (!f.difficulty.length || f.difficulty.includes(ex.difficulty)) &&
-    (!f.injuryStatus.length || f.injuryStatus.includes(ex.contraindication_status))
-  )
+const FOCUS_QUESTION: QuizQuestion = {
+  id: 'library_focus',
+  prompt: 'What do you want to work on?',
+  type: 'single_select',
+  required: false,
+  options: [
+    { value: 'all', label: 'Everything' },
+    { value: 'upper', label: 'Upper body', description: 'Chest, back, shoulders and arms' },
+    { value: 'lower', label: 'Lower body', description: 'Legs and glutes' },
+    { value: 'mobility_core', label: 'Core / mobility', description: 'Core work, stretches and mobility' },
+  ],
+}
+
+/** The quiz's own injury question, reworded for the library (same areas, same labels; "None" isn't a choice). */
+function avoidQuestion(questions: QuizQuestion[]): QuizQuestion | null {
+  const injuries = questions.find((q) => q.id === 'injuries')
+  if (!injuries) return null
+  return {
+    id: 'library_avoid',
+    prompt: 'Any areas to avoid because of an injury?',
+    help_text:
+      'We leave out every exercise tagged as risky for those areas, and every exercise nobody has checked for ' +
+      'injuries yet: unchecked never means safe. The tags are drafts a physical therapist hasn’t reviewed.',
+    type: 'multi_select',
+    required: false,
+    options: injuries.options.filter((o) => o.value !== injuries.exclusive),
+  }
 }
 
 function ChipFilter<T extends string>({
@@ -80,7 +102,8 @@ function ExerciseCard({ ex, favorites, onOpen }: { ex: Exercise; favorites: Favo
           </button>
         </h3>
         <p>
-          <strong>Muscle group:</strong> {MUSCLE_GROUP_LABELS[ex.muscle_group]}
+          <strong>Works:</strong>{' '}
+          {ex.workout_groups.map((g) => WORKOUT_GROUP_LABELS[g]).join(' and ')} ({MUSCLE_GROUP_LABELS[ex.muscle_group]})
         </p>
         <p>
           <strong>Equipment:</strong> {ex.equipment_needed.map(label).join(', ')}
@@ -116,6 +139,13 @@ export default function ExercisesPage({ initialTab = 'all' }: { initialTab?: 'al
   const [error, setError] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const closeDetail = useCallback(() => setOpenId(null), [])
+  const [avoidQ, setAvoidQ] = useState<QuizQuestion | null>(null)
+
+  useEffect(() => {
+    fetchQuizQuestions()
+      .then((qs) => setAvoidQ(avoidQuestion(qs)))
+      .catch(() => setAvoidQ(null))
+  }, [])
 
   // The API does the filtering (real query params), so we never download and sift the whole library.
   useEffect(() => {
@@ -139,9 +169,10 @@ export default function ExercisesPage({ initialTab = 'all' }: { initialTab?: 'al
     setFilters((f) => ({ ...f, ...change }))
   }
 
-  const filtering =
-    !!filters.muscleGroup || !!filters.equipment.length || !!filters.difficulty.length || !!filters.injuryStatus.length
-  const shown = tab === 'all' ? exercises : favorites.favorites.filter((f) => matches(f, filters))
+  const filtering = !!filters.group || !!filters.avoid.length || !!filters.equipment.length
+  // Faves: only the ones in the API's filtered result (one implementation of the filters, incl. the injury one).
+  const allowed = new Set(exercises.map((e) => e.id))
+  const shown = tab === 'all' ? exercises : favorites.favorites.filter((f) => !filtering || allowed.has(f.id))
 
   const perSource = shown.reduce<Record<string, number>>((acc, ex) => {
     acc[ex.source_dataset] = (acc[ex.source_dataset] ?? 0) + 1
@@ -161,49 +192,26 @@ export default function ExercisesPage({ initialTab = 'all' }: { initialTab?: 'al
         </button>
       </div>
 
-      <div className="filters">
-        <div className="controls">
-          <label htmlFor="group">Muscle group</label>
-          <select
-            id="group"
-            value={filters.muscleGroup}
-            onChange={(e) => update({ muscleGroup: e.target.value as MuscleGroup | '' })}
-          >
-            <option value="">All</option>
-            {Object.entries(MUSCLE_GROUP_LABELS).map(([value, text]) => (
-              <option key={value} value={value}>
-                {text}
-              </option>
-            ))}
-          </select>
-          {filtering && (
-            <button type="button" className="btn-ghost" onClick={() => update(NO_FILTERS)}>
-              Clear filters
-            </button>
-          )}
-        </div>
+      <div className="filters library-questions">
+        <QuestionField
+          q={FOCUS_QUESTION}
+          value={filters.group || 'all'}
+          onChange={(v) => update({ group: v === 'all' ? '' : (v as ExerciseFilters['group']) })}
+        />
+        {avoidQ && (
+          <QuestionField q={avoidQ} value={filters.avoid} onChange={(v) => update({ avoid: v as string[] })} />
+        )}
         <ChipFilter
           legend="Equipment it uses"
           options={(equipmentOptions ?? []).map((o) => ({ value: o.value, label: o.label }))}
           selected={filters.equipment}
           onChange={(equipment) => update({ equipment })}
         />
-        <ChipFilter
-          legend="Level"
-          options={LEVEL_OPTIONS}
-          selected={filters.difficulty}
-          onChange={(difficulty) => update({ difficulty })}
-        />
-        <ChipFilter
-          legend="Injury safety"
-          options={INJURY_STATUS_OPTIONS}
-          selected={filters.injuryStatus}
-          onChange={(injuryStatus) => update({ injuryStatus })}
-        />
-        <p className="hint">
-          Injury cautions are drafts that a physical therapist hasn't reviewed yet, and "not checked" means nobody has
-          looked, not that an exercise is safe.
-        </p>
+        {filtering && (
+          <button type="button" className="btn-ghost" onClick={() => update(NO_FILTERS)}>
+            Clear filters
+          </button>
+        )}
         <span className="count" aria-live="polite">
           {tab === 'all' && loading
             ? 'Loading…'
@@ -230,13 +238,7 @@ export default function ExercisesPage({ initialTab = 'all' }: { initialTab?: 'al
         <p>No faves yet. Tap the heart on any exercise to save it here.</p>
       )}
       {!loading && !error && shown.length === 0 && filtering && (tab === 'all' || favorites.favorites.length > 0) && (
-        <p>
-          No exercises match these filters
-          {filters.injuryStatus.length === 1 && filters.injuryStatus[0] === 'pt_reviewed'
-            ? ' (no exercise has been PT-reviewed yet)'
-            : ''}
-          .
-        </p>
+        <p>No exercises match these filters.</p>
       )}
 
       <section className="grid">

@@ -98,32 +98,21 @@ def test_equipment_filter_matches_what_an_exercise_uses(client):
     assert all({"resistance_band", "mat"} & set(e["equipment_needed"]) for e in both)
 
 
-def test_level_and_injury_status_filters(client):
-    beginners = library(client, difficulty="beginner")
-    assert beginners and {e["difficulty"] for e in beginners} == {"beginner"}
-    two = library(client, difficulty=["beginner", "advanced"])
-    assert {e["difficulty"] for e in two} == {"beginner", "advanced"}
-
-    drafted = library(client, injury_status="draft")
-    assert {e["contraindication_status"] for e in drafted} == {"draft"} and len(drafted) == 903
-    untagged = library(client, injury_status="untagged")
-    assert untagged == []                                               # every exercise has drafted data now
-    assert len(drafted) + len(untagged) == len(library(client))
-    assert library(client, injury_status="pt_reviewed") == []          # nobody has reviewed anything yet
-
-
 def test_filters_combine(client):
-    got = library(client, muscle_group="legs", equipment="none", difficulty="beginner", injury_status="draft")
-    assert {"bodyweight_squat", "reverse_lunge", "wall_sit"} <= {e["id"] for e in got}
-    assert got and all(e["muscle_group"] == "legs" and e["equipment_needed"] == ["none"] and e["difficulty"] == "beginner"
-                       and e["contraindication_status"] == "draft" for e in got)
-    from tests.test_agents import rows
-    want = rows("SELECT id FROM exercises WHERE muscle_group = 'legs' AND equipment_needed = '[\"none\"]' "
-                "AND difficulty = 'beginner' AND contraindication_status = 'draft'")
-    assert {e["id"] for e in got} == {r["id"] for r in want}           # exactly what all four filters together allow
+    got = library(client, group="lower", equipment="none", avoid="knee")
+    assert got and all("lower" in e["workout_groups"] and "none" in e["equipment_needed"]
+                       and "knee" not in e["injury_contraindications"] and e["contraindication_status"] != "untagged"
+                       for e in got)
+    want = ids_of(library(client, group="lower")) & ids_of(library(client, equipment="none"))
+    want &= ids_of(library(client, avoid="knee"))
+    assert ids_of(got) == want                                         # exactly what all three filters together allow
 
 
-@pytest.mark.parametrize("params", [{"equipment": "jetpack"}, {"difficulty": "expert"}, {"injury_status": "safe"}])
+def ids_of(items) -> set[str]:
+    return {e["id"] for e in items}
+
+
+@pytest.mark.parametrize("params", [{"equipment": "jetpack"}, {"group": "chest"}, {"avoid": "elbow"}])
 def test_unknown_filter_values_are_rejected(client, params):
     assert client.get("/api/exercises", params=params).status_code == 422
 

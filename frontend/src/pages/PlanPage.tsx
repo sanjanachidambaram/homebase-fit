@@ -1,8 +1,10 @@
-// "Your Personalized Plan": your generated weekly plan (GET /api/plan, built by code, no AI). The Workout Basics
+// "Your Personalized Plan": how your plan works (the general approach, plus the Program Architect's explanation on
+// request) at the top, then your generated weekly plan (GET /api/plan, built by code, no AI). The Workout Basics
 // articles used to share this page; they have their own page now (BasicsPage, /basics).
 import { useEffect, useState } from 'react'
 import { fetchPlan, type WeeklyProgram } from '../api'
 import Link from '../components/Link'
+import PlanApproach from '../components/PlanApproach'
 import WeeklyPlanView from '../components/WeeklyPlanView'
 import { useSession, type Session } from '../session'
 
@@ -29,12 +31,13 @@ function YourPlan({ session }: { session: Session }) {
   }
   if (!plan) return <p className="hint">Loading your plan…</p>
   return (
-    <div className="dash-card">
-      <WeeklyPlanView plan={plan} />
-      <p>
-        <Link to="/how-we-build">See how we built this</Link>
-      </p>
-    </div>
+    <>
+      {/* Not for pregnant / postpartum users: there's no plan to explain (the view below says why). */}
+      {plan.generated && <PlanApproach token={session.token} userId={session.userId} />}
+      <div className="dash-card">
+        <WeeklyPlanView plan={plan} />
+      </div>
+    </>
   )
 }
 

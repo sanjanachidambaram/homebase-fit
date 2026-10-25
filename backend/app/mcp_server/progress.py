@@ -52,6 +52,48 @@ def _current_streak(days: set[date], today: date) -> int:
     return streak
 
 
+STREAK_BADGES = (3, 7, 14, 30)     # day-streak milestones on the Dashboard; earned once your longest streak hits them
+
+
+def _longest_streak(days: set[date]) -> int:
+    best = 0
+    for d in days:
+        if d - timedelta(days=1) not in days:   # the first day of a run
+            n = 1
+            while d + timedelta(days=n) in days:
+                n += 1
+            best = max(best, n)
+    return best
+
+
+def streak_stats(user_id: int, today: date | None = None) -> dict:
+    """The Dashboard's streak card: the same streak as get_progress_summary (and the Coach), plus the longest streak
+    and milestone badges. Code only, no AI; not an MCP tool. Never reads notes or anything typed by the user."""
+    today = today or _today()
+    summary = get_progress_summary(user_id, today)
+    if not summary.get("found"):
+        return {"found": False}
+    conn = connect_readonly()
+    try:
+        days = {_parse(r[0]) for r in conn.execute(
+            "SELECT DISTINCT date FROM workout_logs WHERE user_id = ? AND date <= ?", (user_id, today.isoformat()))}
+    finally:
+        conn.close()
+    current, longest = summary["current_streak_days"], _longest_streak(days)
+    upcoming = next((m for m in STREAK_BADGES if m > current), None)
+    return {
+        "found": True,
+        "current_streak_days": current,
+        "longest_streak_days": longest,
+        "active_days_last_30": summary["sessions_logged"],
+        "last_workout_date": summary["last_workout_date"],
+        "rest_day_suggested": summary["rest_day_suggested"],
+        "badges": [{"days": m, "earned": longest >= m} for m in STREAK_BADGES],
+        "next_badge": {"days": upcoming, "to_go": upcoming - current} if upcoming else None,
+        "definition": summary["definitions"]["current_streak_days"],
+    }
+
+
 def get_progress_summary(user_id: int, today: date | None = None) -> dict:
     today = today or _today()
     start = today - timedelta(days=WINDOW_DAYS - 1)

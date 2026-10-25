@@ -1,11 +1,11 @@
-// Home page. Signed in: the dashboard that ties the agents together. Signed out: the landing page (WelcomePage).
+// Home page. Signed in: the Dashboard, which shows only two things (2026-10-25): the plan for today, then your
+// streak. Both are computed by code, no AI. The plan's explanation lives on the Personalized Plan page, Ask
+// Workout Basics on the Workout Basics page. Signed out: the landing page (WelcomePage).
 import { useEffect, useState } from 'react'
 import { fetchAccount, isSignInGone, type Account } from '../api'
 import ClinicalSupportCard from '../components/ClinicalSupport'
-import AskBasics from '../components/dashboard/AskBasics'
-import CoachCard from '../components/dashboard/CoachCard'
-import PlanCard from '../components/dashboard/PlanCard'
-import Link from '../components/Link'
+import StreakCard from '../components/dashboard/StreakCard'
+import TodayCard from '../components/dashboard/TodayCard'
 import { setSession, useSession, type Session } from '../session'
 import WelcomePage from './WelcomePage'
 
@@ -30,34 +30,21 @@ function Dashboard({ session }: { session: Session }) {
   // The first name is only for this greeting; it never leaves the app (no agent sees it). Accounts made before
   // names were asked for have none. Blank until the account loads, so "Hi there" doesn't flash before the name.
   const greeting = account?.first_name ? `Hi ${account.first_name}` : 'Hi there'
+  const ready = account || loadFailed
 
   return (
     <div className="dashboard">
-      <h2 className="page-title">{account || loadFailed ? greeting : ' '}</h2>
-      <p className="page-sub">Here's your day at a glance.</p>
-
-      {account && !account.quiz_profile && (
-        <section className="dash-card quiz-prompt">
-          <h3>Start with the 2-minute quiz</h3>
-          <p>Tell us your goals and any injuries, and we'll tailor programs and workouts to you.</p>
-          <Link to="/quiz" className="btn btn-big">
-            Take the quiz
-          </Link>
-        </section>
-      )}
-
-      {/* Pregnant / postpartum: no plan, no build-your-own, and no AI cards (all blocked server-side too). */}
-      {account?.quiz_profile?.needs_clinical_review ? (
-        <ClinicalSupportCard />
-      ) : (
-        (account || loadFailed) && (
-          // Build Your Own has its own page (nav), so it isn't repeated here.
-          <div className="dash-grid">
-            <CoachCard token={session.token} userId={session.userId} />
-            <PlanCard token={session.token} userId={session.userId} />
-            <AskBasics token={session.token} />
-          </div>
-        )
+      <h2 className="page-title">{ready ? greeting : ' '}</h2>
+      {ready && (
+        <div className="dash-stack">
+          {/* Pregnant / postpartum: no plan, so the support card stands in for today's plan (blocked server-side too). */}
+          {account?.quiz_profile?.needs_clinical_review ? (
+            <ClinicalSupportCard />
+          ) : (
+            <TodayCard token={session.token} />
+          )}
+          <StreakCard token={session.token} />
+        </div>
       )}
     </div>
   )

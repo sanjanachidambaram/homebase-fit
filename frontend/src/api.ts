@@ -39,6 +39,7 @@ export interface Exercise extends ReviewFields {
   equipment_needed: string[]
   difficulty: 'beginner' | 'intermediate' | 'advanced'
   category: string | null
+  workout_groups: WorkoutGroup[] // which of the plans' groups it counts toward (full-body lifts: upper and lower)
   primary_muscles: string[]
   secondary_muscles: string[]
   injury_contraindications: string[]
@@ -67,20 +68,20 @@ async function getJson<T>(path: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
-/** Library filters. Each list is "any of these"; different filters must all match. Done by the API, in SQL. */
+/** Library filters, read like the quiz: a workout group to focus on, and body areas to avoid because of an injury.
+ *  The API does all of it; `avoid` runs through the same safety search as the plan generator (tagged-risky and
+ *  untagged exercises both left out). Equipment is "any of these"; different filters must all match. */
 export interface ExerciseFilters {
-  muscleGroup: MuscleGroup | ''
+  group: Exclude<WorkoutGroup, 'cardio'> | ''
+  avoid: string[] // the quiz's injury flags (shoulder, knee, ...)
   equipment: string[] // exercises that USE any of these; 'none' = bodyweight
-  difficulty: Exercise['difficulty'][]
-  injuryStatus: Exercise['contraindication_status'][]
 }
 
 export function exerciseQuery(f: ExerciseFilters): string {
   const q = new URLSearchParams()
-  if (f.muscleGroup) q.set('muscle_group', f.muscleGroup)
+  if (f.group) q.set('group', f.group)
+  f.avoid.forEach((v) => q.append('avoid', v))
   f.equipment.forEach((v) => q.append('equipment', v))
-  f.difficulty.forEach((v) => q.append('difficulty', v))
-  f.injuryStatus.forEach((v) => q.append('injury_status', v))
   const s = q.toString()
   return s ? `?${s}` : ''
 }
@@ -584,6 +585,21 @@ export interface CalendarProgress {
 
 export const fetchCalendarProgress = (token: string, weekStart: string) =>
   request<CalendarProgress>(`/api/calendar/progress?week_start=${weekStart}`, {}, token)
+
+/** The Dashboard's streak card (GET /api/progress/streak). Code only, no AI. */
+export interface StreakStats {
+  found: boolean
+  current_streak_days: number
+  longest_streak_days: number
+  active_days_last_30: number
+  last_workout_date: string | null
+  rest_day_suggested: boolean
+  badges: { days: number; earned: boolean }[]
+  next_badge: { days: number; to_go: number } | null
+  definition: string
+}
+
+export const fetchStreak = (token: string) => request<StreakStats>('/api/progress/streak', {}, token)
 
 // ---------------------------------------------------------------- Workout Reviewer
 

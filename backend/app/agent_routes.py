@@ -6,7 +6,7 @@
   POST /api/calendar/{id}/custom Workout Builder, saved onto that calendar day (app/calendar.py has the rules)
   POST /api/workouts/review      Workout Reviewer: a Build Your Own session (the review itself is computed by code)
   POST /api/calendar/{id}/review Workout Reviewer: a custom calendar day
-  GET  /api/coach/summary        Coach (dashboard load)
+  GET  /api/coach/summary        Coach (no longer shown on the Dashboard since 2026-10-25; the route stays)
   POST /api/basics/ask           Workout Basics (red-flag pre-filter runs first)
 
 Security: the user is ALWAYS the one in the sign-in token (token_user_id). No route accepts a user_id

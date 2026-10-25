@@ -100,12 +100,17 @@ match the API returns a supportive message pointing to a doctor or physical ther
 and writes a `safety_events` row (`source = 'calendar_note'`, `action_taken = 'note_saved_pointed_to_professional'`).
 There is no AI call either way. Test: `test_red_flag_note_is_saved_logged_and_answered_without_ai`.
 
-## 4. Injury filtering (the plan generator and the Workout Builder)
+## 4. Injury filtering (the plan generator, the Workout Builder, and the Exercise Library)
 
 - Exercises tagged unsafe for the user's `injury_flags` (neck, shoulder, upper_back, lower_back, wrist, hip, knee,
   ankle) are removed by the SQL in `app/mcp_server/search.py: search_exercises`, which both the MCP tool and the
   plan generator use. The one list lives in `app/safety_rules.py: INJURY_FLAGS`; the quiz, the seed, the MCP tool
   and the PT's tagging template all follow it.
+- **The Exercise Library's "areas to avoid" filter (2026-10-25)** is the same check, not a weaker copy: `GET
+  /api/exercises?avoid=` calls `search_all_exercises` with `checked_only_for(flags)`, so anything tagged for those
+  areas AND every untagged exercise is left out, exactly as in a plan. The library's old level and injury-status
+  filters were removed; that changed nothing in this rule. Tests: `tests/test_library_filters.py` (including that
+  the generator and the MCP tool still exclude tagged and untagged exercises for every flag).
 - **Bulk AI drafting of the imported library (decided 2026-10-24).** Every free-exercise-db exercise got drafted
   cautions in a one-time content run (`app/db/draft_injury_tags.py`, gpt-6-luna, not a live agent), under exactly the
   same rules as the hand-authored drafts: tier `ai_drafted`, source "Pending review by a licensed physical

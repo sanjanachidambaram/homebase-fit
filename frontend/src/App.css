@@ -3280,3 +3280,121 @@ fieldset.question {
   height: auto;
   filter: drop-shadow(0 6px 14px rgba(255, 140, 26, 0.3));
 }
+
+/* Exercise Library filters: the quiz's own questions (QuestionField), laid out as rows of choices. */
+.library-questions .question {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.library-questions .question legend {
+  margin-bottom: 0.3rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+
+.library-questions .question .choice {
+  display: inline-flex;
+  min-height: 44px;
+  margin: 0.25rem 0.4rem 0.25rem 0;
+  padding: 0.35rem 0.85rem;
+}
+
+.library-questions .question-help {
+  display: block;
+  max-width: 48rem;
+  margin-bottom: 0.3rem;
+  font-weight: 400;
+}
+
+/* Dashboard (2026-10-25): just two cards, one above the other: the plan for today, then the streak. */
+.dash-stack {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 52rem;
+}
+
+.today-focus {
+  margin: 0.2rem 0 0.6rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+}
+
+.today-focus .hint {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+}
+
+.today-done {
+  color: var(--green-deep);
+}
+
+.today-list {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.today-list li {
+  display: grid;
+  padding: 0.5rem 0.8rem;
+  border-radius: var(--radius-input);
+  background: var(--honey-tint);
+}
+
+.streak-hero {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.streak-hero p {
+  display: grid;
+  margin: 0;
+}
+
+.streak-number {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.streak-unit {
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.streak-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0 0.4rem;
+  padding: 0;
+  list-style: none;
+}
+
+.streak-badges li {
+  padding: 0.3rem 0.85rem;
+  border-radius: var(--radius-pill);
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.badge-earned {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.badge-locked {
+  background: #fff;
+  border: 2px dashed var(--honey);
+  color: var(--ink-soft);
+}
+
+.plan-approach {
+  margin-bottom: 1.25rem;
+}

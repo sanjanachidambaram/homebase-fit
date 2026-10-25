@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import AccountForm from '../components/AccountForm'
 import { getSession } from '../session'
 import { mockFetch } from '../test-utils'
+import { localToday } from '../components/dashboard/TodayCard'
 import DashboardPage from './DashboardPage'
 
 // A pregnant user's dashboard shows only the support card, so no AI card fetches get in the way of this test.
@@ -35,6 +36,41 @@ describe('Dashboard greeting', () => {
     mockFetch({ '/api/users/1': account(null) })
     render(<DashboardPage />)
     expect(await screen.findByRole('heading', { level: 2, name: 'Hi there' })).toBeTruthy()
+  })
+})
+
+describe('Dashboard contents', () => {
+  it('shows only the plan for today and the streak, with no AI calls', async () => {
+    signIn()
+    const today = localToday()
+    const calls = mockFetch({
+      '/api/users/1': { ...account('Sarah'), quiz_profile: { needs_clinical_review: false } },
+      '/api/calendar': {
+        start: today, end: today, today, needs_quiz: false, needs_clinical_review: false, cardio: [],
+        calendar_mode: 'generated', needs_review: false,
+        entries: [{
+          id: 9, date: today, weekday: 'mon', day_type: 'workout', completed: false, notes: null, can_complete: true,
+          source: 'generated', can_override: true, planned: null, choice: 'plan', calories: null,
+          weights: { glute_bridge: { weighted: false } },
+          workout: { focus: 'Lower body', est_minutes: 22, exercises: [
+            { exercise_id: 'glute_bridge', name: 'Glute Bridge', muscle_group: 'legs', sets: '3', reps: '12-15' }] },
+        }],
+      },
+      '/api/progress/streak': {
+        found: true, current_streak_days: 4, longest_streak_days: 9, active_days_last_30: 12, last_workout_date: today,
+        rest_day_suggested: false, next_badge: { days: 7, to_go: 3 }, definition: 'x',
+        badges: [{ days: 3, earned: true }, { days: 7, earned: true }, { days: 14, earned: false }, { days: 30, earned: false }],
+      },
+    })
+    render(<DashboardPage />)
+    expect(await screen.findByText('Glute Bridge')).toBeTruthy()
+    expect(screen.getByText(/Lower body/)).toBeTruthy()
+    expect(await screen.findByText('4')).toBeTruthy()                                     // the current streak
+    expect(screen.getByText('9 days')).toBeTruthy()                                      // the longest
+    expect(screen.getByText(/3 days to go until your 7 days badge/)).toBeTruthy()
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    expect(headings).toEqual(['Plan for today', 'Your streak'])
+    expect(calls.some((u) => /coach|programs|basics/.test(u))).toBe(false)              // nothing reaches an agent
   })
 })
 
