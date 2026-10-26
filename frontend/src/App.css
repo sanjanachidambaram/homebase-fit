@@ -2712,36 +2712,6 @@ fieldset.question {
   transform: none;
 }
 
-.landing-video .video-slot,
-.video-slot {
-  display: block;
-  width: 100%;
-  max-width: 52rem;
-  margin: 0 auto;
-  aspect-ratio: 16 / 9;
-  border-radius: 24px;
-  background: #000;
-}
-
-.landing-video .video-placeholder,
-.video-slot.video-placeholder {
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 0.4rem;
-  background: var(--honey-tint);
-  border: 2px dashed var(--honey-deep);
-}
-
-.video-slot.video-placeholder span {
-  font-size: 2.6rem;
-}
-
-.video-slot.video-placeholder p {
-  margin: 0;
-  font-weight: 700;
-}
-
 .landing-highlights {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));   /* four highlights: a tidy 2 x 2 */

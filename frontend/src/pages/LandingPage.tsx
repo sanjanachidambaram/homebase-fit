@@ -10,11 +10,9 @@ import BeeLogo from '../components/BeeLogo'
 import { fetchDataSummary, fetchPlanExample, type DataSummary, type PlanExample } from '../api'
 import AccountForm from '../components/AccountForm'
 import Link from '../components/Link'
-import VideoSlot from '../components/VideoSlot'
 import { navigate } from '../router'
 import { useSession } from '../session'
 
-const INTRO_VIDEO = ['/content/video/intro_podcast.mp4', '/content/video/intro_podcast.mov']
 const DAY = { mon: 'M', tue: 'T', wed: 'W', thu: 'T', fri: 'F', sat: 'S', sun: 'S' } as const
 const words = (s: string) => s.replace(/_/g, ' ')
 
@@ -192,10 +190,6 @@ export default function LandingPage() {
           </div>
         )}
       </section>
-
-      <Reveal className="landing-video">
-        <VideoSlot sources={INTRO_VIDEO} label="Intro video" />
-      </Reveal>
 
       <section className="landing-highlights" aria-label="What Bee Fit does">
         <Reveal className="highlight" delay={0}>
