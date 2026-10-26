@@ -56,7 +56,7 @@ All data access goes through the MCP tool server (`app/mcp_server/server.py`) vi
   `users` table, which no agent, prompt, or MCP tool ever reads. They sit on the same excluded list as email,
   `EXCLUDED_USER_FIELDS` in `app/agents/context.py`, and the module refuses to load if any of them is ever added
   to the agent profile. Accounts from before usernames kept their old email as their username, so `email` stays
-  on that list too. Tests: `test_no_agent_ever_sees_the_username_or_first_name` runs all five agents, tools
+  on that list too. Tests: `test_no_agent_ever_sees_the_username_or_first_name` runs all four agents, tools
   included, with a fake model that records everything it is sent and checks neither appears;
   `test_agent_profile_contains_no_pii`, `test_the_model_sees_only_goals_and_the_plan`,
   `test_the_model_never_sees_who_the_user_is` and `test_no_tool_ever_returns_username_name_or_notes` check the

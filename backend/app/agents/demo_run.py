@@ -4,10 +4,11 @@ Run from backend/:
     .venv\\Scripts\\python.exe -m app.agents.demo_run           # deletes the demo account at the end
     .venv\\Scripts\\python.exe -m app.agents.demo_run --keep    # keeps it (to look at in the app or DB)
 
-What it does, against the working database:
-  1. Signs up a demo account and takes the quiz (goals: weight loss + rehab; injury: lower back).
-  2. Adds 11 straight days of demo workout logs and two weigh-ins (there's no logging page yet).
-  3. Calls each agent route as that user and prints what happened.
+What it does, against the database at DATABASE_URL (use a throwaway or branch database, not production):
+  1. Signs up a demo account and takes the quiz (goal: losing weight; injury: lower back).
+  2. Adds 11 straight days of demo workout logs and two weigh-ins, written straight to the database.
+  3. Calls each agent's route as that user (Program Architect, Workout Builder, Coach, Workout Reviewer) and
+     prints what happened.
   4. Prints the agent_runs rows (real token counts) and writes the transcript to output/agent_demo_run.json.
   5. Deletes the demo account through DELETE /api/users/{id}. Its agent_runs rows are kept, unlinked.
 This spends real tokens (a few cents at most).
@@ -30,6 +31,10 @@ CALLS = [
     ("Workout Builder", "POST", "/api/workouts/build",
      {"picks": {"legs": 2, "core": 2}, "time_budget_minutes": 25, "equipment": ["mat", "resistance_band"]}),
     ("Coach", "GET", "/api/coach/summary", None),
+    ("Workout Reviewer", "POST", "/api/workouts/review",
+     {"items": [{"exercise_id": "bird_dog", "sets": 3, "reps": "8", "rest_seconds": 30},
+                {"exercise_id": "glute_bridge", "sets": 3, "reps": "12", "rest_seconds": 45},
+                {"exercise_id": "dead_bug", "sets": 2, "reps": "10", "rest_seconds": 30}]}),
 ]
 
 

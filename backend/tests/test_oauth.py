@@ -254,11 +254,11 @@ def test_start_redirects_with_pkce_state_and_nonce(client, configured, provider,
 
 
 def test_the_state_cookie_is_secure_on_https(client, configured, monkeypatch):
-    monkeypatch.setenv("PUBLIC_BASE_URL", "https://bee-fit.onrender.com")
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://bee-fit-app.onrender.com")
     r = client.get("/api/auth/google/start", follow_redirects=False)
     assert "Secure" in r.headers["set-cookie"]
     q = parse_qs(urlsplit(r.headers["location"]).query)
-    assert q["redirect_uri"] == ["https://bee-fit.onrender.com/api/auth/google/callback"]
+    assert q["redirect_uri"] == ["https://bee-fit-app.onrender.com/api/auth/google/callback"]
 
 
 @pytest.mark.parametrize("provider, claims", [("google", google), ("microsoft", microsoft)])

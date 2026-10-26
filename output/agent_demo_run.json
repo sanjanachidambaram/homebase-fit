@@ -1,184 +1,2082 @@
 {
-  "ran_at": "2026-10-22T12:38:55+00:00",
+  "ran_at": "2026-10-26T16:48:49+00:00",
   "calls": [
     {
       "agent": "Program Architect",
       "request": "POST /api/programs/recommend",
       "body": null,
       "status": 200,
-      "seconds": 8.5,
+      "seconds": 3.5,
       "response": {
         "result": {
-          "recommended": true,
-          "program_id": 1,
-          "name": "Back-Friendly Fat Loss",
-          "rationale": "Back-Friendly Fat Loss matches both your weight-loss and rehab goals, with three low-impact sessions a week and strengthening for the muscles that support your lower back. It avoids jumping and loaded spinal bending; please note this program is a placeholder pending expert review, not a verified safety recommendation.",
-          "goal_tags": [
-            "weight_loss",
-            "rehab"
-          ],
-          "matched_goals": [
-            "rehab",
-            "weight_loss"
-          ],
-          "status": "placeholder",
-          "review_notice": "Content pending expert review",
-          "review_note": "Pending expert review: this program hasn't been checked by a physical therapist yet, so treat it as a starting point, not verified advice.",
-          "citations": [],
-          "injury_note": "No exercise in this program is contraindicated for the requested injuries according to the current tags, but those tags are drafts that a physical therapist has not reviewed. This is not confirmation that the program is safe.",
-          "schedule": {
-            "mon": [
+          "plan": {
+            "generated": true,
+            "blocked_reason": null,
+            "needs_clinical_review": false,
+            "goal": "lose_weight",
+            "goal_label": "Losing weight",
+            "experience_level": "beginner",
+            "training_days": 4,
+            "block_weeks": 4,
+            "plan_weeks": 26,
+            "weeks": [
               {
-                "exercise_id": "cat_cow",
-                "name": "Cat-Cow",
-                "sets": 1,
-                "reps": "10"
+                "week_in_block": 1,
+                "days": [
+                  {
+                    "day": "mon",
+                    "kind": "training",
+                    "category": "upper",
+                    "focus": "Upper body",
+                    "exercises": [
+                      {
+                        "exercise_id": "Decline_Push-Up",
+                        "name": "Decline Push-Up",
+                        "muscle_group": "chest",
+                        "category": "upper",
+                        "slot": "push",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "band_seated_row",
+                        "name": "Band Seated Row",
+                        "muscle_group": "back",
+                        "category": "upper",
+                        "slot": "pull",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Shoulder_Press_-_With_Bands",
+                        "name": "Shoulder Press - With Bands",
+                        "muscle_group": "shoulders",
+                        "category": "upper",
+                        "slot": "shoulders",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "band_biceps_curl",
+                        "name": "Resistance Band Biceps Curl",
+                        "muscle_group": "arms",
+                        "category": "upper",
+                        "slot": "arms",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Dips_-_Triceps_Version",
+                        "name": "Dips - Triceps Version",
+                        "muscle_group": "arms",
+                        "category": "upper",
+                        "slot": "arms",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Incline_Push-Up_Medium",
+                        "name": "Incline Push-Up Medium",
+                        "muscle_group": "chest",
+                        "category": "upper",
+                        "slot": "push",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      }
+                    ],
+                    "est_minutes": 19.5
+                  },
+                  {
+                    "day": "tue",
+                    "kind": "rest",
+                    "category": null,
+                    "focus": null,
+                    "exercises": [],
+                    "est_minutes": 0
+                  },
+                  {
+                    "day": "wed",
+                    "kind": "training",
+                    "category": "cardio",
+                    "focus": "Cardio of your choice",
+                    "exercises": [],
+                    "est_minutes": 0.0
+                  },
+                  {
+                    "day": "thu",
+                    "kind": "rest",
+                    "category": null,
+                    "focus": null,
+                    "exercises": [],
+                    "est_minutes": 0
+                  },
+                  {
+                    "day": "fri",
+                    "kind": "training",
+                    "category": "lower",
+                    "focus": "Lower body",
+                    "exercises": [
+                      {
+                        "exercise_id": "bodyweight_squat",
+                        "name": "Bodyweight Squat",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "knee",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "glute_bridge",
+                        "name": "Glute Bridge",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "hip",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "reverse_lunge",
+                        "name": "Reverse Lunge",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 4.0,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "side_lying_leg_raise",
+                        "name": "Side-Lying Leg Raise",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 4.0,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Calf_Raises_-_With_Bands",
+                        "name": "Calf Raises - With Bands",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Monster_Walk",
+                        "name": "Monster Walk",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      }
+                    ],
+                    "est_minutes": 21.0
+                  },
+                  {
+                    "day": "sat",
+                    "kind": "training",
+                    "category": "cardio",
+                    "focus": "Cardio of your choice",
+                    "exercises": [],
+                    "est_minutes": 0.0
+                  },
+                  {
+                    "day": "sun",
+                    "kind": "rest",
+                    "category": null,
+                    "focus": null,
+                    "exercises": [],
+                    "est_minutes": 0
+                  }
+                ]
               },
               {
-                "exercise_id": "march_in_place",
-                "name": "March in Place",
-                "sets": 3,
-                "reps": "60s"
+                "week_in_block": 2,
+                "days": [
+                  {
+                    "day": "mon",
+                    "kind": "training",
+                    "category": "upper",
+                    "focus": "Upper body",
+                    "exercises": [
+                      {
+                        "exercise_id": "Incline_Push-Up_Medium",
+                        "name": "Incline Push-Up Medium",
+                        "muscle_group": "chest",
+                        "category": "upper",
+                        "slot": "push",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Upright_Row_-_With_Bands",
+                        "name": "Upright Row - With Bands",
+                        "muscle_group": "back",
+                        "category": "upper",
+                        "slot": "pull",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Band_Pull_Apart",
+                        "name": "Band Pull Apart",
+                        "muscle_group": "shoulders",
+                        "category": "upper",
+                        "slot": "shoulders",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Dips_-_Triceps_Version",
+                        "name": "Dips - Triceps Version",
+                        "muscle_group": "arms",
+                        "category": "upper",
+                        "slot": "arms",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Standing_Towel_Triceps_Extension",
+                        "name": "Standing Towel Triceps Extension",
+                        "muscle_group": "arms",
+                        "category": "upper",
+                        "slot": "arms",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Incline_Push-Up_Wide",
+                        "name": "Incline Push-Up Wide",
+                        "muscle_group": "chest",
+                        "category": "upper",
+                        "slot": "push",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      }
+                    ],
+                    "est_minutes": 19.5
+                  },
+                  {
+                    "day": "tue",
+                    "kind": "rest",
+                    "category": null,
+                    "focus": null,
+                    "exercises": [],
+                    "est_minutes": 0
+                  },
+                  {
+                    "day": "wed",
+                    "kind": "training",
+                    "category": "cardio",
+                    "focus": "Cardio of your choice",
+                    "exercises": [],
+                    "est_minutes": 0.0
+                  },
+                  {
+                    "day": "thu",
+                    "kind": "rest",
+                    "category": null,
+                    "focus": null,
+                    "exercises": [],
+                    "est_minutes": 0
+                  },
+                  {
+                    "day": "fri",
+                    "kind": "training",
+                    "category": "lower",
+                    "focus": "Lower body",
+                    "exercises": [
+                      {
+                        "exercise_id": "Bodyweight_Squat",
+                        "name": "Bodyweight Squat",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "knee",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "glute_bridge",
+                        "name": "Glute Bridge",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "hip",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "side_lying_leg_raise",
+                        "name": "Side-Lying Leg Raise",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 4.0,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Monster_Walk",
+                        "name": "Monster Walk",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "reverse_lunge",
+                        "name": "Reverse Lunge",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 4.0,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "wall_sit",
+                        "name": "Wall Sit",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "24-30s hold",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      }
+                    ],
+                    "est_minutes": 21.0
+                  },
+                  {
+                    "day": "sat",
+                    "kind": "training",
+                    "category": "cardio",
+                    "focus": "Cardio of your choice",
+                    "exercises": [],
+                    "est_minutes": 0.0
+                  },
+                  {
+                    "day": "sun",
+                    "kind": "rest",
+                    "category": null,
+                    "focus": null,
+                    "exercises": [],
+                    "est_minutes": 0
+                  }
+                ]
               },
               {
-                "exercise_id": "glute_bridge",
-                "name": "Glute Bridge",
-                "sets": 3,
-                "reps": "12"
+                "week_in_block": 3,
+                "days": [
+                  {
+                    "day": "mon",
+                    "kind": "training",
+                    "category": "upper",
+                    "focus": "Upper body",
+                    "exercises": [
+                      {
+                        "exercise_id": "Incline_Push-Up_Wide",
+                        "name": "Incline Push-Up Wide",
+                        "muscle_group": "chest",
+                        "category": "upper",
+                        "slot": "push",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "band_pull_apart",
+                        "name": "Band Pull-Apart",
+                        "muscle_group": "back",
+                        "category": "upper",
+                        "slot": "pull",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Lateral_Raise_-_With_Bands",
+                        "name": "Lateral Raise - With Bands",
+                        "muscle_group": "shoulders",
+                        "category": "upper",
+                        "slot": "shoulders",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Standing_Towel_Triceps_Extension",
+                        "name": "Standing Towel Triceps Extension",
+                        "muscle_group": "arms",
+                        "category": "upper",
+                        "slot": "arms",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "knee_pushup",
+                        "name": "Knee Push-Up",
+                        "muscle_group": "arms",
+                        "category": "upper",
+                        "slot": "arms",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Pushups",
+                        "name": "Pushups",
+                        "muscle_group": "chest",
+                        "category": "upper",
+                        "slot": "push",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      }
+                    ],
+                    "est_minutes": 19.5
+                  },
+                  {
+                    "day": "tue",
+                    "kind": "rest",
+                    "category": null,
+                    "focus": null,
+                    "exercises": [],
+                    "est_minutes": 0
+                  },
+                  {
+                    "day": "wed",
+                    "kind": "training",
+                    "category": "cardio",
+                    "focus": "Cardio of your choice",
+                    "exercises": [],
+                    "est_minutes": 0.0
+                  },
+                  {
+                    "day": "thu",
+                    "kind": "rest",
+                    "category": null,
+                    "focus": null,
+                    "exercises": [],
+                    "est_minutes": 0
+                  },
+                  {
+                    "day": "fri",
+                    "kind": "training",
+                    "category": "lower",
+                    "focus": "Lower body",
+                    "exercises": [
+                      {
+                        "exercise_id": "reverse_lunge",
+                        "name": "Reverse Lunge",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "knee",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 4.0,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "glute_bridge",
+                        "name": "Glute Bridge",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "hip",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Monster_Walk",
+                        "name": "Monster Walk",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "side_lying_leg_raise",
+                        "name": "Side-Lying Leg Raise",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 4.0,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "bodyweight_squat",
+                        "name": "Bodyweight Squat",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Band_Hip_Adductions",
+                        "name": "Band Hip Adductions",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      }
+                    ],
+                    "est_minutes": 21.0
+                  },
+                  {
+                    "day": "sat",
+                    "kind": "training",
+                    "category": "cardio",
+                    "focus": "Cardio of your choice",
+                    "exercises": [],
+                    "est_minutes": 0.0
+                  },
+                  {
+                    "day": "sun",
+                    "kind": "rest",
+                    "category": null,
+                    "focus": null,
+                    "exercises": [],
+                    "est_minutes": 0
+                  }
+                ]
               },
               {
-                "exercise_id": "bird_dog",
-                "name": "Bird Dog",
-                "sets": 3,
-                "reps": "8 each side"
-              },
-              {
-                "exercise_id": "dead_bug",
-                "name": "Dead Bug",
-                "sets": 3,
-                "reps": "8 each side"
+                "week_in_block": 4,
+                "days": [
+                  {
+                    "day": "mon",
+                    "kind": "training",
+                    "category": "upper",
+                    "focus": "Upper body",
+                    "exercises": [
+                      {
+                        "exercise_id": "Pushups",
+                        "name": "Pushups",
+                        "muscle_group": "chest",
+                        "category": "upper",
+                        "slot": "push",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "band_seated_row",
+                        "name": "Band Seated Row",
+                        "muscle_group": "back",
+                        "category": "upper",
+                        "slot": "pull",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Back_Flyes_-_With_Bands",
+                        "name": "Back Flyes - With Bands",
+                        "muscle_group": "shoulders",
+                        "category": "upper",
+                        "slot": "shoulders",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "knee_pushup",
+                        "name": "Knee Push-Up",
+                        "muscle_group": "arms",
+                        "category": "upper",
+                        "slot": "arms",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Body_Tricep_Press",
+                        "name": "Body Tricep Press",
+                        "muscle_group": "arms",
+                        "category": "upper",
+                        "slot": "arms",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Bench_Press_-_With_Bands",
+                        "name": "Bench Press - With Bands",
+                        "muscle_group": "chest",
+                        "category": "upper",
+                        "slot": "push",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      }
+                    ],
+                    "est_minutes": 19.5
+                  },
+                  {
+                    "day": "tue",
+                    "kind": "rest",
+                    "category": null,
+                    "focus": null,
+                    "exercises": [],
+                    "est_minutes": 0
+                  },
+                  {
+                    "day": "wed",
+                    "kind": "training",
+                    "category": "cardio",
+                    "focus": "Cardio of your choice",
+                    "exercises": [],
+                    "est_minutes": 0.0
+                  },
+                  {
+                    "day": "thu",
+                    "kind": "rest",
+                    "category": null,
+                    "focus": null,
+                    "exercises": [],
+                    "est_minutes": 0
+                  },
+                  {
+                    "day": "fri",
+                    "kind": "training",
+                    "category": "lower",
+                    "focus": "Lower body",
+                    "exercises": [
+                      {
+                        "exercise_id": "Bodyweight_Walking_Lunge",
+                        "name": "Bodyweight Walking Lunge",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "knee",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "glute_bridge",
+                        "name": "Glute Bridge",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "hip",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "bodyweight_squat",
+                        "name": "Bodyweight Squat",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Step-up_with_Knee_Raise",
+                        "name": "Step-up with Knee Raise",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "side_lying_leg_raise",
+                        "name": "Side-Lying Leg Raise",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 4.0,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      },
+                      {
+                        "exercise_id": "Calf_Raises_-_With_Bands",
+                        "name": "Calf Raises - With Bands",
+                        "muscle_group": "legs",
+                        "category": "lower",
+                        "slot": "legs accessory",
+                        "sets": "2-3",
+                        "reps": "12-15",
+                        "reps_your_call": false,
+                        "rest_seconds": 30,
+                        "est_minutes": 3.2,
+                        "injury_check": "drafted_not_pt_reviewed",
+                        "weighted": false,
+                        "load": null,
+                        "default_weight_lb": null,
+                        "swapped_from": null
+                      }
+                    ],
+                    "est_minutes": 20.2
+                  },
+                  {
+                    "day": "sat",
+                    "kind": "training",
+                    "category": "cardio",
+                    "focus": "Cardio of your choice",
+                    "exercises": [],
+                    "est_minutes": 0.0
+                  },
+                  {
+                    "day": "sun",
+                    "kind": "rest",
+                    "category": null,
+                    "focus": null,
+                    "exercises": [],
+                    "est_minutes": 0
+                  }
+                ]
               }
             ],
-            "wed": [
+            "days": [
               {
-                "exercise_id": "pelvic_tilt",
-                "name": "Pelvic Tilt",
-                "sets": 1,
-                "reps": "10"
+                "day": "mon",
+                "kind": "training",
+                "category": "upper",
+                "focus": "Upper body",
+                "exercises": [
+                  {
+                    "exercise_id": "Decline_Push-Up",
+                    "name": "Decline Push-Up",
+                    "muscle_group": "chest",
+                    "category": "upper",
+                    "slot": "push",
+                    "sets": "2-3",
+                    "reps": "12-15",
+                    "reps_your_call": false,
+                    "rest_seconds": 30,
+                    "est_minutes": 3.2,
+                    "injury_check": "drafted_not_pt_reviewed",
+                    "weighted": false,
+                    "load": null,
+                    "default_weight_lb": null,
+                    "swapped_from": null
+                  },
+                  {
+                    "exercise_id": "band_seated_row",
+                    "name": "Band Seated Row",
+                    "muscle_group": "back",
+                    "category": "upper",
+                    "slot": "pull",
+                    "sets": "2-3",
+                    "reps": "12-15",
+                    "reps_your_call": false,
+                    "rest_seconds": 30,
+                    "est_minutes": 3.2,
+                    "injury_check": "drafted_not_pt_reviewed",
+                    "weighted": false,
+                    "load": null,
+                    "default_weight_lb": null,
+                    "swapped_from": null
+                  },
+                  {
+                    "exercise_id": "Shoulder_Press_-_With_Bands",
+                    "name": "Shoulder Press - With Bands",
+                    "muscle_group": "shoulders",
+                    "category": "upper",
+                    "slot": "shoulders",
+                    "sets": "2-3",
+                    "reps": "12-15",
+                    "reps_your_call": false,
+                    "rest_seconds": 30,
+                    "est_minutes": 3.2,
+                    "injury_check": "drafted_not_pt_reviewed",
+                    "weighted": false,
+                    "load": null,
+                    "default_weight_lb": null,
+                    "swapped_from": null
+                  },
+                  {
+                    "exercise_id": "band_biceps_curl",
+                    "name": "Resistance Band Biceps Curl",
+                    "muscle_group": "arms",
+                    "category": "upper",
+                    "slot": "arms",
+                    "sets": "2-3",
+                    "reps": "12-15",
+                    "reps_your_call": false,
+                    "rest_seconds": 30,
+                    "est_minutes": 3.2,
+                    "injury_check": "drafted_not_pt_reviewed",
+                    "weighted": false,
+                    "load": null,
+                    "default_weight_lb": null,
+                    "swapped_from": null
+                  },
+                  {
+                    "exercise_id": "Dips_-_Triceps_Version",
+                    "name": "Dips - Triceps Version",
+                    "muscle_group": "arms",
+                    "category": "upper",
+                    "slot": "arms",
+                    "sets": "2-3",
+                    "reps": "12-15",
+                    "reps_your_call": false,
+                    "rest_seconds": 30,
+                    "est_minutes": 3.2,
+                    "injury_check": "drafted_not_pt_reviewed",
+                    "weighted": false,
+                    "load": null,
+                    "default_weight_lb": null,
+                    "swapped_from": null
+                  },
+                  {
+                    "exercise_id": "Incline_Push-Up_Medium",
+                    "name": "Incline Push-Up Medium",
+                    "muscle_group": "chest",
+                    "category": "upper",
+                    "slot": "push",
+                    "sets": "2-3",
+                    "reps": "12-15",
+                    "reps_your_call": false,
+                    "rest_seconds": 30,
+                    "est_minutes": 3.2,
+                    "injury_check": "drafted_not_pt_reviewed",
+                    "weighted": false,
+                    "load": null,
+                    "default_weight_lb": null,
+                    "swapped_from": null
+                  }
+                ],
+                "est_minutes": 19.5
               },
               {
-                "exercise_id": "step_jacks",
-                "name": "Step Jacks (Low Impact)",
-                "sets": 3,
-                "reps": "45s"
+                "day": "tue",
+                "kind": "rest",
+                "category": null,
+                "focus": null,
+                "exercises": [],
+                "est_minutes": 0
               },
               {
-                "exercise_id": "side_lying_leg_raise",
-                "name": "Side-Lying Leg Raise",
-                "sets": 3,
-                "reps": "12 each side"
+                "day": "wed",
+                "kind": "training",
+                "category": "cardio",
+                "focus": "Cardio of your choice",
+                "exercises": [],
+                "est_minutes": 0.0
               },
               {
-                "exercise_id": "band_seated_row",
-                "name": "Band Seated Row",
-                "sets": 3,
-                "reps": "12"
+                "day": "thu",
+                "kind": "rest",
+                "category": null,
+                "focus": null,
+                "exercises": [],
+                "est_minutes": 0
               },
               {
-                "exercise_id": "wall_sit",
-                "name": "Wall Sit",
-                "sets": 3,
-                "reps": "30s"
+                "day": "fri",
+                "kind": "training",
+                "category": "lower",
+                "focus": "Lower body",
+                "exercises": [
+                  {
+                    "exercise_id": "bodyweight_squat",
+                    "name": "Bodyweight Squat",
+                    "muscle_group": "legs",
+                    "category": "lower",
+                    "slot": "knee",
+                    "sets": "2-3",
+                    "reps": "12-15",
+                    "reps_your_call": false,
+                    "rest_seconds": 30,
+                    "est_minutes": 3.2,
+                    "injury_check": "drafted_not_pt_reviewed",
+                    "weighted": false,
+                    "load": null,
+                    "default_weight_lb": null,
+                    "swapped_from": null
+                  },
+                  {
+                    "exercise_id": "glute_bridge",
+                    "name": "Glute Bridge",
+                    "muscle_group": "legs",
+                    "category": "lower",
+                    "slot": "hip",
+                    "sets": "2-3",
+                    "reps": "12-15",
+                    "reps_your_call": false,
+                    "rest_seconds": 30,
+                    "est_minutes": 3.2,
+                    "injury_check": "drafted_not_pt_reviewed",
+                    "weighted": false,
+                    "load": null,
+                    "default_weight_lb": null,
+                    "swapped_from": null
+                  },
+                  {
+                    "exercise_id": "reverse_lunge",
+                    "name": "Reverse Lunge",
+                    "muscle_group": "legs",
+                    "category": "lower",
+                    "slot": "legs accessory",
+                    "sets": "2-3",
+                    "reps": "12-15",
+                    "reps_your_call": false,
+                    "rest_seconds": 30,
+                    "est_minutes": 4.0,
+                    "injury_check": "drafted_not_pt_reviewed",
+                    "weighted": false,
+                    "load": null,
+                    "default_weight_lb": null,
+                    "swapped_from": null
+                  },
+                  {
+                    "exercise_id": "side_lying_leg_raise",
+                    "name": "Side-Lying Leg Raise",
+                    "muscle_group": "legs",
+                    "category": "lower",
+                    "slot": "legs accessory",
+                    "sets": "2-3",
+                    "reps": "12-15",
+                    "reps_your_call": false,
+                    "rest_seconds": 30,
+                    "est_minutes": 4.0,
+                    "injury_check": "drafted_not_pt_reviewed",
+                    "weighted": false,
+                    "load": null,
+                    "default_weight_lb": null,
+                    "swapped_from": null
+                  },
+                  {
+                    "exercise_id": "Calf_Raises_-_With_Bands",
+                    "name": "Calf Raises - With Bands",
+                    "muscle_group": "legs",
+                    "category": "lower",
+                    "slot": "legs accessory",
+                    "sets": "2-3",
+                    "reps": "12-15",
+                    "reps_your_call": false,
+                    "rest_seconds": 30,
+                    "est_minutes": 3.2,
+                    "injury_check": "drafted_not_pt_reviewed",
+                    "weighted": false,
+                    "load": null,
+                    "default_weight_lb": null,
+                    "swapped_from": null
+                  },
+                  {
+                    "exercise_id": "Monster_Walk",
+                    "name": "Monster Walk",
+                    "muscle_group": "legs",
+                    "category": "lower",
+                    "slot": "legs accessory",
+                    "sets": "2-3",
+                    "reps": "12-15",
+                    "reps_your_call": false,
+                    "rest_seconds": 30,
+                    "est_minutes": 3.2,
+                    "injury_check": "drafted_not_pt_reviewed",
+                    "weighted": false,
+                    "load": null,
+                    "default_weight_lb": null,
+                    "swapped_from": null
+                  }
+                ],
+                "est_minutes": 21.0
+              },
+              {
+                "day": "sat",
+                "kind": "training",
+                "category": "cardio",
+                "focus": "Cardio of your choice",
+                "exercises": [],
+                "est_minutes": 0.0
+              },
+              {
+                "day": "sun",
+                "kind": "rest",
+                "category": null,
+                "focus": null,
+                "exercises": [],
+                "est_minutes": 0
               }
             ],
-            "fri": [
-              {
-                "exercise_id": "cat_cow",
-                "name": "Cat-Cow",
-                "sets": 1,
-                "reps": "10"
+            "protocol": {
+              "goal": "lose_weight",
+              "experience_level": "beginner",
+              "session_length_minutes": 30,
+              "sets_range": "2-3",
+              "reps_range": "12-15",
+              "rest_seconds": 30,
+              "progression_note": "Weights go up 5 lb every 4 weeks, when the 4-week pattern starts again.",
+              "status": "placeholder",
+              "review_notice": "Content pending expert review",
+              "citations": []
+            },
+            "safety": {
+              "injury_flags": [
+                "lower_back"
+              ],
+              "checked_only": true,
+              "excluded_as_contraindicated": 51,
+              "left_out_for_injury": [
+                {
+                  "exercise_id": "Band_Good_Morning",
+                  "name": "Band Good Morning",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The forward hip hinge puts the lower back under tension as the torso leans and returns upright. Repeated or resisted bending can aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Band_Good_Morning_Pull_Through",
+                  "name": "Band Good Morning (Pull Through)",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The torso bends forward at the hips against band tension, placing strain on the lower back as it stabilizes the hinge. This can aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Bench_Jump",
+                  "name": "Bench Jump",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Jumping and landing repeatedly transmit impact through the body, while the trunk braces to control the motion; this can aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Body-Up",
+                  "name": "Body-Up",
+                  "muscle_group": "arms",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Holding a rigid plank asks the lower back to stay braced under bodyweight as your support shifts. That sustained effort can aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Butt_Lift_Bridge",
+                  "name": "Butt Lift (Bridge)",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Lifting the hips requires the lower back and trunk to stay controlled; arching or taking load through the back can aggravate a sore or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Cat_Stretch",
+                  "name": "Cat Stretch",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The movement rounds the lower spine while holding the position. Repeated or sustained forward bending can aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Chair_Lower_Back_Stretch",
+                  "name": "Chair Lower Back Stretch",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The stretch bends the trunk to one side and lengthens the lower back. Side bending can aggravate a sore or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Childs_Pose",
+                  "name": "Child's Pose",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The pose rounds the lower back as the torso reaches forward and settles down. Sustained spinal bending can aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Clock_Push-Up",
+                  "name": "Clock Push-Up",
+                  "muscle_group": "chest",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The body must stay braced in a plank while turning and shifting sideways, placing rotational and stabilizing demands on the lower back that can aggravate an injury there.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Close-Grip_Push-Up_off_of_a_Dumbbell",
+                  "name": "Close-Grip Push-Up off of a Dumbbell",
+                  "muscle_group": "arms",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The lower back must stay braced while the body is held straight and lowered. This sustained effort can aggravate a sensitive or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Crossover_Reverse_Lunge",
+                  "name": "Crossover Reverse Lunge",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The torso rotates across the front leg while the hips and knees bend. This repeated trunk twisting can aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Dancers_Stretch",
+                  "name": "Dancer's Stretch",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The seated stretch rotates the trunk while the pelvis and legs are held in place. This twisting can aggravate a sensitive or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Flutter_Kicks",
+                  "name": "Flutter Kicks",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Alternating the legs while lying facedown can encourage the lower back to arch as the legs lift. Repeated back extension may aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Glute_Kickback",
+                  "name": "Glute Kickback",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Lifting the leg can encourage the lower back to arch if the trunk is not held steady, which may aggravate a sensitive back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Groin_and_Back_Stretch",
+                  "name": "Groin and Back Stretch",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Curling the torso forward repeatedly bends the lower spine, which can aggravate a sensitive or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Hip_Lift_with_Band",
+                  "name": "Hip Lift with Band",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The bridge position repeatedly lifts the pelvis and can encourage the lower back to arch, especially near the top. That bending under effort may aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Hug_Knees_To_Chest",
+                  "name": "Hug Knees To Chest",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Pulling both knees toward the chest rounds the lower back into a sustained forward bend. This position can aggravate a sensitive or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Hyperextensions_With_No_Hyperextension_Bench",
+                  "name": "Hyperextensions With No Hyperextension Bench",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The torso bends forward and lifts back up through the lower spine, sometimes with added weight. This repeated spinal movement and loading may aggravate a sore or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Inchworm",
+                  "name": "Inchworm",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The movement starts with a forward bend while the legs stay straight, then supports the body in a plank. Repeated bending and bracing may aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Inverted_Row",
+                  "name": "Inverted Row",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The lower back works to keep the body straight while it is suspended beneath the bar. Holding that position under load can aggravate a sore or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Iron_Crosses_stretch",
+                  "name": "Iron Crosses (stretch)",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Bringing each leg across the body rotates the lower trunk while lying face down. Repeated twisting can aggravate a sore or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Isometric_Wipers",
+                  "name": "Isometric Wipers",
+                  "muscle_group": "chest",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The plank position asks the lower back to stay braced while your weight shifts from side to side. That sustained effort can aggravate a sensitive or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Knee_Across_The_Body",
+                  "name": "Knee Across The Body",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Lowering a bent knee across the body rotates the lower spine and holds it in a twist. That position can aggravate a sore or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Linear_3-Part_Start_Technique",
+                  "name": "Linear 3-Part Start Technique",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The drill begins in a deep, forward-leaning crouch and then drives the body forward quickly. That bent posture and forceful effort can aggravate a sore or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Looking_At_Ceiling",
+                  "name": "Looking At Ceiling",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Lifting the hips forward while arching the back puts the lower spine into a deep backward bend. This can aggravate a sensitive or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Lying_Crossover",
+                  "name": "Lying Crossover",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Crossing the bent leg over the body rotates the lower spine, and the partner adds pressure to deepen the stretch. This twisting force may aggravate a sore or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Middle_Back_Stretch",
+                  "name": "Middle Back Stretch",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The stretch asks you to twist at the waist, which can rotate the lower spine. That motion may aggravate a sore or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Mountain_Climbers",
+                  "name": "Mountain Climbers",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Holding a plank while rapidly driving the knees forward challenges the lower back to stay steady; repeated movement can aggravate a sensitive back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "One_Half_Locust",
+                  "name": "One Half Locust",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Lifting the chest and leg while lying facedown arches the lower back. That backward bend can aggravate a sensitive or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "One_Knee_To_Chest",
+                  "name": "One Knee To Chest",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Pulling the knee toward the chest rounds the lower back into a forward bend. This stretch position can aggravate a sensitive or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Pelvic_Tilt_Into_Bridge",
+                  "name": "Pelvic Tilt Into Bridge",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The movement rolls and lifts the pelvis and spine into a bridge, repeatedly changing the lower back\u2019s position and loading it, which can aggravate a sensitive or recovering back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Pullups",
+                  "name": "Pullups",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The instructions call for arching the lower back while hanging and pulling, which can aggravate a sensitive or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Push_Up_to_Side_Plank",
+                  "name": "Push Up to Side Plank",
+                  "muscle_group": "chest",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The exercise holds the trunk steady during push-ups and twists from side to side into each plank. That bracing and rotation can aggravate a sore or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Push-Up_Wide",
+                  "name": "Push-Up Wide",
+                  "muscle_group": "chest",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The lower back must stay braced in a plank while the body lowers and rises, which can aggravate a sensitive or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Rear_Leg_Raises",
+                  "name": "Rear Leg Raises",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Lifting the leg behind you can encourage the lower back to arch as the hip extends, which may aggravate a sensitive or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Runners_Stretch",
+                  "name": "Runner's Stretch",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Lowering the torso toward the floor can involve a forward bend at the lower back, particularly if the movement rounds the spine. That position may aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Seated_Floor_Hamstring_Stretch",
+                  "name": "Seated Floor Hamstring Stretch",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Leaning forward to reach the ankle can round or bend the lower back, which may aggravate a sensitive or recovering back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Seated_Glute",
+                  "name": "Seated Glute",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The partner increases the forward lean, which can round or bend the lower back and aggravate a sensitive or recovering back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Seated_Hamstring",
+                  "name": "Seated Hamstring",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Leaning forward while your partner increases the stretch bends the lower back, and the added pressure can make that position harder to tolerate with a sore or recovering back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Single_Leg_Glute_Bridge",
+                  "name": "Single Leg Glute Bridge",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Lifting the pelvis high can lead to arching the lower back, adding strain to a sensitive area, especially if the movement comes from the spine rather than the hips.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Single-Arm_Push-Up",
+                  "name": "Single-Arm Push-Up",
+                  "muscle_group": "chest",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The body is held in a plank while pressing asymmetrically, asking the lower back and trunk to resist sagging and twisting. That demand can aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Spinal_Stretch",
+                  "name": "Spinal Stretch",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The stretch combines forward bending with a deep torso twist. These movements can aggravate a sensitive or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Squats_-_With_Bands",
+                  "name": "Squats - With Bands",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "The lower back helps stabilize the torso during repeated squats against resistance, which can aggravate a sensitive or recovering back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Standing_Long_Jump",
+                  "name": "Standing Long Jump",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "A long jump creates a forceful landing that can jolt the lower back, especially as the body absorbs the impact. This may aggravate a sensitive or recovering back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Standing_Pelvic_Tilt",
+                  "name": "Standing Pelvic Tilt",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Tilting the pelvis repeatedly moves the lower spine through a small arch and round. Even gentle repeated spinal motion can aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Standing_Toe_Touches",
+                  "name": "Standing Toe Touches",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "This stretch holds the torso bent forward with the legs straight, placing the lower back in a sustained rounded position that can aggravate a sensitive or recovering back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Superman",
+                  "name": "Superman",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Lifting and holding the chest and legs arches the lower back and contracts its muscles. This repeated spinal extension can aggravate a sensitive or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "superman_hold",
+                  "name": "Superman Hold",
+                  "muscle_group": "back",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Lifting your chest and legs off the floor arches the lower spine and squeezes the low-back muscles hard, which can aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "The_Straddle",
+                  "name": "The Straddle",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Leaning forward with the legs spread can round the lower back, especially when reaching far. This bending may aggravate a sensitive or recovering lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Upper_Back-Leg_Grab",
+                  "name": "Upper Back-Leg Grab",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Bringing the chest toward the knees rounds the lower back in a deep forward bend, which may aggravate a sore or recovering back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                },
+                {
+                  "exercise_id": "Windmills",
+                  "name": "Windmills",
+                  "muscle_group": "legs",
+                  "cautions": [
+                    {
+                      "injury": "lower_back",
+                      "reasoning": "Crossing the leg across the body rotates the pelvis and can twist the lower back, especially if the movement is quick. That may aggravate a sensitive lower back.",
+                      "tier": "ai_drafted",
+                      "source": "Pending review by a licensed physical therapist"
+                    }
+                  ]
+                }
+              ],
+              "equipment": [
+                "chair",
+                "mat",
+                "none",
+                "resistance_band"
+              ]
+            },
+            "notes": [
+              "Week 1 is a calibration week: the weights shown are only starting suggestions, so log what you actually did. From week 2, suggestions build on your week 1 numbers. You can change any weight any time.",
+              "Because you flagged an injury, every exercise here has drafted injury data, and anything tagged as unsafe for lower back was left out. The tags are drafts a physical therapist hasn't reviewed yet, so stop anything that hurts."
+            ],
+            "weights": {
+              "rule": "Weights go up 5 lb every 4 weeks, when the 4-week pattern starts again. Suggestions go at most 2 increases past the last weight you logged, then wait for you to log again, so they keep pace with what you actually lift.",
+              "calibration": "Week 1 is a calibration week: the weights shown are only starting suggestions, so log what you actually did. From week 2, suggestions build on your week 1 numbers. You can change any weight any time.",
+              "defaults_lb": null,
+              "step_lb": {
+                "arms": 5,
+                "legs": 5
               },
-              {
-                "exercise_id": "march_in_place",
-                "name": "March in Place",
-                "sets": 3,
-                "reps": "60s"
-              },
-              {
-                "exercise_id": "glute_bridge",
-                "name": "Glute Bridge",
-                "sets": 3,
-                "reps": "15"
-              },
-              {
-                "exercise_id": "band_pull_apart",
-                "name": "Band Pull-Apart",
-                "sets": 3,
-                "reps": "15"
-              },
-              {
-                "exercise_id": "dead_bug",
-                "name": "Dead Bug",
-                "sets": 3,
-                "reps": "10 each side"
-              }
-            ]
+              "schedule_weeks": 26,
+              "schedule": []
+            },
+            "swap_options": null
           },
-          "message": null
+          "explanation": "This beginner plan alternates upper-body and lower-body strength days with two cardio-of-your-choice days and rest days between them, giving you a clear four-day weekly rhythm. Strength sessions use 2\u20133 sets of 12\u201315 reps with 30 seconds of rest, in sessions designed for about 30 minutes. It repeats the same four-week pattern across the 26 weeks, with weights increasing by 5 lb when each new pattern begins; suggestions stay close to the last weight you logged. It\u2019s kept gentle and injury-aware, and it\u2019s a starting point still pending expert review.",
+          "review_note": "Pending expert review: the training settings behind this plan haven't been checked by a physical therapist yet, so treat it as a starting point, not verified advice."
         },
         "meta": {
           "agent_run_id": 1,
           "usage": {
-            "input_tokens": 2568,
-            "output_tokens": 252,
+            "input_tokens": 601,
+            "output_tokens": 137,
             "cached_tokens": 0,
-            "requests": 3,
-            "tool_calls": 2
+            "requests": 1,
+            "tool_calls": 0,
+            "gateway_cache_status": "miss",
+            "gateway_cache_hits": 0,
+            "fresh_input_tokens": 601,
+            "fresh_output_tokens": 137
           },
-          "tool_calls": [
-            {
-              "tool": "get_user_profile",
-              "args": {
-                "user_id": "(from your sign-in)"
-              },
-              "called_by": "code"
-            },
-            {
-              "tool": "search_program_templates",
-              "args": {
-                "goal_tags": [
-                  "rehab",
-                  "weight_loss"
-                ],
-                "injury_flags": [
-                  "lower_back"
-                ],
-                "checked_only": true
-              },
-              "called_by": "code"
-            },
-            {
-              "tool": "get_user_profile",
-              "args": {
-                "user_id": "(from your sign-in)"
-              },
-              "called_by": "model"
-            },
-            {
-              "tool": "search_program_templates",
-              "args": {
-                "goal_tags": [
-                  "rehab",
-                  "weight_loss"
-                ],
-                "injury_flags": [
-                  "lower_back"
-                ],
-                "checked_only": true
-              },
-              "called_by": "model"
-            }
-          ]
+          "tool_calls": []
         }
       }
     },
@@ -197,7 +2095,7 @@
         ]
       },
       "status": 200,
-      "seconds": 4.2,
+      "seconds": 10.3,
       "response": {
         "result": {
           "exercises": [
@@ -236,11 +2134,11 @@
             },
             {
               "order": 4,
-              "exercise_id": "forearm_plank",
-              "name": "Forearm Plank",
+              "exercise_id": "pelvic_tilt",
+              "name": "Pelvic Tilt",
               "muscle_group": "core",
               "sets": 3,
-              "reps": "30s",
+              "reps": "10",
               "rest_seconds": 45,
               "est_minutes": 3.8,
               "injury_check": "drafted_not_pt_reviewed"
@@ -248,7 +2146,7 @@
           ],
           "total_estimated_minutes": 15.9,
           "time_budget_minutes": 25,
-          "balance_note": "Alternates legs and core, with both squat and hip-bridge work. This is lower-body/core focused, with no upper-body push or pull work.",
+          "balance_note": "Lower-body and core focused as requested; no upper-body push or pull work is included.",
           "notes": [
             "Exercises flagged as unsafe for your injuries, or not yet checked for injury safety, were left out automatically."
           ]
@@ -256,11 +2154,15 @@
         "meta": {
           "agent_run_id": 2,
           "usage": {
-            "input_tokens": 1732,
-            "output_tokens": 425,
+            "input_tokens": 2379,
+            "output_tokens": 418,
             "cached_tokens": 0,
             "requests": 2,
-            "tool_calls": 2
+            "tool_calls": 3,
+            "gateway_cache_status": "miss",
+            "gateway_cache_hits": 0,
+            "fresh_input_tokens": 2379,
+            "fresh_output_tokens": 418
           },
           "tool_calls": [
             {
@@ -269,6 +2171,13 @@
                 "user_id": "(from your sign-in)"
               },
               "called_by": "code"
+            },
+            {
+              "tool": "get_user_profile",
+              "args": {
+                "user_id": "(from your sign-in)"
+              },
+              "called_by": "model"
             },
             {
               "tool": "search_exercises",
@@ -303,7 +2212,8 @@
               "called_by": "model"
             }
           ]
-        }
+        },
+        "built_id": 1
       }
     },
     {
@@ -311,11 +2221,11 @@
       "request": "GET /api/coach/summary",
       "body": null,
       "status": 200,
-      "seconds": 6.0,
+      "seconds": 5.1,
       "response": {
         "result": {
-          "encouragement": "Eleven straight days of showing up\u2014now that\u2019s some serious consistency! You\u2019ve lifted the equivalent of about 5.6 concert grand pianos, and a rest day is part of training too. Take a breather and come back ready to roll!",
-          "fun_fact": "In the last 30 days you've lifted about 5.6 concert grand pianos!",
+          "encouragement": "You\u2019ve shown up for 11 straight days and logged 5,940 pounds lifted\u2014that\u2019s about 1.2 full-size trees, which is some seriously sturdy work. You\u2019ve earned a rest day; recovery is part of training, and you can come back fresh after it.",
+          "fun_fact": "In the last 30 days you've lifted about 1.2 full-size trees!",
           "goal_status": "insufficient_data",
           "overtraining_flag": true,
           "rest_suggestion": "You've trained 11 days in a row. Your muscles get stronger while you rest, so take a rest day (or an easy walk) before your next session.",
@@ -326,11 +2236,15 @@
         "meta": {
           "agent_run_id": 3,
           "usage": {
-            "input_tokens": 3482,
-            "output_tokens": 155,
-            "cached_tokens": 1033,
+            "input_tokens": 4128,
+            "output_tokens": 158,
+            "cached_tokens": 0,
             "requests": 3,
-            "tool_calls": 3
+            "tool_calls": 3,
+            "gateway_cache_status": "partial",
+            "gateway_cache_hits": 1,
+            "fresh_input_tokens": 3621,
+            "fresh_output_tokens": 112
           },
           "tool_calls": [
             {
@@ -359,81 +2273,162 @@
       }
     },
     {
-      "agent": "Fitness Basics",
-      "request": "POST /api/basics/ask",
+      "agent": "Workout Reviewer",
+      "request": "POST /api/workouts/review",
       "body": {
-        "question": "How long should I rest between sets?"
+        "items": [
+          {
+            "exercise_id": "bird_dog",
+            "sets": 3,
+            "reps": "8",
+            "rest_seconds": 30
+          },
+          {
+            "exercise_id": "glute_bridge",
+            "sets": 3,
+            "reps": "12",
+            "rest_seconds": 45
+          },
+          {
+            "exercise_id": "dead_bug",
+            "sets": 2,
+            "reps": "10",
+            "rest_seconds": 30
+          }
+        ]
       },
       "status": 200,
-      "seconds": 4.7,
+      "seconds": 6.1,
       "response": {
         "result": {
-          "answer": "Our guide says rest about 1.5\u20133 minutes between sets for heavier strength work, 60\u201390 seconds for moderate work (8\u201315 reps), and 15\u201345 seconds for circuits or endurance work. This article is a placeholder pending expert review.",
-          "answered": true,
-          "redirected_to_professional": false,
-          "sources": [
+          "exercises": [
             {
-              "slug": "rest_between_sets",
-              "title": "How Long to Rest Between Sets",
-              "status": "placeholder",
-              "review_notice": "Content pending expert review",
-              "citations": []
+              "name": "Bird Dog",
+              "muscle_group": "back",
+              "force": "static",
+              "workout_groups": [
+                "mobility_core"
+              ]
+            },
+            {
+              "name": "Glute Bridge",
+              "muscle_group": "legs",
+              "force": "push",
+              "workout_groups": [
+                "lower"
+              ]
+            },
+            {
+              "name": "Dead Bug",
+              "muscle_group": "core",
+              "force": "pull",
+              "workout_groups": [
+                "mobility_core"
+              ]
             }
           ],
-          "review_note": "This comes from our Fitness Basics guide, which is still pending expert review."
+          "coverage": {
+            "groups_hit": [
+              {
+                "group": "lower",
+                "label": "Lower body",
+                "exercises": 1
+              },
+              {
+                "group": "mobility_core",
+                "label": "Mobility + core",
+                "exercises": 2
+              }
+            ],
+            "groups_missing": [
+              "cardio",
+              "upper"
+            ],
+            "suggestion": "This session doesn't include any cardio or upper-body work. Consider adding one of those next time.",
+            "upper_body_balance": {
+              "push": 0,
+              "pull": 0,
+              "static": 0,
+              "unclassified": 0,
+              "note": "No upper-body exercises, so there's no push/pull balance to check."
+            },
+            "notes": []
+          },
+          "estimate": {
+            "available": true,
+            "session_minutes": 10,
+            "per_session_kcal": {
+              "low": 40,
+              "high": 100
+            },
+            "sessions_per_week": 4,
+            "weekly_kcal": {
+              "low": 160,
+              "high": 400
+            },
+            "weight_change": {
+              "weeks": 4,
+              "pounds": {
+                "low": 0.1,
+                "high": 0.5
+              },
+              "label": "A rough, long-used approximation (3,500 calories per pound), not a precise prediction.",
+              "cdc_context": "For context, the CDC notes that people who lose weight at a gradual, steady pace of about 1 to 2 pounds a week are more likely to keep it off."
+            },
+            "method": {
+              "formula": "kcal = MET x body weight (kg) x hours, using about 1 kcal per kg per hour per MET",
+              "low": {
+                "met": 3.5,
+                "code": "02054",
+                "activity": "Resistance (weight) training, multiple exercises, 8-15 reps at varied resistance"
+              },
+              "high": {
+                "met": 7.5,
+                "code": "02020",
+                "activity": "Calisthenics (e.g., pushups, sit ups, pull-ups, jumping jacks, burpees), vigorous effort"
+              }
+            },
+            "caveats": [
+              "These are estimates from average MET values in the 2024 Adult Compendium of Physical Activities, which itself says its values don't reflect precise individual energy use.",
+              "Where you land depends on how hard you work: steady sets with full rests sit near the low end, vigorous work with little rest near the high end.",
+              "The pound figures use the 3,500-calories-per-pound rule of thumb: a rough, long-used approximation, not a precise prediction.",
+              "They count only the workout. Exercise on its own is usually a small piece of weight change compared with eating habits; sleep and stress play a part too."
+            ],
+            "sources": [
+              "compendium-physical-activities",
+              "cdc-losing-weight"
+            ]
+          },
+          "citations": [
+            {
+              "id": "compendium-physical-activities",
+              "name": "2024 Adult Compendium of Physical Activities (Herrmann SD et al., J Sport Health Sci 2024;13(1):6-12)",
+              "url": "https://pacompendium.com/conditioning-exercise/"
+            },
+            {
+              "id": "cdc-losing-weight",
+              "name": "CDC: Losing Weight",
+              "url": "https://www.cdc.gov/healthy-weight-growth/losing-weight/index.html"
+            }
+          ],
+          "summary": "This session covers Lower body and Mobility + core. It doesn\u2019t include cardio or upper-body work, so you could consider adding one next time. The estimate is roughly 40 to 100 calories per session, 160 to 400 calories weekly, and 0.1 to 0.5 pounds over 4 weeks. These are estimates, not precise predictions.",
+          "summary_by": "model"
         },
         "meta": {
           "agent_run_id": 4,
           "usage": {
-            "input_tokens": 1654,
-            "output_tokens": 111,
+            "input_tokens": 1134,
+            "output_tokens": 411,
             "cached_tokens": 0,
-            "requests": 2,
-            "tool_calls": 1
+            "requests": 1,
+            "tool_calls": 0,
+            "gateway_cache_status": "miss",
+            "gateway_cache_hits": 0,
+            "fresh_input_tokens": 1134,
+            "fresh_output_tokens": 411
           },
-          "tool_calls": [
-            {
-              "tool": "search_basics_kb",
-              "args": {
-                "query": "How long should I rest between sets?"
-              },
-              "called_by": "code"
-            },
-            {
-              "tool": "search_basics_kb",
-              "args": {
-                "query": "How long should I rest between sets?"
-              },
-              "called_by": "model"
-            }
-          ],
+          "tool_calls": [],
           "agent_called": true
-        }
-      }
-    },
-    {
-      "agent": "Fitness Basics (red flag)",
-      "request": "POST /api/basics/ask",
-      "body": {
-        "question": "I get a sharp pain in my lower back when I do glute bridges. Should I push through?"
-      },
-      "status": 200,
-      "seconds": 0.0,
-      "response": {
-        "result": {
-          "answer": "That sounds like something a professional should look at, so I'm not going to give exercise advice for it. Please stop any exercise that causes it and talk to a doctor or physical therapist. If it's severe or sudden, like chest pain, trouble breathing, or fainting, get medical help right away.",
-          "answered": false,
-          "redirected_to_professional": true,
-          "sources": [],
-          "review_note": null
-        },
-        "meta": {
-          "safety_event_id": 1,
-          "red_flags": [
-            "sharp/severe pain",
-            "pain in my"
-          ],
-          "agent_called": false
         }
       }
     }
@@ -443,67 +2438,74 @@
       "id": 1,
       "agent_name": "program_architect",
       "user_id": 1,
-      "input_tokens": 2568,
-      "output_tokens": 252,
+      "input_tokens": 601,
+      "output_tokens": 137,
       "cached_tokens": 0,
-      "requests": 3,
-      "tool_calls": 2,
+      "requests": 1,
+      "tool_calls": 0,
       "route": "POST /api/programs/recommend",
       "status": "ok",
-      "duration_ms": 7977,
-      "timestamp": "2026-10-22T12:39:04Z"
+      "duration_ms": 3426,
+      "timestamp": "2026-10-26T16:48:55Z"
     },
     {
       "id": 2,
       "agent_name": "workout_builder",
       "user_id": 1,
-      "input_tokens": 1732,
-      "output_tokens": 425,
+      "input_tokens": 2379,
+      "output_tokens": 418,
       "cached_tokens": 0,
       "requests": 2,
-      "tool_calls": 2,
+      "tool_calls": 3,
       "route": "POST /api/workouts/build",
       "status": "ok",
-      "duration_ms": 4134,
-      "timestamp": "2026-10-22T12:39:08Z"
+      "duration_ms": 9970,
+      "timestamp": "2026-10-26T16:49:05Z"
     },
     {
       "id": 3,
       "agent_name": "coach",
       "user_id": 1,
-      "input_tokens": 3482,
-      "output_tokens": 155,
-      "cached_tokens": 1033,
+      "input_tokens": 4128,
+      "output_tokens": 158,
+      "cached_tokens": 0,
       "requests": 3,
       "tool_calls": 3,
       "route": "GET /api/coach/summary",
       "status": "ok",
-      "duration_ms": 5937,
-      "timestamp": "2026-10-22T12:39:14Z"
+      "duration_ms": 5067,
+      "timestamp": "2026-10-26T16:49:11Z"
     },
     {
       "id": 4,
-      "agent_name": "basics",
+      "agent_name": "workout_reviewer",
       "user_id": 1,
-      "input_tokens": 1654,
-      "output_tokens": 111,
+      "input_tokens": 1134,
+      "output_tokens": 411,
       "cached_tokens": 0,
-      "requests": 2,
-      "tool_calls": 1,
-      "route": "POST /api/basics/ask",
+      "requests": 1,
+      "tool_calls": 0,
+      "route": "POST /api/workouts/review",
       "status": "ok",
-      "duration_ms": 4622,
-      "timestamp": "2026-10-22T12:39:18Z"
+      "duration_ms": 6060,
+      "timestamp": "2026-10-26T16:49:17Z"
     }
   ],
-  "safety_events": [
-    {
-      "id": 1,
-      "user_id": 1,
-      "timestamp": "2026-10-22T12:39:18Z",
-      "source": "basics_qa",
-      "trigger_text": "I get a sharp pain in my lower back when I do glute bridges. Should I push through?",
-      "action_taken": "redirected_to_professional"
-    }
-  ]
+  "safety_events": [],
+  "cleanup": {
+    "deleted": true,
+    "rows_removed": {
+      "safety_events": 0,
+      "measurements": 2,
+      "workout_logs": 22,
+      "calendar_entries": 28,
+      "cardio_logs": 0,
+      "built_workouts": 1,
+      "exercise_favorites": 0,
+      "quiz_profiles": 1,
+      "oauth_identities": 0,
+      "users": 1
+    },
+    "agent_runs_unlinked": 4
+  }
 }

@@ -86,7 +86,7 @@ def credentials(provider: str) -> tuple[str, str] | None:
 
 
 def public_base_url(request: Request) -> str:
-    """PUBLIC_BASE_URL (https://bee-fit.onrender.com in production); in development, the address the request came in on."""
+    """PUBLIC_BASE_URL (https://bee-fit-app.onrender.com in production); in development, the address the request came in on."""
     return (get_secret("PUBLIC_BASE_URL") or str(request.base_url)).rstrip("/")
 
 

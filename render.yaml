@@ -31,7 +31,7 @@ services:
       - key: DATABASE_URL     # required: the Neon connection string (postgresql://...?sslmode=require)
         sync: false
       - key: PUBLIC_BASE_URL  # not a secret: the service's public address; OAuth redirect URIs are built from it
-        value: https://bee-fit.onrender.com
+        value: https://bee-fit-app.onrender.com
       - key: GOOGLE_CLIENT_ID         # required for "Continue with Google" (the button is hidden without it)
         sync: false
       - key: GOOGLE_CLIENT_SECRET

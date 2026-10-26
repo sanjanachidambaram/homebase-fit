@@ -208,7 +208,7 @@ def test_render_yaml_is_free_with_no_disk_and_the_database_in_postgres():
     assert web["healthCheckPath"] == "/api/health"
     env = {e["key"]: e for e in web["envVars"]}
     assert "HOMEBASE_DB_PATH" not in env
-    assert env["PUBLIC_BASE_URL"] == {"key": "PUBLIC_BASE_URL", "value": "https://bee-fit.onrender.com"}
+    assert env["PUBLIC_BASE_URL"] == {"key": "PUBLIC_BASE_URL", "value": "https://bee-fit-app.onrender.com"}
     for secret in ("APP_ENV", "APP_SECRET_KEY", "PORTKEY_API_KEY", "DATABASE_URL", "GOOGLE_CLIENT_ID",
                    "GOOGLE_CLIENT_SECRET", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET"):
         assert env[secret] == {"key": secret, "sync": False}              # set in the dashboard, never here

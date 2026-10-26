@@ -33,3 +33,6 @@ content/exercise_review_export.xlsx
 
 # Portable PostgreSQL for the local test suite (downloaded by backend/scripts/get_test_postgres.py; never committed)
 backend/.pg/
+
+# A zip of screenshots/ made for sharing; the PNGs themselves are committed
+screenshots/*.zip

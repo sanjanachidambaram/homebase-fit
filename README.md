@@ -78,7 +78,7 @@ any `.env` file.
 | `DATABASE_URL` | **Required.** The Neon connection string. Without it the app won't start. |
 | `APP_ENV` | `production` |
 | `APP_SECRET_KEY` | **Required.** A long random string; signs sign-in tokens and the Google / Microsoft sign-in cookie. |
-| `PUBLIC_BASE_URL` | Set in `render.yaml` (`https://bee-fit.onrender.com`). The OAuth redirect addresses are built from it. |
+| `PUBLIC_BASE_URL` | Set in `render.yaml` (`https://bee-fit-app.onrender.com`). The OAuth redirect addresses are built from it. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | **Required for "Continue with Google"** (the button is hidden without them). |
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | **Required for "Continue with Microsoft"** (hidden without them). |
 | `PORTKEY_API_KEY` | The course Portkey key (blank = AI features off). Do **not** add `OPENAI_API_KEY`. |
@@ -105,14 +105,14 @@ new account.
    developer contact. Scopes: `openid`, `email`, `profile` (nothing else). Then **Publish app** (while it says
    *Testing*, only the test users you list can sign in).
 3. **APIs & Services → Credentials → Create credentials → OAuth client ID**: type **Web application**. Under
-   **Authorized redirect URIs** add exactly `https://bee-fit.onrender.com/api/auth/google/callback` (and, for local
+   **Authorized redirect URIs** add exactly `https://bee-fit-app.onrender.com/api/auth/google/callback` (and, for local
    testing, `http://localhost:8000/api/auth/google/callback`). **Create**, then copy the **Client ID** and **Client
    secret**.
 
 **3. Create the Microsoft sign-in app.**
 1. https://portal.azure.com → **Microsoft Entra ID → App registrations → New registration**. Name `Bee Fit`.
    Supported account types: **Accounts in any organizational directory and personal Microsoft accounts**. Redirect URI:
-   platform **Web**, `https://bee-fit.onrender.com/api/auth/microsoft/callback`. **Register**.
+   platform **Web**, `https://bee-fit-app.onrender.com/api/auth/microsoft/callback`. **Register**.
 2. Copy the **Application (client) ID** from the **Overview** page.
 3. **Certificates & secrets → New client secret** → copy its **Value** right away (it's shown once; note when it
    expires and make a new one before then).
@@ -125,7 +125,7 @@ new account.
    `python -c "import secrets; print(secrets.token_hex(32))"` and paste the output; if you're moving accounts from the
    old service, use **the same value it had**, so people stay signed in.
 3. **Apply.** The first build takes about 5 minutes. When the service says **Live**, check:
-   - `https://bee-fit.onrender.com/api/health` shows `"status":"ok"`, and the log shows
+   - `https://bee-fit-app.onrender.com/api/health` shows `"status":"ok"`, and the log shows
      `Database: schema up to date, content seeded.`
    - The sign-in form shows **Continue with Google** and **Continue with Microsoft**; both work, and so does a
      username / password account.
